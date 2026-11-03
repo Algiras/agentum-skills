@@ -1,0 +1,41 @@
+{
+  "name": "agentum-marketplace",
+  "owner": {
+    "name": "Agentum Network",
+    "email": "compliance@asimplek.cloud",
+    "url": "https://agentum.asimplek.cloud"
+  },
+  "metadata": {
+    "description": "Official Agentum EU & US Corporate Entity, EU VIES VAT & OFAC/EU/UN Sanctions Resolver Plugin Marketplace",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "agentum-entity-resolver",
+      "source": "./",
+      "description": "Deterministic EU & US Corporate Entity (GLEIF LEI, US SEC EDGAR CIK, Lithuania JAR), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Agentum Network",
+        "url": "https://agentum.asimplek.cloud"
+      },
+      "homepage": "https://agentum.asimplek.cloud",
+      "repository": "https://github.com/Algiras/agentum-skills",
+      "license": "MIT",
+      "keywords": [
+        "mcp",
+        "kyb",
+        "entity-resolution",
+        "eu-vat",
+        "vies",
+        "sanctions",
+        "ofac",
+        "gleif",
+        "sec-edgar",
+        "x402",
+        "mpp"
+      ],
+      "category": "compliance"
+    }
+  ]
+}

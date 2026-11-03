@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agentum": {
+      "type": "http",
+      "url": "https://agentum.asimplek.cloud/mcp"
+    }
+  }
+}

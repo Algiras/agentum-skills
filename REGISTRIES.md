@@ -24,6 +24,7 @@ This document tracks all platforms, AI assistant ecosystems, MCP directories, se
 | **Awesome MCP Servers** (`mcpservers.org`) | Web Form Submission | Category: `finance`<br>Remote: `https://agentum.asimplek.cloud/mcp` | **Submitted** | Submitted via Chrome session on `mcpservers.org/submit`. Confirmed with "Submission Successful! Review within 2 weeks". Email: `kras.algim@gmail.com`. |
 | **Glama.ai** | `glama.json` (Root) | `agentum-entity-resolver` | **Published** | Configured with MIT license, repository backlink, and categories: `compliance`, `financial-services`, `developer-tools`. Automated crawler indexing. |
 | **Smithery.ai** | `smithery.yaml` (Root) | `agentum-entity-resolver` | **Published** | Configured for direct non-proxied Streamable HTTP transport at `https://agentum.asimplek.cloud/mcp`. |
+| **NPM Global Registry** | `https://www.npmjs.com/package/agentum-mcp` | `agentum-mcp@0.1.0` | **Live & Published** | Published via automated GitHub Actions CI. Enables zero-config launch: `npx -y agentum-mcp` for Claude Desktop, Cursor, Zed, and Windsurf. |
 | **PulseMCP** (`pulsemcp.com`) | Official Registry Mirror | `io.github.algiras/agentum-entity-resolver` | **Auto-Synced via Registry** | Manual submissions paused by PulseMCP since Sept 2026. PulseMCP pulls directly from the Official MCP Registry `server.json`. |
 
 ---

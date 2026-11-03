@@ -3,6 +3,8 @@
   "maintainers": ["Algiras"],
   "name": "agentum-entity-resolver",
   "description": "Deterministic EU & US Corporate Entity (GLEIF LEI, US SEC EDGAR, Lithuania JAR), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+  "repository": "https://github.com/Algiras/agentum-skills",
+  "categories": ["compliance", "financial-services", "developer-tools"],
   "endpoints": [
     {
       "transport": "streamable-http",

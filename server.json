@@ -1,8 +1,13 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.algiras/agentum-entity-resolver",
-  "description": "EU & US Corporate Entity, EU VIES VAT & OFAC/EU/UN Sanctions Resolver with HTTP 402 (x402 + MPP)",
+  "description": "Deterministic EU & US Corporate Entity (GLEIF LEI, US SEC EDGAR, Lithuania JAR), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+  "status": "active",
   "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/Algiras/agentum-skills",
+    "source": "github"
+  },
   "remotes": [
     {
       "transport_type": "streamable-http",

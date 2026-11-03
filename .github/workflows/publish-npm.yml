@@ -1,0 +1,41 @@
+name: Publish agentum-mcp to NPM
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "NPM dist-tag (e.g. latest, beta)"
+        required: false
+        default: "latest"
+
+permissions:
+  contents: read
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Verify package tarball
+        working-directory: packages/agentum-mcp
+        run: |
+          echo "Verifying package tarball contents..."
+          npm pack --dry-run
+
+      - name: Publish to NPM
+        working-directory: packages/agentum-mcp
+        run: |
+          echo "Publishing agentum-mcp to https://registry.npmjs.org/..."
+          npm publish --access public --tag ${{ github.event.inputs.tag || 'latest' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

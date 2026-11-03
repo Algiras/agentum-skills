@@ -1,0 +1,49 @@
+name: CI & Validation
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Validate JSON & Manifest Syntax
+        run: |
+          bun -e '
+            const files = [
+              "server.json",
+              ".mcp/server.json",
+              "glama.json",
+              ".claude-plugin/plugin.json",
+              ".claude-plugin/marketplace.json",
+              ".cursor-plugin/plugin.json",
+              "gemini-extension.json",
+              "packages/agentum-mcp/package.json"
+            ];
+            for (const f of files) {
+              const content = require("fs").readFileSync(f, "utf8");
+              JSON.parse(content);
+              console.log("✓ Validated JSON:", f);
+            }
+          '
+
+      - name: Test agentum-mcp CLI binary
+        run: |
+          node packages/agentum-mcp/bin/agentum-mcp.js --version
+          node packages/agentum-mcp/bin/agentum-mcp.js --help
+
+      - name: Test Vendor Onboarding Cookbook
+        run: |
+          bun run examples/vendor-onboarding-agent.ts

@@ -9,9 +9,9 @@
   2. **Stripe + Tempo MPP (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Settles Tempo stablecoins and Stripe Shared Payment Tokens.
 
 ## Machine Discovery Endpoints
-- OpenAPI 3.1 Spec: https://agentum-api-staging.up.railway.app/openapi.json
-- MCP Manifest: https://agentum-api-staging.up.railway.app/.well-known/mcp.json
-- Streamable HTTP MCP Server: https://agentum-api-staging.up.railway.app/mcp
+- OpenAPI 3.1 Spec: https://agentum.up.railway.app/openapi.json
+- MCP Manifest: https://agentum.up.railway.app/.well-known/mcp.json
+- Streamable HTTP MCP Server: https://agentum.up.railway.app/mcp
 
 ## Available Tools
 - `POST /v1/entity/resolve` (MCP: `resolve_entity`, $0.005/call): Resolve legal entity by identifier or name — Resolves companies and organizations across global registers (GLEIF, EU VAT, SEC EDGAR, State Registrars) with optional sanctions screening and live VAT verification.

@@ -6,7 +6,7 @@
   "remotes": [
     {
       "transport_type": "streamable-http",
-      "url": "https://agentum-api-staging.up.railway.app/mcp"
+      "url": "https://agentum.up.railway.app/mcp"
     }
   ]
 }

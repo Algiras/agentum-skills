@@ -27,7 +27,7 @@ Or in `.mcp.json` / `claude_desktop_config.json`:
 
 ### 2. Agent Skills CLI (`skills.sh`)
 ```bash
-npx skills add agentum/agentum-skills
+npx skills add Algiras/agentum-skills
 ```
 
 ---

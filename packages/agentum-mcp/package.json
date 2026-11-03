@@ -1,0 +1,46 @@
+{
+  "name": "agentum-mcp",
+  "version": "0.1.0",
+  "description": "Zero-config stdio MCP bridge for Agentum EU/US corporate entity, EU VIES VAT, and OFAC/EU/UN sanctions resolver.",
+  "main": "bin/agentum-mcp.js",
+  "bin": {
+    "agentum-mcp": "./bin/agentum-mcp.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude",
+    "claude-desktop",
+    "cursor",
+    "zed",
+    "windsurf",
+    "agentum",
+    "entity-resolution",
+    "lei",
+    "sec-edgar",
+    "vies-vat",
+    "sanctions",
+    "ofac",
+    "x402",
+    "mpp"
+  ],
+  "author": "Algimantas Krasauskas / Agentum Network <compliance@asimplek.cloud>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Algiras/agentum-skills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Algiras/agentum-skills/issues"
+  },
+  "homepage": "https://agentum.asimplek.cloud"
+}

@@ -1,0 +1,7 @@
+# Smithery.ai MCP Server Configuration
+startCommand:
+  type: http
+  url: https://agentum.asimplek.cloud/mcp
+  configSchema:
+    type: object
+    properties: {}

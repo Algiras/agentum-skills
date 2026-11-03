@@ -1,0 +1,21 @@
+{
+  "name": "Agentum Compliance & Entity Resolver Agent",
+  "description": "Deterministic EU & US corporate entity resolution (GLEIF LEI, US SEC EDGAR CIK, Lithuania JAR), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening.",
+  "url": "https://agentum.asimplek.cloud",
+  "mcpUrl": "https://agentum.asimplek.cloud/mcp",
+  "version": "0.1.0",
+  "provider": {
+    "organization": "Agentum Network",
+    "url": "https://github.com/Algiras/agentum-skills"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "authentication": {
+    "schemes": ["none", "x402", "Payment"],
+    "freeTierCallsPerDay": 10
+  },
+  "defaultInputModes": ["application/json", "text/plain"],
+  "defaultOutputModes": ["application/json"]
+}

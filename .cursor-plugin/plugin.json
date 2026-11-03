@@ -6,7 +6,7 @@
   "mcpServers": {
     "agentum": {
       "type": "http",
-      "url": "https://agentum.up.railway.app/mcp"
+      "url": "https://agentum.asimplek.cloud/mcp"
     }
   }
 }

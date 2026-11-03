@@ -10,7 +10,7 @@
 Add the remote Streamable HTTP MCP server directly — no API keys or local installation required:
 
 ```bash
-claude mcp add --transport http agentum https://agentum.up.railway.app/mcp
+claude mcp add --transport http agentum https://agentum.asimplek.cloud/mcp
 ```
 
 Or in `.mcp.json` / `claude_desktop_config.json`:
@@ -19,7 +19,7 @@ Or in `.mcp.json` / `claude_desktop_config.json`:
   "mcpServers": {
     "agentum": {
       "type": "http",
-      "url": "https://agentum.up.railway.app/mcp"
+      "url": "https://agentum.asimplek.cloud/mcp"
     }
   }
 }
@@ -36,11 +36,11 @@ npx skills add agentum/agentum-skills
 
 | Resource | URL |
 | :--- | :--- |
-| **Streamable HTTP MCP** | `https://agentum.up.railway.app/mcp` |
-| **MCP Discovery** | `https://agentum.up.railway.app/.well-known/mcp.json` |
-| **OpenAPI 3.1 Spec** | `https://agentum.up.railway.app/openapi.json` |
-| **LLM Discovery (`llms.txt`)** | `https://agentum.up.railway.app/llms.txt` |
-| **Health & Feature Status** | `https://agentum.up.railway.app/health` |
+| **Streamable HTTP MCP** | `https://agentum.asimplek.cloud/mcp` |
+| **MCP Discovery** | `https://agentum.asimplek.cloud/.well-known/mcp.json` |
+| **OpenAPI 3.1 Spec** | `https://agentum.asimplek.cloud/openapi.json` |
+| **LLM Discovery (`llms.txt`)** | `https://agentum.asimplek.cloud/llms.txt` |
+| **Health & Feature Status** | `https://agentum.asimplek.cloud/health` |
 
 ---
 

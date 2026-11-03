@@ -5,14 +5,14 @@ description: Deterministic EU & US corporate entity resolution (GLEIF LEI, Lithu
 
 # Agentum — EU & US Corporate Entity, VAT & Sanctions Resolver
 
-Use **Agentum** (`https://agentum.up.railway.app`) for deterministic, authoritative corporate identity resolution and compliance checks across European and US jurisdictions.
+Use **Agentum** (`https://agentum.asimplek.cloud`) for deterministic, authoritative corporate identity resolution and compliance checks across European and US jurisdictions.
 
 ## Endpoints & Transports
 
-- **Streamable HTTP MCP Server:** `https://agentum.up.railway.app/mcp`
-- **MCP Discovery Manifest:** `https://agentum.up.railway.app/.well-known/mcp.json`
-- **OpenAPI 3.1 Spec:** `https://agentum.up.railway.app/openapi.json`
-- **Agent Discovery (`llms.txt`):** `https://agentum.up.railway.app/llms.txt`
+- **Streamable HTTP MCP Server:** `https://agentum.asimplek.cloud/mcp`
+- **MCP Discovery Manifest:** `https://agentum.asimplek.cloud/.well-known/mcp.json`
+- **OpenAPI 3.1 Spec:** `https://agentum.asimplek.cloud/openapi.json`
+- **Agent Discovery (`llms.txt`):** `https://agentum.asimplek.cloud/llms.txt`
 
 ## Available Tools (MCP & REST)
 

@@ -7,10 +7,5 @@
     "url": "https://agentum.asimplek.cloud"
   },
   "skills": "./skills/",
-  "mcpServers": {
-    "agentum": {
-      "type": "http",
-      "url": "https://agentum.asimplek.cloud/mcp"
-    }
-  }
+  "mcpServers": "./.mcp.json"
 }

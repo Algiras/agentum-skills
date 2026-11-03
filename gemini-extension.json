@@ -1,0 +1,11 @@
+{
+  "name": "agentum-entity-resolver",
+  "version": "0.1.0",
+  "description": "Deterministic EU & US Corporate Entity (GLEIF LEI, US SEC EDGAR CIK, Lithuania JAR), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "agentum": {
+      "httpUrl": "https://agentum.asimplek.cloud/mcp"
+    }
+  }
+}

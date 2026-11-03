@@ -1,0 +1,19 @@
+# Agentum — EU & US Entity & Compliance Resolver for AI Agents
+
+> Deterministic EU & US company registration resolution (GLEIF LEI, Lithuania Registrų centras JAR, US SEC EDGAR CIK/EIN), live EU Commission VIES VAT validation, and OFAC/EU sanctions screening.
+
+## Access & Pricing
+- **Free Tier:** 5 free calls/day per agent (`X-Agent-Id` or IP) — zero signup or API keys required.
+- **Inline HTTP 402 Micropayments:**
+  1. **x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on `eip155:84532` to `0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e`.
+  2. **Stripe + Tempo MPP (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Settles Tempo stablecoins and Stripe Shared Payment Tokens.
+
+## Machine Discovery Endpoints
+- OpenAPI 3.1 Spec: https://agentum-api-staging.up.railway.app/openapi.json
+- MCP Manifest: https://agentum-api-staging.up.railway.app/.well-known/mcp.json
+- Streamable HTTP MCP Server: https://agentum-api-staging.up.railway.app/mcp
+
+## Available Tools
+- `POST /v1/entity/resolve` (MCP: `resolve_entity`, $0.005/call): Resolve legal entity by identifier or name — Resolves companies and organizations across global registers (GLEIF, EU VAT, SEC EDGAR, State Registrars) with optional sanctions screening and live VAT verification.
+- `POST /v1/entity/vat-verify` (MCP: `verify_eu_vat`, $0.005/call): Verify EU VAT registration status via VIES — Validates European Union VAT identification numbers against the live official EU VIES system, linking against known company profiles.
+- `POST /v1/entity/sanctions-screen` (MCP: `screen_sanctions`, $0.005/call): Screen entity or individual against global sanctions lists — Performs fuzzy and exact sanctions screening against OFAC SDN and EU Financial Sanctions with configurable similarity thresholds.

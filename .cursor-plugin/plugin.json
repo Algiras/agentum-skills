@@ -1,0 +1,12 @@
+{
+  "name": "agentum-entity-resolver",
+  "version": "0.1.0",
+  "description": "Deterministic EU & US Corporate Entity, EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with x402 v2 and Stripe/Tempo MPP micropayments.",
+  "skills": ["./skills/entity-compliance-resolver/SKILL.md"],
+  "mcpServers": {
+    "agentum": {
+      "type": "http",
+      "url": "https://agentum-api-staging.up.railway.app/mcp"
+    }
+  }
+}

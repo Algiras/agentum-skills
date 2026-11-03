@@ -1,0 +1,12 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.agentum/entity-resolver",
+  "description": "EU & US Corporate Entity, EU VIES VAT & OFAC/EU/UN Sanctions Resolver with HTTP 402 (x402 + MPP)",
+  "version": "0.1.0",
+  "remotes": [
+    {
+      "transport_type": "streamable-http",
+      "url": "https://agentum-api-staging.up.railway.app/mcp"
+    }
+  ]
+}

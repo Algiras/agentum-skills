@@ -15307,7 +15307,7 @@ class HybridPostgresEntityRepositoryAdapter {
               OR regexp_replace(upper(registration_number), '[^A-Z0-9]', '', 'g') = ${normalized}
               OR regexp_replace(upper(tax_id), '[^A-Z0-9]', '', 'g') = ${normalized}
               OR cik = ${query.type === "US_CIK" ? query.cleanedValue : cleanVal}
-              OR domains @> ${JSON.stringify([domain])}::jsonb)
+              OR domains @> ${JSON.stringify([domain])}::text::jsonb)
         `;
         const candidates = rows.map(mapRowToEntity);
         const matching = await new InMemoryEntityRepositoryAdapter(candidates).findByIdentifier(type, value, jurisdiction);
@@ -15400,7 +15400,7 @@ class HybridPostgresEntityRepositoryAdapter {
               r.tickers, r.legal_form, r.status, r.incorporation_date, r.legal_address,
               r.headquarters_address, r.parent_lei, r.ultimate_parent_lei, r.domains,
               r.aliases, r.sources, NOW()
-            FROM jsonb_to_recordset(${JSON.stringify(chunk)}::jsonb) AS r(
+            FROM jsonb_to_recordset(${JSON.stringify(chunk)}::text::jsonb) AS r(
               id text,
               canonical_name text,
               normalized_name text,
@@ -15427,7 +15427,7 @@ class HybridPostgresEntityRepositoryAdapter {
               aliases text,
               sources jsonb
             )
-            ON CONFLICT (primary_id_type, primary_id_value) DO UPDATE SET
+            ON CONFLICT (jurisdiction, primary_id_type, primary_id_value) DO UPDATE SET
               canonical_name = EXCLUDED.canonical_name,
               normalized_name = EXCLUDED.normalized_name,
               lei = COALESCE(EXCLUDED.lei, entities.lei),
@@ -15444,7 +15444,11 @@ class HybridPostgresEntityRepositoryAdapter {
               updated_at = NOW()
           `;
         }
-      } catch {}
+      } catch (error) {
+        throw error;
+      }
+    } else if (this.databaseUrl) {
+      throw new Error("Cannot persist entities: PostgreSQL unavailable");
     }
     return memCount;
   }
@@ -15511,6 +15515,7 @@ var sanctionsEntriesTable = {
     "updated_at"
   ],
   createSql: `
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
     CREATE TABLE IF NOT EXISTS sanctions_entries (
       id TEXT PRIMARY KEY,
       list_source VARCHAR(32) NOT NULL,
@@ -15621,10 +15626,17 @@ function assessCoverage(totalRecords, statuses, minRecords = 100, maxAgeMs = 168
     feeds: Object.fromEntries(statuses)
   };
 }
+function validateSnapshot(source, entries, previous, minRecords = 100) {
+  if (entries.length < minRecords || previous >= 10 && entries.length < previous * 0.8)
+    throw new Error("Sanctions snapshot is too small compared with the last published snapshot");
+  if (entries.some((entry) => entry.listSource !== source || !entry.externalId || !entry.primaryName) || new Set(entries.map((entry) => entry.externalId)).size !== entries.length)
+    throw new Error("Invalid or duplicate sanctions snapshot entries");
+}
 
 class InMemorySanctionsRepositoryAdapter {
   entries = new Map;
   feedStatus = new Map;
+  attempts = new Map;
   minRecords;
   maxAgeMs;
   lastRefreshedAt = null;
@@ -15707,6 +15719,27 @@ class InMemorySanctionsRepositoryAdapter {
     }
     return count;
   }
+  async beginFeedAttempt(source) {
+    const token = crypto.randomUUID();
+    this.attempts.set(source, token);
+    return token;
+  }
+  async failFeedAttempt(source, attempt, error) {
+    if (this.attempts.get(source) === attempt)
+      await this.recordFeedSync({ source, recordCount: 0, lastRefreshedAt: null, status: "FAILED", error });
+  }
+  async replaceFeedSnapshot(source, entries, refreshedAt, attempt) {
+    if (attempt && this.attempts.get(source) !== attempt)
+      throw new Error("Superseded sanctions feed attempt");
+    const previous = [...this.entries.values()].filter((entry) => entry.listSource === source).length;
+    validateSnapshot(source, entries, previous, this.minRecords);
+    for (const [key, entry] of this.entries)
+      if (entry.listSource === source)
+        this.entries.delete(key);
+    for (const entry of entries)
+      this.entries.set(`${source}:${entry.externalId}`, { ...entry });
+    await this.recordFeedSync({ source, recordCount: entries.length, lastRefreshedAt: refreshedAt, status: "OK" });
+  }
   async count() {
     return this.entries.size;
   }
@@ -15714,11 +15747,16 @@ class InMemorySanctionsRepositoryAdapter {
 
 class HybridPostgresSanctionsRepositoryAdapter {
   databaseUrl;
-  fallback = new InMemorySanctionsRepositoryAdapter;
+  minRecords;
+  fallback;
   sql = null;
   initPromise = null;
-  constructor(databaseUrl) {
+  constructor(databaseUrl, minRecords = 100) {
     this.databaseUrl = databaseUrl;
+    this.minRecords = minRecords;
+    this.fallback = new InMemorySanctionsRepositoryAdapter(SEED_SANCTIONS, {
+      minRecords
+    });
   }
   async ensureDb() {
     if (!this.databaseUrl)
@@ -15727,21 +15765,31 @@ class HybridPostgresSanctionsRepositoryAdapter {
       return this.sql;
     if (!this.initPromise) {
       this.initPromise = (async () => {
+        let db;
         try {
           const SqlCtor = globalThis.Bun?.SQL;
           if (!SqlCtor)
             return;
-          const db = new SqlCtor(this.databaseUrl);
+          db = new SqlCtor(this.databaseUrl);
+          try {
+            await db.unsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
+          } catch (extErr) {
+            console.warn("[sanctions:db] pg_trgm extension creation skipped/failed:", extErr);
+          }
           await db.unsafe(sanctionsEntriesTable.createSql);
           await db.unsafe(syncRunsTable.createSql);
           this.sql = db;
         } catch (err) {
           console.error("[sanctions:db] ensureDb failed:", err);
+          if (db)
+            await db.close().catch(() => {});
           this.sql = null;
         }
       })();
     }
     await this.initPromise;
+    if (!this.sql)
+      this.initPromise = null;
     return this.sql;
   }
   async recordFeedSync(status) {
@@ -15877,23 +15925,26 @@ class HybridPostgresSanctionsRepositoryAdapter {
     const db = await this.ensureDb();
     if (!db)
       throw new Error("Cannot persist sanctions data: PostgreSQL unavailable");
-    try {
-      const BATCH_SIZE = 500;
-      for (let i = 0;i < entries.length; i += BATCH_SIZE) {
-        const chunk = entries.slice(i, i + BATCH_SIZE).map((entry) => ({
-          id: `${entry.listSource}:${entry.externalId}`,
-          list_source: entry.listSource,
-          external_id: entry.externalId,
-          entity_type: entry.entityType,
-          primary_name: entry.primaryName,
-          normalized_name: normalizeCompanyName(entry.primaryName).normalizedName || entry.primaryName.toUpperCase(),
-          aliases: entry.aliases.map((a) => normalizeCompanyName(a).normalizedName).filter(Boolean).join(" | "),
-          countries: entry.countries,
-          programs: entry.programs,
-          identifiers: entry.identifiers,
-          remarks: entry.remarks ?? null
-        }));
-        await db`
+    await this.writeEntries(db, entries);
+    return entries.length;
+  }
+  async writeEntries(db, entries) {
+    const BATCH_SIZE = 500;
+    for (let i = 0;i < entries.length; i += BATCH_SIZE) {
+      const chunk = entries.slice(i, i + BATCH_SIZE).map((entry) => ({
+        id: `${entry.listSource}:${entry.externalId}`,
+        list_source: entry.listSource,
+        external_id: entry.externalId,
+        entity_type: entry.entityType,
+        primary_name: entry.primaryName,
+        normalized_name: normalizeCompanyName(entry.primaryName).normalizedName || entry.primaryName.toUpperCase(),
+        aliases: entry.aliases.map((a) => normalizeCompanyName(a).normalizedName).filter(Boolean).join(" | "),
+        countries: entry.countries,
+        programs: entry.programs,
+        identifiers: entry.identifiers,
+        remarks: entry.remarks ?? null
+      }));
+      await db`
           INSERT INTO sanctions_entries (
             id, list_source, external_id, entity_type, primary_name,
             normalized_name, aliases, countries, programs, identifiers, remarks, updated_at
@@ -15901,7 +15952,7 @@ class HybridPostgresSanctionsRepositoryAdapter {
           SELECT
             r.id, r.list_source, r.external_id, r.entity_type, r.primary_name,
             r.normalized_name, r.aliases, r.countries, r.programs, r.identifiers, r.remarks, NOW()
-          FROM jsonb_to_recordset(${JSON.stringify(chunk)}::jsonb) AS r(
+          FROM jsonb_to_recordset(${JSON.stringify(chunk)}::text::jsonb) AS r(
             id text,
             list_source text,
             external_id text,
@@ -15924,11 +15975,62 @@ class HybridPostgresSanctionsRepositoryAdapter {
             remarks = EXCLUDED.remarks,
             updated_at = NOW()
         `;
-      }
-    } catch (error) {
-      throw error;
     }
-    return entries.length;
+  }
+  async beginFeedAttempt(source) {
+    if (!this.databaseUrl)
+      return this.fallback.beginFeedAttempt(source);
+    const db = await this.ensureDb();
+    if (!db)
+      throw new Error("Cannot begin sanctions feed attempt: PostgreSQL unavailable");
+    const token = crypto.randomUUID();
+    await db.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${`sanctions-feed:${source}`}))`;
+      await tx`INSERT INTO sync_runs (id, dataset, status, error_message) VALUES (${`sanctions-attempt:${source}`}, ${source}, 'RUNNING', ${token})
+        ON CONFLICT (id) DO UPDATE SET status = 'RUNNING', error_message = EXCLUDED.error_message`;
+    });
+    return token;
+  }
+  async failFeedAttempt(source, attempt, error) {
+    if (!this.databaseUrl)
+      return this.fallback.failFeedAttempt(source, attempt, error);
+    const db = await this.ensureDb();
+    if (!db)
+      throw new Error("Cannot record sanctions feed failure: PostgreSQL unavailable");
+    await db.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${`sanctions-feed:${source}`}))`;
+      const current = await tx`SELECT error_message FROM sync_runs WHERE id = ${`sanctions-attempt:${source}`}`;
+      if (current[0]?.error_message !== attempt)
+        return;
+      await tx`INSERT INTO sync_runs (id, dataset, status, rows_upserted, finished_at, error_message)
+        VALUES (${`sanctions-feed:${source}`}, ${source}, 'FAILED', 0, NULL, ${error})
+        ON CONFLICT (id) DO UPDATE SET status = 'FAILED', rows_upserted = 0, finished_at = NULL, error_message = EXCLUDED.error_message`;
+    });
+  }
+  async replaceFeedSnapshot(source, entries, refreshedAt, attempt) {
+    if (!this.databaseUrl)
+      return this.fallback.replaceFeedSnapshot(source, entries, refreshedAt, attempt);
+    const db = await this.ensureDb();
+    if (!db)
+      throw new Error("Cannot persist sanctions data: PostgreSQL unavailable");
+    await db.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${`sanctions-feed:${source}`}))`;
+      if (attempt) {
+        const current = await tx`SELECT error_message FROM sync_runs WHERE id = ${`sanctions-attempt:${source}`}`;
+        if (current[0]?.error_message !== attempt)
+          throw new Error("Superseded sanctions feed attempt");
+      }
+      const rows = await tx`SELECT COUNT(*)::int AS cnt FROM sanctions_entries WHERE list_source = ${source}`;
+      validateSnapshot(source, entries, Number(rows[0]?.cnt ?? 0), this.minRecords);
+      await tx`DELETE FROM sanctions_entries WHERE list_source = ${source}`;
+      await this.writeEntries(tx, entries);
+      await tx`
+        INSERT INTO sync_runs (id, dataset, status, rows_upserted, finished_at, error_message)
+        VALUES (${`sanctions-feed:${source}`}, ${source}, 'OK', ${entries.length}, ${refreshedAt}, NULL)
+        ON CONFLICT (id) DO UPDATE SET status = 'OK', rows_upserted = EXCLUDED.rows_upserted,
+          finished_at = EXCLUDED.finished_at, error_message = NULL
+      `;
+    });
   }
   async count() {
     const db = await this.ensureDb();
@@ -15960,6 +16062,7 @@ function parseCsvRows(csvText) {
   let currentRow = [];
   let currentField = "";
   let inQuotes = false;
+  let quoteClosed = false;
   const len = text.length;
   for (let i = 0;i < len; i++) {
     const ch = text[i];
@@ -15970,17 +16073,25 @@ function parseCsvRows(csvText) {
           i++;
         } else {
           inQuotes = false;
+          quoteClosed = true;
         }
       } else {
         currentField += ch;
       }
     } else {
+      if (quoteClosed && ch !== "," && ch !== "\r" && ch !== `
+` && ch !== " " && ch !== "\t")
+        throw new Error("Invalid CSV after closing quote");
       if (ch === '"') {
+        if (quoteClosed || currentField.trim())
+          throw new Error("Invalid quote in CSV field");
         inQuotes = true;
       } else if (ch === ",") {
+        quoteClosed = false;
         currentRow.push(currentField.trim());
         currentField = "";
       } else if (ch === "\r") {
+        quoteClosed = false;
         if (i + 1 < len && text[i + 1] === `
 `)
           i++;
@@ -15992,6 +16103,7 @@ function parseCsvRows(csvText) {
         currentRow = [];
       } else if (ch === `
 `) {
+        quoteClosed = false;
         currentRow.push(currentField.trim());
         currentField = "";
         if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
@@ -16009,6 +16121,8 @@ function parseCsvRows(csvText) {
       rows.push(currentRow);
     }
   }
+  if (inQuotes)
+    throw new Error("Unterminated quoted CSV field");
   return rows;
 }
 function parseOfacSdnCsv(csvText) {
@@ -16191,23 +16305,113 @@ function parseLithuaniaJarBulkJson(payload) {
   }
   return entities;
 }
+function validateFeedCsv(csv, source) {
+  const rows = parseCsvRows(csv);
+  if (source === "OFAC_SDN") {
+    if (!rows.length || rows.some((row) => row.length !== 12 || !/^\d+$/.test(row[0]) || !row[1] || row[1] === "-0-"))
+      throw new Error("Invalid OFAC CSV records");
+    return;
+  }
+  const header = rows[0]?.map((value) => value.toLowerCase()) ?? [];
+  const required = ["id", "schema", "name", "aliases", "countries", "identifiers", "sanctions"];
+  if (new Set(header).size !== header.length || required.some((name) => !header.includes(name)))
+    throw new Error("Invalid sanctions CSV headers");
+  const id = header.indexOf("id"), name = header.indexOf("name");
+  if (rows.length < 2 || rows.slice(1).some((row) => row.length !== header.length || !row[id] || !row[name]))
+    throw new Error("Invalid sanctions CSV records");
+}
 
 class DatasetIngestWorkerAdapter {
   deps;
   fetchImpl;
   feedUrls;
   secUserAgent;
+  activeSync = null;
   constructor(deps) {
     this.deps = deps;
     this.fetchImpl = deps.fetchImpl ?? fetch;
     this.feedUrls = { ...DEFAULT_BULK_FEED_URLS, ...deps.feedUrls };
     this.secUserAgent = deps.secUserAgent ?? "Agentum/1.0 (algimantask@wix.com)";
   }
-  async runSync(sources = ["seed_eu_us", "ofac_eu_sanctions"]) {
+  async beginFeedAttempt(source) {
+    if (!this.deps.sanctionsRepo.beginFeedAttempt || !this.deps.sanctionsRepo.failFeedAttempt)
+      throw new Error("Sanctions repository cannot coordinate feed attempts");
+    return this.deps.sanctionsRepo.beginFeedAttempt(source);
+  }
+  async publishSnapshot(source, entries, refreshedAt, attempt) {
+    if (!this.deps.sanctionsRepo.replaceFeedSnapshot)
+      throw new Error("Sanctions repository cannot publish atomic snapshots");
+    await this.deps.sanctionsRepo.replaceFeedSnapshot(source, entries, refreshedAt, attempt);
+  }
+  async fetchBody(url, format, init) {
+    let lastError;
+    for (let attempt = 0;attempt < 2; attempt++) {
+      const controller = new AbortController;
+      let timer;
+      try {
+        return await Promise.race([
+          (async () => {
+            const response = await this.fetchImpl(url, { ...init, signal: controller.signal });
+            if (!response.ok)
+              throw new Error(`HTTP ${response.status}`);
+            const reader = response.body?.getReader();
+            if (!reader)
+              throw new Error("Feed response has no body");
+            const limit = this.deps.maxFeedBytes ?? 100 * 1024 * 1024;
+            const chunks = [];
+            let bytes = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done)
+                break;
+              bytes += value.byteLength;
+              if (bytes > limit) {
+                controller.abort();
+                reader.cancel().catch(() => {});
+                throw new Error("Feed response exceeds size limit");
+              }
+              chunks.push(value);
+            }
+            const decoded = new TextDecoder().decode(Buffer.concat(chunks));
+            return format === "text" ? decoded : JSON.parse(decoded);
+          })(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              controller.abort();
+              reject(new Error("Feed request timed out"));
+            }, this.deps.requestTimeoutMs ?? 30000);
+          })
+        ]);
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0)
+          await new Promise((resolve) => setTimeout(resolve, 100));
+      } finally {
+        if (timer)
+          clearTimeout(timer);
+      }
+    }
+    throw lastError;
+  }
+  runSync(sources = ["seed_eu_us", "ofac_eu_sanctions"]) {
+    const key = JSON.stringify([...sources].sort());
+    if (this.activeSync) {
+      if (this.activeSync.key !== key)
+        return Promise.reject(new Error("Another sync is already running"));
+      return this.activeSync.promise;
+    }
+    const promise = this.performSync(sources).finally(() => {
+      this.activeSync = null;
+    });
+    this.activeSync = { key, promise };
+    return promise;
+  }
+  async performSync(sources = ["seed_eu_us", "ofac_eu_sanctions"]) {
     const started = Date.now();
     const sourceDetails = {};
     await this.deps.entityRepo.upsertMany(SEED_ENTITIES);
-    await this.deps.sanctionsRepo.upsertMany(SEED_SANCTIONS);
+    if (sources.includes("ofac_eu_sanctions") && !sources.includes("all") && await this.deps.sanctionsRepo.count() < 100)
+      await this.deps.sanctionsRepo.upsertMany(SEED_SANCTIONS);
     const expandedSources = sources.includes("all") ? [
       "seed_eu_us",
       "ofac_eu_sanctions",
@@ -16239,29 +16443,18 @@ class DatasetIngestWorkerAdapter {
         continue;
       }
       if (src === "ofac_sdn_live") {
+        let attempt;
         try {
-          const res = await this.fetchImpl(this.feedUrls.ofacSdnCsvUrl);
-          if (!res.ok)
-            throw new Error(`HTTP ${res.status}`);
-          const csv = await res.text();
+          attempt = await this.beginFeedAttempt("OFAC_SDN");
+          const csv = await this.fetchBody(this.feedUrls.ofacSdnCsvUrl, "text");
+          validateFeedCsv(csv, "OFAC_SDN");
           const parsed = parseOfacSdnCsv(csv);
-          await this.deps.sanctionsRepo.upsertMany(parsed);
-          await this.deps.sanctionsRepo.recordFeedSync?.({
-            source: "OFAC_SDN",
-            recordCount: parsed.length,
-            lastRefreshedAt: new Date().toISOString(),
-            status: parsed.length >= 100 ? "OK" : "DEGRADED"
-          });
+          await this.publishSnapshot("OFAC_SDN", parsed, new Date().toISOString(), attempt);
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
-          await this.deps.sanctionsRepo.recordFeedSync?.({
-            source: "OFAC_SDN",
-            recordCount: 0,
-            lastRefreshedAt: null,
-            status: "FAILED",
-            error: errMsg
-          });
+          if (attempt)
+            await this.deps.sanctionsRepo.failFeedAttempt("OFAC_SDN", attempt, errMsg);
           sourceDetails[src] = {
             status: "skipped_or_offline",
             recordsLoaded: 0,
@@ -16273,29 +16466,18 @@ class DatasetIngestWorkerAdapter {
       if (src === "eu_fsf_live" || src === "un_sc_live") {
         const listSource = src === "eu_fsf_live" ? "EU_FSF" : "UN_SC";
         const url = src === "eu_fsf_live" ? this.feedUrls.euFsfSimpleCsvUrl : this.feedUrls.unScSimpleCsvUrl;
+        let attempt;
         try {
-          const res = await this.fetchImpl(url);
-          if (!res.ok)
-            throw new Error(`HTTP ${res.status}`);
-          const csv = await res.text();
+          attempt = await this.beginFeedAttempt(listSource);
+          const csv = await this.fetchBody(url, "text");
+          validateFeedCsv(csv, listSource);
           const parsed = parseOpenSanctionsSimpleCsv(csv, listSource);
-          await this.deps.sanctionsRepo.upsertMany(parsed);
-          await this.deps.sanctionsRepo.recordFeedSync?.({
-            source: listSource,
-            recordCount: parsed.length,
-            lastRefreshedAt: new Date().toISOString(),
-            status: parsed.length >= 100 ? "OK" : "DEGRADED"
-          });
+          await this.publishSnapshot(listSource, parsed, new Date().toISOString(), attempt);
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
-          await this.deps.sanctionsRepo.recordFeedSync?.({
-            source: listSource,
-            recordCount: 0,
-            lastRefreshedAt: null,
-            status: "FAILED",
-            error: errMsg
-          });
+          if (attempt)
+            await this.deps.sanctionsRepo.failFeedAttempt(listSource, attempt, errMsg);
           sourceDetails[src] = {
             status: "skipped_or_offline",
             recordsLoaded: 0,
@@ -16306,16 +16488,14 @@ class DatasetIngestWorkerAdapter {
       }
       if (src === "sec_edgar_bulk") {
         try {
-          const res = await this.fetchImpl(this.feedUrls.secCompanyTickersUrl, {
+          const json = await this.fetchBody(this.feedUrls.secCompanyTickersUrl, "json", {
             headers: {
               "User-Agent": this.secUserAgent,
               Accept: "application/json"
             }
           });
-          if (!res.ok)
-            throw new Error(`HTTP ${res.status}`);
-          const json = await res.json();
-          const parsed = parseSecCompanyTickersJson(json);
+          const payload = json;
+          const parsed = parseSecCompanyTickersJson(payload);
           await this.deps.entityRepo.upsertMany(parsed);
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
@@ -16329,13 +16509,11 @@ class DatasetIngestWorkerAdapter {
       }
       if (src === "lt_jar_bulk") {
         try {
-          const res = await this.fetchImpl(this.feedUrls.ltJarBulkJsonUrl, {
+          const json = await this.fetchBody(this.feedUrls.ltJarBulkJsonUrl, "json", {
             headers: { Accept: "application/json" }
           });
-          if (!res.ok)
-            throw new Error(`HTTP ${res.status}`);
-          const json = await res.json();
-          const parsed = parseLithuaniaJarBulkJson(json);
+          const payload = json;
+          const parsed = parseLithuaniaJarBulkJson(payload);
           await this.deps.entityRepo.upsertMany(parsed);
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
@@ -18555,7 +18733,9 @@ function createApp(overrides = {}, customDeps) {
   const fetchImpl = customDeps?.fetchImpl ?? fetch;
   const cacheStore = createQuotaAndCacheAdapter(appConfig.redisUrl);
   const entityRepo = appConfig.databaseUrl ? new HybridPostgresEntityRepositoryAdapter(appConfig.databaseUrl) : new InMemoryEntityRepositoryAdapter;
-  const sanctionsRepo = appConfig.databaseUrl ? new HybridPostgresSanctionsRepositoryAdapter(appConfig.databaseUrl) : new InMemorySanctionsRepositoryAdapter;
+  const sanctionsRepo = appConfig.databaseUrl ? new HybridPostgresSanctionsRepositoryAdapter(appConfig.databaseUrl, appConfig.nodeEnv === "production" ? 100 : 1) : new InMemorySanctionsRepositoryAdapter(undefined, {
+    minRecords: appConfig.nodeEnv === "production" ? 100 : 1
+  });
   const configurableAdapters = REGISTRY_CONFIGS.map((cfg) => new ConfigurableRegistryAdapter(cfg, { fetchImpl }));
   const upstreamProviders = [
     new GleifUpstreamAdapter(fetchImpl),
@@ -18657,9 +18837,18 @@ function createApp(overrides = {}, customDeps) {
 var { app, config: config3, ingestWorker } = createApp();
 if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
   const syncSources = config3.nodeEnv === "production" ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
-  ingestWorker.runSync(syncSources).catch((err) => {
-    console.error("[agentum:worker] initial sync error:", err);
-  });
+  const refresh = () => {
+    ingestWorker.runSync(syncSources).then((report) => {
+      for (const [source, detail] of Object.entries(report.sourceDetails)) {
+        if (detail.status !== "ok")
+          console.error(`[agentum:worker] ${source} refresh failed:`, detail.error);
+      }
+    }).catch((err) => console.error("[agentum:worker] sync error:", err));
+  };
+  refresh();
+  if (config3.nodeEnv === "production") {
+    setInterval(refresh, 24 * 60 * 60 * 1000).unref();
+  }
 }
 console.log(`[agentum] starting serviceRole=${config3.serviceRole} resolverMode=${config3.resolverMode} port=${config3.port}`);
 var src_default = {

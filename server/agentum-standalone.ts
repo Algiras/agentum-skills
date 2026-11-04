@@ -1,4 +1,71 @@
 // @bun
+// src/adapters/outbound/persistence/payment-ledger.adapter.ts
+var CREATE_TABLE = `CREATE TABLE IF NOT EXISTS payment_consumptions (
+  payment_key TEXT PRIMARY KEY, rail TEXT NOT NULL, resource TEXT NOT NULL,
+  price_usd TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`;
+class PostgresPaymentLedger {
+  databaseUrl;
+  sql = null;
+  initialization = null;
+  constructor(databaseUrl) {
+    this.databaseUrl = databaseUrl;
+  }
+  async db() {
+    if (this.sql)
+      return this.sql;
+    if (!this.initialization)
+      this.initialization = (async () => {
+        const db = new Bun.SQL(this.databaseUrl);
+        try {
+          await db.unsafe(CREATE_TABLE);
+          this.sql = db;
+          return db;
+        } catch (error) {
+          await db.close().catch(() => {});
+          throw error;
+        }
+      })();
+    try {
+      return await this.initialization;
+    } catch (error) {
+      this.initialization = null;
+      throw error;
+    }
+  }
+  async claim(claim) {
+    const db = await this.db();
+    const rows = await db`INSERT INTO payment_consumptions (payment_key,rail,resource,price_usd,fingerprint,status)
+      VALUES (${claim.key},${claim.rail},${claim.resource},${claim.priceUsd},${claim.fingerprint},'CLAIMED')
+      ON CONFLICT (payment_key) DO NOTHING RETURNING payment_key`;
+    return rows.length === 1;
+  }
+  async complete(key, status) {
+    const db = await this.db();
+    const rows = await db`UPDATE payment_consumptions SET status=${status},updated_at=NOW()
+      WHERE payment_key=${key} AND status='CLAIMED' RETURNING payment_key`;
+    if (rows.length !== 1)
+      throw new Error("Payment claim is not pending");
+  }
+  async listRecent(limit) {
+    const db = await this.db();
+    const bounded = Number.isFinite(limit) ? Math.max(0, Math.min(100, Math.floor(limit))) : 0;
+    const rows = await db`SELECT payment_key,rail,resource,price_usd,fingerprint,status,created_at,updated_at
+      FROM payment_consumptions ORDER BY created_at DESC LIMIT ${bounded}`;
+    return rows.map((r) => ({
+      key: r.payment_key,
+      rail: r.rail,
+      resource: r.resource,
+      priceUsd: r.price_usd,
+      fingerprint: r.fingerprint,
+      status: r.status,
+      createdAt: new Date(r.created_at).toISOString(),
+      updatedAt: new Date(r.updated_at).toISOString()
+    }));
+  }
+}
+
 // node_modules/hono/dist/http-exception.js
 var HTTPException = class extends Error {
   res;
@@ -13363,6 +13430,59 @@ async function evaluateDual402Gate(opts) {
   if (hasPayment && opts.config.nodeEnv === "production" && opts.config.paymentMode === "live" && (!opts.config.redisUrl || !opts.config.featureReplayProtection)) {
     return { allowed: false, challenge: buildChallenge(), error: "Live production payments require shared replay protection" };
   }
+  const verifyPayment = async (credential, spentKey, rail, verifier) => {
+    const serviceFailure = () => ({ allowed: false, challenge: buildChallenge(), reconciliationRequired: true, error: "Payment status requires reconciliation; do not pay again" });
+    if (opts.config.nodeEnv === "production" && opts.config.paymentMode === "live" && !opts.paymentLedger)
+      return serviceFailure();
+    if (!opts.paymentLedger && opts.config.featureReplayProtection) {
+      try {
+        if (!await opts.cacheStore.claimOnce(spentKey, 604800))
+          return { allowed: false, challenge: buildChallenge(), error: "Payment credential replay detected" };
+      } catch {
+        return serviceFailure();
+      }
+    }
+    const key = crypto3.createHash("sha256").update(spentKey).digest("hex");
+    const bounded = async (promise) => {
+      let timer;
+      try {
+        return await Promise.race([promise, new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Payment ledger timeout")), 2000);
+        })]);
+      } finally {
+        if (timer)
+          clearTimeout(timer);
+      }
+    };
+    if (opts.paymentLedger) {
+      try {
+        const path = new URL(opts.resource, opts.config.publicBaseUrl).pathname;
+        if (!await bounded(opts.paymentLedger.claim({ key, rail, resource: path, priceUsd: opts.priceUsd, fingerprint: opts.fingerprint })))
+          return serviceFailure();
+      } catch {
+        return serviceFailure();
+      }
+    }
+    let verification;
+    try {
+      verification = await verifier.verifyAndSettle(credential, challengeContext);
+    } catch {
+      verification = { verified: false, rail, outcome: "UNCERTAIN" };
+    }
+    const status = verification.verified ? "SETTLED" : verification.outcome === "REJECTED" ? "REJECTED" : "UNCERTAIN";
+    if (opts.paymentLedger) {
+      try {
+        await bounded(opts.paymentLedger.complete(key, status));
+      } catch {
+        return serviceFailure();
+      }
+    }
+    if (verification.verified)
+      return { allowed: true, verification };
+    if (status === "UNCERTAIN" && opts.paymentLedger)
+      return serviceFailure();
+    return { allowed: false, challenge: buildChallenge(), error: verification.error };
+  };
   const x402Cred = normalizedHeaders["payment-signature"] ?? normalizedHeaders["x-payment"] ?? opts.metaPayment?.x402;
   if (x402Cred) {
     let identity = x402Cred.trim();
@@ -13372,24 +13492,7 @@ async function evaluateDual402Gate(opts) {
       identity = auth?.nonce && auth?.from ? `${opts.config.x402Network}:${String(auth.from).toLowerCase()}:${String(auth.nonce).toLowerCase()}` : String(payload.payload?.signature ?? payload.signature ?? identity).toLowerCase();
     } catch {}
     const spentKey = `agentum:spent:x402:${crypto3.createHash("sha256").update(identity).digest("hex")}`;
-    if (opts.config.featureReplayProtection) {
-      try {
-        if (!await opts.cacheStore.claimOnce(spentKey, 604800)) {
-          return { allowed: false, challenge: buildChallenge(), error: "Payment credential replay detected: x402 token already spent or in progress" };
-        }
-      } catch {
-        return { allowed: false, challenge: buildChallenge(), error: "Payment replay store unavailable" };
-      }
-    }
-    const verification = await opts.x402Verifier.verifyAndSettle(x402Cred, challengeContext);
-    if (verification.verified) {
-      return { allowed: true, verification };
-    }
-    return {
-      allowed: false,
-      challenge: buildChallenge(),
-      error: verification.error
-    };
+    return verifyPayment(x402Cred, spentKey, "X402", opts.x402Verifier);
   }
   const authHeader = normalizedHeaders["authorization"];
   let mppCred = opts.metaPayment?.mpp;
@@ -13399,24 +13502,7 @@ async function evaluateDual402Gate(opts) {
   if (mppCred) {
     const piMatch = mppCred.match(/\b(pi_[A-Za-z0-9_]{10,})\b/);
     const spentKey = piMatch ? `agentum:spent:stripe:${piMatch[1]}` : `agentum:spent:mpp:${crypto3.createHash("sha256").update(mppCred.trim()).digest("hex")}`;
-    if (opts.config.featureReplayProtection) {
-      try {
-        if (!await opts.cacheStore.claimOnce(spentKey, 604800)) {
-          return { allowed: false, challenge: buildChallenge(), error: "Payment credential replay detected: MPP token already spent or in progress" };
-        }
-      } catch {
-        return { allowed: false, challenge: buildChallenge(), error: "Payment replay store unavailable" };
-      }
-    }
-    const verification = await opts.mppVerifier.verifyAndSettle(mppCred, challengeContext);
-    if (verification.verified) {
-      return { allowed: true, verification };
-    }
-    return {
-      allowed: false,
-      challenge: buildChallenge(),
-      error: verification.error
-    };
+    return verifyPayment(mppCred, spentKey, "MPP", opts.mppVerifier);
   }
   const dateKey = new Date().toISOString().slice(0, 10);
   const currentUsed = await opts.cacheStore.getDailyQuota(opts.fingerprint, dateKey);
@@ -13465,6 +13551,7 @@ function createDual402Middleware(opts) {
     const gate = await evaluateDual402Gate({
       config: opts.config,
       cacheStore: opts.cacheStore,
+      paymentLedger: opts.paymentLedger,
       x402Verifier: opts.x402Verifier,
       mppVerifier: opts.mppVerifier,
       fingerprint,
@@ -13474,6 +13561,8 @@ function createDual402Middleware(opts) {
       headers
     });
     if (!gate.allowed) {
+      if (gate.reconciliationRequired)
+        return c.json({ error: gate.error, reconciliationRequired: true }, 503);
       c.header("PAYMENT-REQUIRED", gate.challenge.x402HeaderBase64);
       c.header("WWW-Authenticate", gate.challenge.mppWwwAuthenticate);
       c.header("X-Free-Tier-Limit", String(opts.config.freeCallsPerDay));
@@ -13520,6 +13609,7 @@ function mountRestToolsAdapter(app, deps) {
     const paymentGate = createDual402Middleware({
       config: deps.config,
       cacheStore: deps.cacheStore,
+      paymentLedger: deps.paymentLedger,
       x402Verifier: deps.x402Verifier,
       mppVerifier: deps.mppVerifier,
       priceUsd: tool.priceUsd,
@@ -14357,6 +14447,7 @@ function mountMcpHttpAdapter(app, deps) {
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
+              paymentLedger: deps.paymentLedger,
               x402Verifier: deps.x402Verifier,
               mppVerifier: deps.mppVerifier,
               fingerprint,
@@ -14365,6 +14456,8 @@ function mountMcpHttpAdapter(app, deps) {
               description: resolveTool.summary,
               headers: rawHeaders
             });
+            if (!gate.allowed && gate.reconciliationRequired)
+              return { isNotification: false, body: { jsonrpc: "2.0", id, error: { code: -32001, message: gate.error } } };
             if (!gate.allowed) {
               return {
                 isNotification: false,
@@ -14432,6 +14525,7 @@ function mountMcpHttpAdapter(app, deps) {
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
+              paymentLedger: deps.paymentLedger,
               x402Verifier: deps.x402Verifier,
               mppVerifier: deps.mppVerifier,
               fingerprint,
@@ -14440,6 +14534,8 @@ function mountMcpHttpAdapter(app, deps) {
               description: vatTool.summary,
               headers: rawHeaders
             });
+            if (!gate.allowed && gate.reconciliationRequired)
+              return { isNotification: false, body: { jsonrpc: "2.0", id, error: { code: -32001, message: gate.error } } };
             if (!gate.allowed) {
               return {
                 isNotification: false,
@@ -14495,6 +14591,7 @@ function mountMcpHttpAdapter(app, deps) {
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
+              paymentLedger: deps.paymentLedger,
               x402Verifier: deps.x402Verifier,
               mppVerifier: deps.mppVerifier,
               fingerprint,
@@ -14503,6 +14600,8 @@ function mountMcpHttpAdapter(app, deps) {
               description: sanctionsTool.summary,
               headers: rawHeaders
             });
+            if (!gate.allowed && gate.reconciliationRequired)
+              return { isNotification: false, body: { jsonrpc: "2.0", id, error: { code: -32001, message: gate.error } } };
             if (!gate.allowed) {
               return {
                 isNotification: false,
@@ -14765,6 +14864,7 @@ function mountMcpHttpAdapter(app, deps) {
         const gate = await evaluateDual402Gate({
           config: deps.config,
           cacheStore: deps.cacheStore,
+          paymentLedger: deps.paymentLedger,
           x402Verifier: deps.x402Verifier,
           mppVerifier: deps.mppVerifier,
           fingerprint,
@@ -14777,6 +14877,8 @@ function mountMcpHttpAdapter(app, deps) {
             mpp: typeof meta?.mppPayment === "string" ? meta.mppPayment : undefined
           }
         });
+        if (!gate.allowed && gate.reconciliationRequired)
+          return { isNotification: false, body: { jsonrpc: "2.0", id, error: { code: -32001, message: gate.error } } };
         if (!gate.allowed) {
           const paymentElicitation = buildElicitationPayload({
             reason: "payment_required",
@@ -14973,6 +15075,145 @@ function mountMcpHttpAdapter(app, deps) {
     }
     return c.json(single.body ?? { jsonrpc: "2.0", id: null, result: {} });
   });
+}
+
+// src/adapters/inbound/worker/feed-stream.ts
+async function* responseBytes(response, limit, signal) {
+  const reader = response.body?.getReader();
+  if (!reader)
+    throw new Error("Feed response has no body");
+  let completed = false;
+  let total = 0;
+  try {
+    while (true) {
+      if (signal?.aborted)
+        throw new Error("Feed request aborted");
+      let onAbort;
+      const aborted = new Promise((_, reject) => {
+        if (signal) {
+          onAbort = () => reject(new Error("Feed request aborted"));
+          signal.addEventListener("abort", onAbort, { once: true });
+        }
+      });
+      let result;
+      try {
+        result = await Promise.race([reader.read(), aborted]);
+      } finally {
+        if (onAbort)
+          signal?.removeEventListener("abort", onAbort);
+      }
+      if (result.done) {
+        completed = true;
+        return;
+      }
+      const chunk = result.value;
+      if (!chunk)
+        throw new Error("Feed response returned an empty chunk");
+      total += chunk.byteLength;
+      if (total > limit)
+        throw new Error("Feed response exceeds size limit");
+      yield chunk;
+    }
+  } finally {
+    if (!completed)
+      reader.cancel().catch(() => {});
+    try {
+      reader.releaseLock();
+    } catch {}
+  }
+}
+async function* decodeUtf8(chunks) {
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  for await (const chunk of chunks) {
+    const text = decoder.decode(chunk, { stream: true });
+    if (text)
+      yield text;
+  }
+  const tail = decoder.decode();
+  if (tail)
+    yield tail;
+}
+
+class CsvRowDecoder {
+  row = [];
+  field = "";
+  inQuotes = false;
+  quoteClosed = false;
+  quoteWhitespace = false;
+  skipLf = false;
+  started = false;
+  *push(text) {
+    for (const ch of text) {
+      if (!this.started) {
+        this.started = true;
+        if (ch === "\uFEFF")
+          continue;
+      }
+      if (this.skipLf) {
+        this.skipLf = false;
+        if (ch === `
+`)
+          continue;
+      }
+      if (this.inQuotes) {
+        if (ch === '"') {
+          this.inQuotes = false;
+          this.quoteClosed = true;
+        } else
+          this.field += ch;
+      } else if (this.quoteClosed && ch === '"' && !this.quoteWhitespace) {
+        this.field += '"';
+        this.inQuotes = true;
+        this.quoteClosed = false;
+      } else if (ch === '"') {
+        if (this.field.trim() || this.quoteClosed)
+          throw new Error("Invalid quote in CSV field");
+        this.inQuotes = true;
+      } else if (ch === ",") {
+        this.finishField();
+      } else if (ch === "\r" || ch === `
+`) {
+        this.finishField();
+        const row = this.finishRow();
+        this.skipLf = ch === "\r";
+        if (row)
+          yield row;
+      } else {
+        if (this.quoteClosed && ch !== " " && ch !== "\t")
+          throw new Error("Invalid CSV after closing quote");
+        if (this.quoteClosed)
+          this.quoteWhitespace = true;
+        this.field += ch;
+      }
+    }
+  }
+  *finish() {
+    if (this.inQuotes)
+      throw new Error("Unterminated quoted CSV field");
+    if (this.field.length || this.row.length || this.quoteClosed) {
+      this.finishField();
+      const row = this.finishRow();
+      if (row)
+        yield row;
+    }
+  }
+  finishField() {
+    this.row.push(this.field.trim());
+    this.field = "";
+    this.quoteClosed = false;
+    this.quoteWhitespace = false;
+  }
+  finishRow() {
+    const row = this.row;
+    this.row = [];
+    return row.length > 1 || row.length === 1 && row[0] !== "" && row[0] !== "\x1A" ? row : undefined;
+  }
+}
+async function* csvRows(chunks) {
+  const decoder = new CsvRowDecoder;
+  for await (const chunk of chunks)
+    yield* decoder.push(chunk);
+  yield* decoder.finish();
 }
 
 // src/adapters/outbound/persistence/db-schema.ts
@@ -16154,82 +16395,6 @@ var DEFAULT_BULK_FEED_URLS = {
   ltJarBulkJsonUrl: "https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo?limit(500)",
   gleifBulkJsonUrl: "https://api.gleif.org/api/v1/lei-records?page[size]=200&page[number]=1"
 };
-
-class CsvRowDecoder {
-  onRow;
-  row = [];
-  field = "";
-  inQuotes = false;
-  quoteClosed = false;
-  quoteWhitespace = false;
-  skipLf = false;
-  started = false;
-  constructor(onRow) {
-    this.onRow = onRow;
-  }
-  push(text) {
-    for (const ch of text) {
-      if (!this.started) {
-        this.started = true;
-        if (ch === "\uFEFF")
-          continue;
-      }
-      if (this.skipLf) {
-        this.skipLf = false;
-        if (ch === `
-`)
-          continue;
-      }
-      if (this.inQuotes) {
-        if (ch === '"') {
-          this.inQuotes = false;
-          this.quoteClosed = true;
-        } else
-          this.field += ch;
-      } else if (this.quoteClosed && ch === '"' && !this.quoteWhitespace) {
-        this.field += '"';
-        this.inQuotes = true;
-        this.quoteClosed = false;
-      } else if (ch === '"') {
-        if (this.field.trim() || this.quoteClosed)
-          throw new Error("Invalid quote in CSV field");
-        this.inQuotes = true;
-      } else if (ch === ",") {
-        this.finishField();
-      } else if (ch === "\r" || ch === `
-`) {
-        this.finishField();
-        this.finishRow();
-        this.skipLf = ch === "\r";
-      } else {
-        if (this.quoteClosed && ch !== " " && ch !== "\t")
-          throw new Error("Invalid CSV after closing quote");
-        if (this.quoteClosed)
-          this.quoteWhitespace = true;
-        this.field += ch;
-      }
-    }
-  }
-  finish() {
-    if (this.inQuotes)
-      throw new Error("Unterminated quoted CSV field");
-    if (this.field.length || this.row.length || this.quoteClosed) {
-      this.finishField();
-      this.finishRow();
-    }
-  }
-  finishField() {
-    this.row.push(this.field.trim());
-    this.field = "";
-    this.quoteClosed = false;
-    this.quoteWhitespace = false;
-  }
-  finishRow() {
-    if (this.row.length > 1 || this.row.length === 1 && this.row[0] !== "" && this.row[0] !== "\x1A")
-      this.onRow(this.row);
-    this.row = [];
-  }
-}
 function parseOfacRows(rows) {
   const entries = [];
   for (const cols of rows) {
@@ -16414,15 +16579,10 @@ class SanctionsCsvCollector {
   entries = [];
   header = null;
   rowCount = 0;
-  csv = new CsvRowDecoder((row) => this.accept(row));
   constructor(source) {
     this.source = source;
   }
-  push(text) {
-    this.csv.push(text);
-  }
   finish() {
-    this.csv.finish();
     if (!this.rowCount || this.source !== "OFAC_SDN" && !this.entries.length)
       throw new Error("Invalid sanctions CSV records");
     return this.entries;
@@ -16475,43 +16635,23 @@ class DatasetIngestWorkerAdapter {
     for (let attempt = 0;attempt < 2; attempt++) {
       const controller = new AbortController;
       let timer;
-      let reader;
       try {
         return await Promise.race([
           (async () => {
             const response = await this.fetchImpl(url, { ...init, signal: controller.signal });
             if (!response.ok)
               throw new Error(`HTTP ${response.status}`);
-            reader = response.body?.getReader();
-            if (!reader)
-              throw new Error("Feed response has no body");
-            const limit = this.deps.maxFeedBytes ?? 100 * 1024 * 1024;
+            const bytes = responseBytes(response, this.deps.maxFeedBytes ?? 100 * 1024 * 1024, controller.signal);
+            if (format !== "json") {
+              const collector = new SanctionsCsvCollector(format);
+              for await (const row of csvRows(decodeUtf8(bytes)))
+                collector.accept(row);
+              return collector.finish();
+            }
             const chunks = [];
-            const csv = format === "json" ? null : new SanctionsCsvCollector(format);
-            const decoder = new TextDecoder("utf-8", { fatal: true });
-            let bytes = 0;
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done)
-                break;
-              if (!value)
-                throw new Error("Feed response returned an empty chunk");
-              bytes += value.byteLength;
-              if (bytes > limit) {
-                controller.abort();
-                reader.cancel().catch(() => {});
-                throw new Error("Feed response exceeds size limit");
-              }
-              if (csv)
-                csv.push(decoder.decode(value, { stream: true }));
-              else
-                chunks.push(value);
-            }
-            if (csv) {
-              csv.push(decoder.decode());
-              return csv.finish();
-            }
-            return JSON.parse(decoder.decode(Buffer.concat(chunks)));
+            for await (const chunk of bytes)
+              chunks.push(chunk);
+            return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
           })(),
           new Promise((_, reject) => {
             timer = setTimeout(() => {
@@ -16522,8 +16662,6 @@ class DatasetIngestWorkerAdapter {
         ]);
       } catch (error) {
         controller.abort();
-        if (reader)
-          reader.cancel().catch(() => {});
         lastError = error;
         if (attempt === 0)
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -18869,6 +19007,7 @@ function createApp(overrides = {}, customDeps) {
   };
   const fetchImpl = customDeps?.fetchImpl ?? fetch;
   const cacheStore = createQuotaAndCacheAdapter(appConfig.redisUrl);
+  const paymentLedger = appConfig.databaseUrl ? new PostgresPaymentLedger(appConfig.databaseUrl) : undefined;
   const entityRepo = appConfig.databaseUrl ? new HybridPostgresEntityRepositoryAdapter(appConfig.databaseUrl) : new InMemoryEntityRepositoryAdapter;
   const sanctionsRepo = appConfig.databaseUrl ? new HybridPostgresSanctionsRepositoryAdapter(appConfig.databaseUrl, appConfig.nodeEnv === "production" ? 100 : 1) : new InMemorySanctionsRepositoryAdapter(undefined, {
     minRecords: appConfig.nodeEnv === "production" ? 100 : 1
@@ -18947,6 +19086,7 @@ function createApp(overrides = {}, customDeps) {
     registry,
     config: appConfig,
     cacheStore,
+    paymentLedger,
     x402Verifier,
     mppVerifier,
     ingestWorker
@@ -18955,6 +19095,7 @@ function createApp(overrides = {}, customDeps) {
     registry,
     config: appConfig,
     cacheStore,
+    paymentLedger,
     x402Verifier,
     mppVerifier
   });

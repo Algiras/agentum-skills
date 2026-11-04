@@ -2087,6 +2087,458 @@ function verifyBankPayee(cmd) {
   };
 }
 
+// src/domain/identifiers/checksums.ts
+function luhn(digits) {
+  const clean = digits.replace(/\D/g, "");
+  if (!clean)
+    return false;
+  let sum = 0;
+  let shouldDouble = false;
+  for (let i = clean.length - 1;i >= 0; i--) {
+    let digit = parseInt(clean[i], 10);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9)
+        digit -= 9;
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+  return sum % 10 === 0;
+}
+function mod97(cleanDigits) {
+  const clean = cleanDigits.replace(/\D/g, "");
+  if (clean.length !== 10)
+    return false;
+  const base = parseInt(clean.slice(0, 8), 10);
+  const check = parseInt(clean.slice(8, 10), 10);
+  const remainder = base % 97;
+  return 97 - remainder === check;
+}
+function cnpjChecksum(cleanDigits) {
+  const clean = cleanDigits.replace(/\D/g, "");
+  if (clean.length !== 14)
+    return false;
+  if (/^(\d)\1{13}$/.test(clean))
+    return false;
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let s1 = 0;
+  for (let i = 0;i < 12; i++) {
+    s1 += parseInt(clean[i], 10) * w1[i];
+  }
+  const r1 = s1 % 11;
+  const d1 = r1 < 2 ? 0 : 11 - r1;
+  if (parseInt(clean[12], 10) !== d1)
+    return false;
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  let s2 = 0;
+  for (let i = 0;i < 13; i++) {
+    s2 += parseInt(clean[i], 10) * w2[i];
+  }
+  const r2 = s2 % 11;
+  const d2 = r2 < 2 ? 0 : 11 - r2;
+  return parseInt(clean[13], 10) === d2;
+}
+function jpCnChecksum(cleanDigits) {
+  const clean = cleanDigits.replace(/\D/g, "");
+  if (clean.length !== 13)
+    return false;
+  const checkDigit = parseInt(clean[0], 10);
+  const basic = clean.slice(1).split("").map((c) => parseInt(c, 10));
+  const rev = [...basic].reverse();
+  let s = 0;
+  for (let i = 0;i < 12; i++) {
+    const weight = i % 2 === 0 ? 1 : 2;
+    s += rev[i] * weight;
+  }
+  const rem = s % 9;
+  const expected = rem === 0 ? 0 : 9 - rem;
+  return checkDigit === expected;
+}
+function cnUsccChecksum(cleanRaw) {
+  const clean = cleanRaw.toUpperCase().replace(/[\s-]/g, "");
+  if (clean.length !== 18)
+    return false;
+  const CHARS = "0123456789ABCDEFGHJKLMNPQRTUWXY";
+  const WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
+  let sum = 0;
+  for (let i = 0;i < 17; i++) {
+    const idx = CHARS.indexOf(clean[i]);
+    if (idx === -1)
+      return false;
+    sum += idx * WEIGHTS[i];
+  }
+  const rem = sum % 31;
+  const checkVal = (31 - rem) % 31;
+  return clean[17] === CHARS[checkVal];
+}
+function inGstinChecksum(cleanRaw) {
+  const clean = cleanRaw.toUpperCase().replace(/[\s-]/g, "");
+  if (clean.length !== 15)
+    return false;
+  const CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let sum = 0;
+  for (let i = 0;i < 14; i++) {
+    const val = CHARS.indexOf(clean[i]);
+    if (val === -1)
+      return false;
+    const factor = i % 2 === 0 ? 1 : 2;
+    const prod = val * factor;
+    sum += Math.floor(prod / 36) + prod % 36;
+  }
+  const rem = sum % 36;
+  const checkCode = (36 - rem) % 36;
+  return clean[14] === CHARS[checkCode];
+}
+function plNipChecksum(cleanDigits) {
+  const clean = cleanDigits.replace(/\D/g, "");
+  if (clean.length !== 10)
+    return false;
+  const weights = [6, 5, 7, 2, 3, 4, 5, 6, 7];
+  let sum = 0;
+  for (let i = 0;i < 9; i++) {
+    sum += parseInt(clean[i], 10) * weights[i];
+  }
+  const rem = sum % 11;
+  if (rem === 10)
+    return false;
+  return rem === parseInt(clean[9], 10);
+}
+function czIcoChecksum(cleanDigits) {
+  const clean = cleanDigits.replace(/\D/g, "");
+  if (clean.length !== 8)
+    return false;
+  const weights = [8, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+  for (let i = 0;i < 7; i++) {
+    sum += parseInt(clean[i], 10) * weights[i];
+  }
+  const rem = sum % 11;
+  let expected = 0;
+  if (rem === 0 || rem === 1) {
+    expected = 1 - rem;
+  } else if (rem === 10) {
+    expected = 1;
+  } else {
+    expected = 11 - rem;
+  }
+  return expected === parseInt(clean[7], 10);
+}
+function noOrgnrChecksum(cleanDigits) {
+  const clean = cleanDigits.replace(/\D/g, "");
+  if (clean.length !== 9)
+    return false;
+  const weights = [3, 2, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+  for (let i = 0;i < 8; i++) {
+    sum += parseInt(clean[i], 10) * weights[i];
+  }
+  const rem = sum % 11;
+  if (rem === 1)
+    return false;
+  const expected = rem === 0 ? 0 : 11 - rem;
+  return expected === parseInt(clean[8], 10);
+}
+function fiYtunnusChecksum(cleanRaw) {
+  const clean = cleanRaw.replace(/\D/g, "");
+  if (clean.length !== 8)
+    return false;
+  const weights = [7, 9, 10, 5, 8, 4, 2];
+  let sum = 0;
+  for (let i = 0;i < 7; i++) {
+    sum += parseInt(clean[i], 10) * weights[i];
+  }
+  const rem = sum % 11;
+  if (rem === 1)
+    return false;
+  const expected = rem === 0 ? 0 : 11 - rem;
+  return expected === parseInt(clean[7], 10);
+}
+
+// src/domain/countries/types.ts
+var COUNTRY_ALIASES = {
+  UK: "GB",
+  EL: "GR"
+};
+function normalizeCountryCode(code) {
+  if (!code)
+    return "";
+  const upper = code.trim().toUpperCase();
+  return COUNTRY_ALIASES[upper] || upper;
+}
+
+// src/domain/identifiers/registry.ts
+var cleanDigits = (raw) => raw.replace(/\D/g, "");
+var cleanAlphaNum = (raw) => raw.toUpperCase().replace(/[\s-]/g, "");
+var NATIONAL_ID_SCHEMES = [
+  {
+    scheme: "FR_SIREN",
+    country: "FR",
+    kind: "COMPANY",
+    pattern: /^\d{9}$/,
+    normalize: cleanDigits,
+    checksum: luhn
+  },
+  {
+    scheme: "FR_SIRET",
+    country: "FR",
+    kind: "BOTH",
+    pattern: /^\d{14}$/,
+    normalize: cleanDigits,
+    checksum: luhn
+  },
+  {
+    scheme: "BR_CNPJ",
+    country: "BR",
+    kind: "BOTH",
+    pattern: /^\d{14}$/,
+    normalize: cleanDigits,
+    checksum: cnpjChecksum
+  },
+  {
+    scheme: "JP_CN",
+    country: "JP",
+    kind: "BOTH",
+    pattern: /^\d{13}$/,
+    normalize: cleanDigits,
+    checksum: jpCnChecksum
+  },
+  {
+    scheme: "CN_USCC",
+    country: "CN",
+    kind: "BOTH",
+    pattern: /^[0-9A-HJ-NP-RT-UW-Y]{18}$/,
+    normalize: cleanAlphaNum,
+    checksum: cnUsccChecksum
+  },
+  {
+    scheme: "IN_GSTIN",
+    country: "IN",
+    kind: "TAX",
+    pattern: /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+    normalize: cleanAlphaNum,
+    checksum: inGstinChecksum
+  },
+  {
+    scheme: "IN_PAN",
+    country: "IN",
+    kind: "TAX",
+    pattern: /^[A-Z]{5}\d{4}[A-Z]$/,
+    normalize: cleanAlphaNum
+  },
+  {
+    scheme: "IN_CIN",
+    country: "IN",
+    kind: "COMPANY",
+    pattern: /^[UL]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$/,
+    normalize: cleanAlphaNum
+  },
+  {
+    scheme: "PL_NIP",
+    country: "PL",
+    kind: "TAX",
+    pattern: /^\d{10}$/,
+    normalize: cleanDigits,
+    checksum: plNipChecksum
+  },
+  {
+    scheme: "PL_REGON",
+    country: "PL",
+    kind: "COMPANY",
+    pattern: /^(\d{9}|\d{14})$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "PL_KRS",
+    country: "PL",
+    kind: "COMPANY",
+    pattern: /^\d{10}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "CZ_ICO",
+    country: "CZ",
+    kind: "COMPANY",
+    pattern: /^\d{8}$/,
+    normalize: cleanDigits,
+    checksum: czIcoChecksum
+  },
+  {
+    scheme: "NO_ORGNR",
+    country: "NO",
+    kind: "COMPANY",
+    pattern: /^\d{9}$/,
+    normalize: cleanDigits,
+    checksum: noOrgnrChecksum
+  },
+  {
+    scheme: "FI_YTUNNUS",
+    country: "FI",
+    kind: "BOTH",
+    pattern: /^\d{8}$/,
+    normalize: cleanDigits,
+    checksum: fiYtunnusChecksum
+  },
+  {
+    scheme: "BE_KBO",
+    country: "BE",
+    kind: "BOTH",
+    pattern: /^(0|1)\d{9}$/,
+    normalize: (r) => {
+      const d = cleanDigits(r);
+      return d.length === 9 ? "0" + d : d;
+    },
+    checksum: mod97
+  },
+  {
+    scheme: "DK_CVR",
+    country: "DK",
+    kind: "BOTH",
+    pattern: /^\d{8}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "NL_KVK",
+    country: "NL",
+    kind: "COMPANY",
+    pattern: /^\d{8}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "EE_REGCODE",
+    country: "EE",
+    kind: "COMPANY",
+    pattern: /^\d{8}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "ES_NIF",
+    country: "ES",
+    kind: "BOTH",
+    pattern: /^[A-HJ-NP-SUVW]\d{7}[0-9A-J]$/i,
+    normalize: cleanAlphaNum
+  },
+  {
+    scheme: "IT_PIVA",
+    country: "IT",
+    kind: "BOTH",
+    pattern: /^\d{11}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "SE_ORGNR",
+    country: "SE",
+    kind: "COMPANY",
+    pattern: /^\d{10}$/,
+    normalize: cleanDigits,
+    checksum: luhn
+  },
+  {
+    scheme: "AT_FN",
+    country: "AT",
+    kind: "COMPANY",
+    pattern: /^\d{1,6}[A-Z]$/i,
+    normalize: cleanAlphaNum
+  },
+  {
+    scheme: "IE_CRO",
+    country: "IE",
+    kind: "COMPANY",
+    pattern: /^\d{5,7}[A-Z]?$/i,
+    normalize: cleanAlphaNum
+  },
+  {
+    scheme: "MX_RFC",
+    country: "MX",
+    kind: "TAX",
+    pattern: /^[A-Z&\u00D1]{3,4}\d{6}[A-V1-9][A-Z1-9][0-9A]$/i,
+    normalize: cleanAlphaNum
+  },
+  {
+    scheme: "KR_BRN",
+    country: "KR",
+    kind: "COMPANY",
+    pattern: /^\d{10}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "CA_BN",
+    country: "CA",
+    kind: "TAX",
+    pattern: /^\d{9}$/,
+    normalize: cleanDigits,
+    checksum: luhn
+  },
+  {
+    scheme: "NZ_NZBN",
+    country: "NZ",
+    kind: "COMPANY",
+    pattern: /^9429\d{9}$/,
+    normalize: cleanDigits,
+    checksum: luhn
+  },
+  {
+    scheme: "HK_BR",
+    country: "HK",
+    kind: "COMPANY",
+    pattern: /^\d{8}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "AE_TRN",
+    country: "AE",
+    kind: "TAX",
+    pattern: /^100\d{12}$/,
+    normalize: cleanDigits
+  },
+  {
+    scheme: "DE_VAT",
+    country: "DE",
+    kind: "TAX",
+    pattern: /^DE\d{9}$/i,
+    normalize: cleanAlphaNum
+  }
+];
+function validateNationalId(raw, country) {
+  if (!raw || !country)
+    return null;
+  const iso2 = normalizeCountryCode(country);
+  const candidates = NATIONAL_ID_SCHEMES.filter((s) => s.country === iso2);
+  for (const validator of candidates) {
+    const cleaned = validator.normalize(raw);
+    if (validator.pattern.test(cleaned)) {
+      const valid = validator.checksum ? validator.checksum(cleaned) : true;
+      return {
+        scheme: validator.scheme,
+        valid,
+        cleaned
+      };
+    }
+  }
+  return null;
+}
+function detectSchemes(raw, countryHint) {
+  if (!raw)
+    return [];
+  const iso2 = countryHint ? normalizeCountryCode(countryHint) : null;
+  const pool = iso2 ? NATIONAL_ID_SCHEMES.filter((s) => s.country === iso2) : NATIONAL_ID_SCHEMES;
+  const matches = [];
+  for (const validator of pool) {
+    const cleaned = validator.normalize(raw);
+    if (validator.pattern.test(cleaned)) {
+      const valid = validator.checksum ? validator.checksum(cleaned) : true;
+      if (valid) {
+        matches.push({
+          scheme: validator.scheme,
+          country: validator.country,
+          cleaned
+        });
+      }
+    }
+  }
+  return matches;
+}
+
 // src/domain/normalize.ts
 var LEGAL_FORMS = [
   { pattern: "UZDAROJI AKCINE BENDROVE", form: "UAB" },
@@ -2441,6 +2893,36 @@ function classifyQuery(raw, jurisdictionHint) {
       };
     }
   }
+  if (jurisdictionHint) {
+    const nationalMatch = validateNationalId(trimmed, jurisdictionHint);
+    if (nationalMatch && nationalMatch.valid) {
+      return {
+        raw,
+        type: "NATIONAL_ID",
+        scheme: nationalMatch.scheme,
+        cleanedValue: nationalMatch.cleaned,
+        normalizedName: nationalMatch.cleaned,
+        detectedLegalForm: null,
+        inferredCountry: jurisdictionHint.toUpperCase()
+      };
+    }
+  } else {
+    if (/\d/.test(trimmed) && trimmed.length >= 6) {
+      const detected = detectSchemes(trimmed);
+      if (detected.length === 1) {
+        const match = detected[0];
+        return {
+          raw,
+          type: "NATIONAL_ID",
+          scheme: match.scheme,
+          cleanedValue: match.cleaned,
+          normalizedName: match.cleaned,
+          detectedLegalForm: null,
+          inferredCountry: match.country
+        };
+      }
+    }
+  }
   const { normalizedName, detectedLegalForm } = normalizeCompanyName(raw);
   const inferredCountry = jurisdictionHint ? jurisdictionHint.toUpperCase() : detectedLegalForm && JURISDICTION_BY_LEGAL_FORM[detectedLegalForm] || null;
   return {
@@ -2513,11 +2995,686 @@ function wordTrigramSimilarity(a, b) {
   return maxWindowSim;
 }
 
+// src/domain/countries/catalog.ts
+var ISO_ENTRIES = [
+  ["AD", "Andorra", "Europe"],
+  ["AE", "United Arab Emirates", "Asia"],
+  ["AF", "Afghanistan", "Asia"],
+  ["AG", "Antigua and Barbuda", "Americas"],
+  ["AI", "Anguilla", "Americas"],
+  ["AL", "Albania", "Europe"],
+  ["AM", "Armenia", "Asia"],
+  ["AO", "Angola", "Africa"],
+  ["AQ", "Antarctica", "Polar"],
+  ["AR", "Argentina", "Americas"],
+  ["AS", "American Samoa", "Oceania"],
+  ["AT", "Austria", "Europe"],
+  ["AU", "Australia", "Oceania"],
+  ["AW", "Aruba", "Americas"],
+  ["AX", "\xC5land Islands", "Europe"],
+  ["AZ", "Azerbaijan", "Asia"],
+  ["BA", "Bosnia and Herzegovina", "Europe"],
+  ["BB", "Barbados", "Americas"],
+  ["BD", "Bangladesh", "Asia"],
+  ["BE", "Belgium", "Europe"],
+  ["BF", "Burkina Faso", "Africa"],
+  ["BG", "Bulgaria", "Europe"],
+  ["BH", "Bahrain", "Asia"],
+  ["BI", "Burundi", "Africa"],
+  ["BJ", "Benin", "Africa"],
+  ["BL", "Saint Barth\xE9lemy", "Americas"],
+  ["BM", "Bermuda", "Americas"],
+  ["BN", "Brunei", "Asia"],
+  ["BO", "Bolivia", "Americas"],
+  ["BQ", "Bonaire, Sint Eustatius and Saba", "Americas"],
+  ["BR", "Brazil", "Americas"],
+  ["BS", "Bahamas", "Americas"],
+  ["BT", "Bhutan", "Asia"],
+  ["BV", "Bouvet Island", "Americas"],
+  ["BW", "Botswana", "Africa"],
+  ["BY", "Belarus", "Europe"],
+  ["BZ", "Belize", "Americas"],
+  ["CA", "Canada", "Americas"],
+  ["CC", "Cocos (Keeling) Islands", "Oceania"],
+  ["CD", "Democratic Republic of the Congo", "Africa"],
+  ["CF", "Central African Republic", "Africa"],
+  ["CG", "Republic of the Congo", "Africa"],
+  ["CH", "Switzerland", "Europe"],
+  ["CI", "C\xF4te d'Ivoire", "Africa"],
+  ["CK", "Cook Islands", "Oceania"],
+  ["CL", "Chile", "Americas"],
+  ["CM", "Cameroon", "Africa"],
+  ["CN", "China", "Asia"],
+  ["CO", "Colombia", "Americas"],
+  ["CR", "Costa Rica", "Americas"],
+  ["CU", "Cuba", "Americas"],
+  ["CV", "Cabo Verde", "Africa"],
+  ["CW", "Cura\xE7ao", "Americas"],
+  ["CX", "Christmas Island", "Oceania"],
+  ["CY", "Cyprus", "Europe"],
+  ["CZ", "Czechia", "Europe"],
+  ["DE", "Germany", "Europe"],
+  ["DJ", "Djibouti", "Africa"],
+  ["DK", "Denmark", "Europe"],
+  ["DM", "Dominica", "Americas"],
+  ["DO", "Dominican Republic", "Americas"],
+  ["DZ", "Algeria", "Africa"],
+  ["EC", "Ecuador", "Americas"],
+  ["EE", "Estonia", "Europe"],
+  ["EG", "Egypt", "Africa"],
+  ["EH", "Western Sahara", "Africa"],
+  ["ER", "Eritrea", "Africa"],
+  ["ES", "Spain", "Europe"],
+  ["ET", "Ethiopia", "Africa"],
+  ["FI", "Finland", "Europe"],
+  ["FJ", "Fiji", "Oceania"],
+  ["FK", "Falkland Islands", "Americas"],
+  ["FM", "Micronesia", "Oceania"],
+  ["FO", "Faroe Islands", "Europe"],
+  ["FR", "France", "Europe"],
+  ["GA", "Gabon", "Africa"],
+  ["GB", "United Kingdom", "Europe"],
+  ["GD", "Grenada", "Americas"],
+  ["GE", "Georgia", "Asia"],
+  ["GF", "French Guiana", "Americas"],
+  ["GG", "Guernsey", "Europe"],
+  ["GH", "Ghana", "Africa"],
+  ["GI", "Gibraltar", "Europe"],
+  ["GL", "Greenland", "Americas"],
+  ["GM", "Gambia", "Africa"],
+  ["GN", "Guinea", "Africa"],
+  ["GP", "Guadeloupe", "Americas"],
+  ["GQ", "Equatorial Guinea", "Africa"],
+  ["GR", "Greece", "Europe"],
+  ["GS", "South Georgia and South Sandwich Islands", "Americas"],
+  ["GT", "Guatemala", "Americas"],
+  ["GU", "Guam", "Oceania"],
+  ["GW", "Guinea-Bissau", "Africa"],
+  ["GY", "Guyana", "Americas"],
+  ["HK", "Hong Kong", "Asia"],
+  ["HM", "Heard Island and McDonald Islands", "Oceania"],
+  ["HN", "Honduras", "Americas"],
+  ["HR", "Croatia", "Europe"],
+  ["HT", "Haiti", "Americas"],
+  ["HU", "Hungary", "Europe"],
+  ["ID", "Indonesia", "Asia"],
+  ["IE", "Ireland", "Europe"],
+  ["IL", "Israel", "Asia"],
+  ["IM", "Isle of Man", "Europe"],
+  ["IN", "India", "Asia"],
+  ["IO", "British Indian Ocean Territory", "Africa"],
+  ["IQ", "Iraq", "Asia"],
+  ["IR", "Iran", "Asia"],
+  ["IS", "Iceland", "Europe"],
+  ["IT", "Italy", "Europe"],
+  ["JE", "Jersey", "Europe"],
+  ["JM", "Jamaica", "Americas"],
+  ["JO", "Jordan", "Asia"],
+  ["JP", "Japan", "Asia"],
+  ["KE", "Kenya", "Africa"],
+  ["KG", "Kyrgyzstan", "Asia"],
+  ["KH", "Cambodia", "Asia"],
+  ["KI", "Kiribati", "Oceania"],
+  ["KM", "Comoros", "Africa"],
+  ["KN", "Saint Kitts and Nevis", "Americas"],
+  ["KP", "North Korea", "Asia"],
+  ["KR", "South Korea", "Asia"],
+  ["KW", "Kuwait", "Asia"],
+  ["KY", "Cayman Islands", "Americas"],
+  ["KZ", "Kazakhstan", "Asia"],
+  ["LA", "Laos", "Asia"],
+  ["LB", "Lebanon", "Asia"],
+  ["LC", "Saint Lucia", "Americas"],
+  ["LI", "Liechtenstein", "Europe"],
+  ["LK", "Sri Lanka", "Asia"],
+  ["LR", "Liberia", "Africa"],
+  ["LS", "Lesotho", "Africa"],
+  ["LT", "Lithuania", "Europe"],
+  ["LU", "Luxembourg", "Europe"],
+  ["LV", "Latvia", "Europe"],
+  ["LY", "Libya", "Africa"],
+  ["MA", "Morocco", "Africa"],
+  ["MC", "Monaco", "Europe"],
+  ["MD", "Moldova", "Europe"],
+  ["ME", "Montenegro", "Europe"],
+  ["MF", "Saint Martin", "Americas"],
+  ["MG", "Madagascar", "Africa"],
+  ["MH", "Marshall Islands", "Oceania"],
+  ["MK", "North Macedonia", "Europe"],
+  ["ML", "Mali", "Africa"],
+  ["MM", "Myanmar", "Asia"],
+  ["MN", "Mongolia", "Asia"],
+  ["MO", "Macao", "Asia"],
+  ["MP", "Northern Mariana Islands", "Oceania"],
+  ["MQ", "Martinique", "Americas"],
+  ["MR", "Mauritania", "Africa"],
+  ["MS", "Montserrat", "Americas"],
+  ["MT", "Malta", "Europe"],
+  ["MU", "Mauritius", "Africa"],
+  ["MV", "Maldives", "Asia"],
+  ["MW", "Malawi", "Africa"],
+  ["MX", "Mexico", "Americas"],
+  ["MY", "Malaysia", "Asia"],
+  ["MZ", "Mozambique", "Africa"],
+  ["NA", "Namibia", "Africa"],
+  ["NC", "New Caledonia", "Oceania"],
+  ["NE", "Niger", "Africa"],
+  ["NF", "Norfolk Island", "Oceania"],
+  ["NG", "Nigeria", "Africa"],
+  ["NI", "Nicaragua", "Americas"],
+  ["NL", "Netherlands", "Europe"],
+  ["NO", "Norway", "Europe"],
+  ["NP", "Nepal", "Asia"],
+  ["NR", "Nauru", "Oceania"],
+  ["NU", "Niue", "Oceania"],
+  ["NZ", "New Zealand", "Oceania"],
+  ["OM", "Oman", "Asia"],
+  ["PA", "Panama", "Americas"],
+  ["PE", "Peru", "Americas"],
+  ["PF", "French Polynesia", "Oceania"],
+  ["PG", "Papua New Guinea", "Oceania"],
+  ["PH", "Philippines", "Asia"],
+  ["PK", "Pakistan", "Asia"],
+  ["PL", "Poland", "Europe"],
+  ["PM", "Saint Pierre and Miquelon", "Americas"],
+  ["PN", "Pitcairn", "Oceania"],
+  ["PR", "Puerto Rico", "Americas"],
+  ["PS", "Palestine", "Asia"],
+  ["PT", "Portugal", "Europe"],
+  ["PW", "Palau", "Oceania"],
+  ["PY", "Paraguay", "Americas"],
+  ["QA", "Qatar", "Asia"],
+  ["RE", "R\xE9union", "Africa"],
+  ["RO", "Romania", "Europe"],
+  ["RS", "Serbia", "Europe"],
+  ["RU", "Russia", "Europe"],
+  ["RW", "Rwanda", "Africa"],
+  ["SA", "Saudi Arabia", "Asia"],
+  ["SB", "Solomon Islands", "Oceania"],
+  ["SC", "Seychelles", "Africa"],
+  ["SD", "Sudan", "Africa"],
+  ["SE", "Sweden", "Europe"],
+  ["SG", "Singapore", "Asia"],
+  ["SH", "Saint Helena", "Africa"],
+  ["SI", "Slovenia", "Europe"],
+  ["SJ", "Svalbard and Jan Mayen", "Europe"],
+  ["SK", "Slovakia", "Europe"],
+  ["SL", "Sierra Leone", "Africa"],
+  ["SM", "San Marino", "Europe"],
+  ["SN", "Senegal", "Africa"],
+  ["SO", "Somalia", "Africa"],
+  ["SR", "Suriname", "Americas"],
+  ["SS", "South Sudan", "Africa"],
+  ["ST", "Sao Tome and Principe", "Africa"],
+  ["SV", "El Salvador", "Americas"],
+  ["SX", "Sint Maarten", "Americas"],
+  ["SY", "Syria", "Asia"],
+  ["SZ", "Eswatini", "Africa"],
+  ["TC", "Turks and Caicos Islands", "Americas"],
+  ["TD", "Chad", "Africa"],
+  ["TF", "French Southern Territories", "Polar"],
+  ["TG", "Togo", "Africa"],
+  ["TH", "Thailand", "Asia"],
+  ["TJ", "Tajikistan", "Asia"],
+  ["TK", "Tokelau", "Oceania"],
+  ["TL", "Timor-Leste", "Asia"],
+  ["TM", "Turkmenistan", "Asia"],
+  ["TN", "Tunisia", "Africa"],
+  ["TO", "Tonga", "Oceania"],
+  ["TR", "Turkey", "Asia"],
+  ["TT", "Trinidad and Tobago", "Americas"],
+  ["TV", "Tuvalu", "Oceania"],
+  ["TW", "Taiwan", "Asia"],
+  ["TZ", "Tanzania", "Africa"],
+  ["UA", "Ukraine", "Europe"],
+  ["UG", "Uganda", "Africa"],
+  ["UM", "United States Minor Outlying Islands", "Americas"],
+  ["US", "United States", "Americas"],
+  ["UY", "Uruguay", "Americas"],
+  ["UZ", "Uzbekistan", "Asia"],
+  ["VA", "Vatican City", "Europe"],
+  ["VC", "Saint Vincent and the Grenadines", "Americas"],
+  ["VE", "Venezuela", "Americas"],
+  ["VG", "British Virgin Islands", "Americas"],
+  ["VI", "U.S. Virgin Islands", "Americas"],
+  ["VN", "Vietnam", "Asia"],
+  ["VU", "Vanuatu", "Oceania"],
+  ["WF", "Wallis and Futuna", "Oceania"],
+  ["WS", "Samoa", "Oceania"],
+  ["YE", "Yemen", "Asia"],
+  ["YT", "Mayotte", "Africa"],
+  ["ZA", "South Africa", "Africa"],
+  ["ZM", "Zambia", "Africa"],
+  ["ZW", "Zimbabwe", "Africa"]
+];
+var OVERLAY_PROFILES = {
+  GB: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["UK_CRN", "GB_VAT"],
+    legalForms: ["Ltd", "Limited", "PLC", "LLP"],
+    sources: [
+      {
+        id: "uk_companies_house",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  CH: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["CH_UID"],
+    legalForms: ["AG", "SA", "GmbH", "Sarl"],
+    sources: [
+      {
+        id: "ch_zefix",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  AU: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["AU_ABN", "AU_ACN"],
+    legalForms: ["Pty Ltd", "Ltd", "Proprietary Limited"],
+    sources: [
+      {
+        id: "au_abr",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  SG: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["SG_UEN"],
+    legalForms: ["Pte. Ltd.", "Ltd.", "LLP"],
+    sources: [
+      {
+        id: "sg_acra",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  US: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["US_CIK", "US_EIN"],
+    legalForms: ["Inc.", "LLC", "Corp.", "Corporation"],
+    sources: [
+      {
+        id: "us_sec_edgar",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  LT: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["LT_JAR", "LT_VAT"],
+    legalForms: ["UAB", "AB", "V\u0161\u012E", "MB"],
+    sources: [
+      {
+        id: "lt_jar",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  FR: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["FR_SIREN", "FR_SIRET", "FR_VAT"],
+    legalForms: ["SAS", "SARL", "SA", "SASU", "EURL"],
+    sources: [
+      {
+        id: "fr_recherche_entreprises",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  PL: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["PL_NIP", "PL_REGON", "PL_KRS"],
+    legalForms: ["Sp. z o.o.", "S.A.", "Sp. k."],
+    sources: [
+      {
+        id: "pl_mf_whitelist",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  CZ: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["CZ_ICO"],
+    legalForms: ["s.r.o.", "a.s.", "v.o.s."],
+    sources: [
+      {
+        id: "cz_ares",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  NO: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["NO_ORGNR"],
+    legalForms: ["AS", "ASA", "ENK"],
+    sources: [
+      {
+        id: "no_brreg",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  FI: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["FI_YTUNNUS"],
+    legalForms: ["Oy", "Oyj", "Ky"],
+    sources: [
+      {
+        id: "fi_prh_ytj",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  EE: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["EE_REGCODE"],
+    legalForms: ["O\xDC", "AS", "T\xDC"],
+    sources: [
+      {
+        id: "ee_ariregister",
+        kind: "BULK",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  BE: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["BE_KBO"],
+    legalForms: ["BV", "NV", "SRL", "SA"],
+    sources: [
+      {
+        id: "be_kbo",
+        kind: "BULK",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  NZ: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["NZ_NZBN"],
+    legalForms: ["Limited", "Ltd"],
+    sources: [
+      {
+        id: "nz_nzbn",
+        kind: "LIVE_API",
+        access: "FREE_REGISTRATION",
+        envKey: "NZBN_API_KEY",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  BR: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["BR_CNPJ"],
+    legalForms: ["Ltda", "S.A.", "ME", "EPP"],
+    sources: [
+      {
+        id: "br_cnpj",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  CA: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["CA_BN"],
+    legalForms: ["Inc.", "Corp.", "Ltd.", "ULC"],
+    sources: [
+      {
+        id: "ca_corp",
+        kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  },
+  JP: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["JP_CN"],
+    legalForms: ["\u682A\u5F0F\u4F1A\u793E", "\u5408\u540C\u4F1A\u793E", "\u6709\u9650\u4F1A\u793E", "K.K."],
+    sources: [
+      {
+        id: "jp_nta",
+        kind: "LIVE_API",
+        access: "FREE_REGISTRATION",
+        envKey: "JP_NTA_APP_ID",
+        cacheTtlSeconds: 86400 * 7,
+        resaleAllowed: true,
+        costPerCallUsd: 0
+      }
+    ]
+  }
+};
+var COUNTRY_MAP = new Map;
+var SCHEMES_BY_COUNTRY = new Map;
+for (const s of NATIONAL_ID_SCHEMES) {
+  const list = SCHEMES_BY_COUNTRY.get(s.country) || [];
+  if (!list.includes(s.scheme)) {
+    list.push(s.scheme);
+  }
+  SCHEMES_BY_COUNTRY.set(s.country, list);
+}
+for (const [iso2, name, region] of ISO_ENTRIES) {
+  const overlay = OVERLAY_PROFILES[iso2] || {};
+  const regSchemes = SCHEMES_BY_COUNTRY.get(iso2) || [];
+  const combinedSchemes = Array.from(new Set([...overlay.idSchemes ?? [], ...regSchemes]));
+  let coverage = overlay.coverage ?? "L0_SCREENED";
+  if (coverage === "L0_SCREENED" && combinedSchemes.length > 0) {
+    coverage = "L1_VALIDATED";
+  }
+  COUNTRY_MAP.set(iso2, {
+    iso2,
+    name,
+    region,
+    coverage,
+    wave: overlay.wave ?? null,
+    idSchemes: combinedSchemes,
+    legalForms: overlay.legalForms ?? [],
+    sources: overlay.sources ?? []
+  });
+}
+function getCountryProfile(code) {
+  const iso2 = normalizeCountryCode(code);
+  const found = COUNTRY_MAP.get(iso2);
+  if (found) {
+    return found;
+  }
+  return {
+    iso2: iso2 || "XX",
+    name: "Unknown",
+    region: "Unknown",
+    coverage: "L0_SCREENED",
+    wave: null,
+    idSchemes: [],
+    legalForms: [],
+    sources: []
+  };
+}
+function listCoverage() {
+  return Array.from(COUNTRY_MAP.values());
+}
+
+// src/application/source-router.ts
+class SourceRouter {
+  free;
+  paid;
+  timeoutMs;
+  constructor(deps) {
+    this.free = deps.free;
+    this.paid = deps.paid;
+    this.timeoutMs = deps.timeoutMs ?? 2500;
+  }
+  async resolve(query, opts = {}) {
+    const sourcesTried = [];
+    const supportedFree = this.free.filter((p) => p.supports(query, opts.jurisdiction));
+    const freePromises = supportedFree.map(async (provider) => {
+      const start = Date.now();
+      try {
+        const records = await provider.search(query, {
+          jurisdiction: opts.jurisdiction,
+          timeoutMs: this.timeoutMs
+        });
+        const elapsed = Date.now() - start;
+        const status = records.length > 0 ? "HIT" : "MISS";
+        sourcesTried.push({
+          source: provider.sourceName,
+          tier: "FREE",
+          status,
+          ms: elapsed
+        });
+        return records;
+      } catch {
+        const elapsed = Date.now() - start;
+        sourcesTried.push({
+          source: provider.sourceName,
+          tier: "FREE",
+          status: "ERROR",
+          ms: elapsed
+        });
+        return [];
+      }
+    });
+    const settled = await Promise.allSettled(freePromises);
+    const freeRecords = [];
+    for (const res of settled) {
+      if (res.status === "fulfilled" && res.value.length > 0) {
+        freeRecords.push(...res.value);
+      }
+    }
+    if (freeRecords.length > 0) {
+      return {
+        records: freeRecords,
+        sourcesTried,
+        costUsd: 0
+      };
+    }
+    if (opts.allowPaidSources && this.paid && this.paid.supports(query, opts.jurisdiction)) {
+      const start = Date.now();
+      try {
+        const records = await this.paid.search(query, {
+          jurisdiction: opts.jurisdiction,
+          timeoutMs: this.timeoutMs
+        });
+        const elapsed = Date.now() - start;
+        const hit = records.length > 0;
+        sourcesTried.push({
+          source: this.paid.sourceName,
+          tier: "PAID",
+          status: hit ? "HIT" : "MISS",
+          ms: elapsed
+        });
+        return {
+          records,
+          sourcesTried,
+          costUsd: hit ? this.paid.costPerCallUsd : 0
+        };
+      } catch {
+        const elapsed = Date.now() - start;
+        sourcesTried.push({
+          source: this.paid.sourceName,
+          tier: "PAID",
+          status: "ERROR",
+          ms: elapsed
+        });
+      }
+    }
+    return {
+      records: [],
+      sourcesTried,
+      costUsd: 0
+    };
+  }
+}
+
 // src/application/entity-service.ts
 class EntityApplicationService {
   deps;
+  sourceRouter;
   constructor(deps) {
     this.deps = deps;
+    this.sourceRouter = new SourceRouter({
+      free: this.deps.upstreamProviders,
+      paid: this.deps.commercialAggregator,
+      timeoutMs: 2200
+    });
   }
   async resolveEntity(cmd) {
     const startedAt = Date.now();
@@ -2539,7 +3696,7 @@ class EntityApplicationService {
     const modeUsed = this.deps.config.resolverMode;
     if (this.deps.config.resolverMode !== "live") {
       if (classified.type !== "NAME") {
-        const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue);
+        const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction);
         if (exact) {
           candidates.push({ ...exact, confidence: 0.99 });
         }
@@ -2551,19 +3708,16 @@ class EntityApplicationService {
       candidates.sort((a, b) => b.confidence - a.confidence);
     }
     const shouldQueryUpstream = this.deps.config.resolverMode === "live" || this.deps.config.resolverMode === "hybrid" && (candidates.length === 0 || candidates[0].confidence < 0.82);
+    let routerAttempts = [];
+    let paidUsed = false;
     if (shouldQueryUpstream) {
-      const applicable = this.deps.upstreamProviders.filter((p) => p.supports(classified, effectiveJurisdiction));
-      const settled = await Promise.allSettled(applicable.map((p) => p.search(classified, {
+      const routerRes = await this.sourceRouter.resolve(classified, {
         jurisdiction: effectiveJurisdiction,
-        includeParent: cmd.includeParent,
-        timeoutMs: 2200
-      })));
-      const upstreamRecords = [];
-      for (const res of settled) {
-        if (res.status === "fulfilled" && Array.isArray(res.value)) {
-          upstreamRecords.push(...res.value);
-        }
-      }
+        allowPaidSources: cmd.allowPaidSources
+      });
+      routerAttempts = routerRes.sourcesTried;
+      paidUsed = routerRes.costUsd > 0;
+      const upstreamRecords = routerRes.records;
       if (upstreamRecords.length > 0) {
         await this.deps.entityRepo.upsertMany(upstreamRecords);
         const combined = [...candidates, ...upstreamRecords];
@@ -2571,7 +3725,7 @@ class EntityApplicationService {
         const seen = new Set;
         const deduplicated = [];
         for (const item of combined) {
-          const key = `${item.primaryIdType}:${item.primaryIdValue}`;
+          const key = `${item.jurisdiction}:${item.primaryIdType}:${item.primaryIdValue}`;
           if (!seen.has(key)) {
             seen.add(key);
             deduplicated.push(item);
@@ -2608,6 +3762,8 @@ class EntityApplicationService {
         registrationNumber: best?.registrationNumber ?? best?.lei ?? undefined
       });
     }
+    const targetCountry = effectiveJurisdiction || classified.inferredCountry || "XX";
+    const profile = getCountryProfile(targetCountry);
     const result = {
       resolved: best !== null,
       confidence: best ? best.confidence : 0,
@@ -2617,6 +3773,12 @@ class EntityApplicationService {
       compliance,
       vatVerification,
       candidates,
+      coverage: {
+        country: profile.iso2,
+        level: profile.coverage,
+        sourcesTried: routerAttempts,
+        paidSourceUsed: paidUsed
+      },
       latencyMs: Math.max(1, Date.now() - startedAt)
     };
     if (best !== null) {
@@ -2690,6 +3852,14 @@ class EntityApplicationService {
       verdict = "REJECTED";
       riskLevel = "CRITICAL";
       auditTrail.push(`[VERDICT] \u274C REJECTED due to sanctions match on lists: ${sanctionsRes.matchedLists.join(", ")}`);
+    } else if (sanctionsRes.degraded) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Sanctions screening is in degraded mode (${sanctionsRes.degradedReason ?? "coverage threshold unmet"}). Unqualified approval is prohibited.`);
+    } else if (entity && entity.status && ["INACTIVE", "DISSOLVED", "LIQUIDATION"].includes(entity.status)) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is '${entity.status}' (not active). Verification cannot be approved.`);
     } else if (vatValid === false) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
@@ -4347,6 +5517,10 @@ var $ZodBoolean = /* @__PURE__ */ $constructor("$ZodBoolean", (inst, def) => {
     return payload;
   };
 });
+var $ZodAny = /* @__PURE__ */ $constructor("$ZodAny", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.parse = (payload) => payload;
+});
 var $ZodUnknown = /* @__PURE__ */ $constructor("$ZodUnknown", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.parse = (payload) => payload;
@@ -5492,6 +6666,11 @@ function _boolean(Class, params) {
   return new Class({
     type: "boolean",
     ...normalizeParams(params)
+  });
+}
+function _any(Class) {
+  return new Class({
+    type: "any"
   });
 }
 function _unknown(Class) {
@@ -6912,6 +8091,14 @@ var ZodBoolean = /* @__PURE__ */ $constructor("ZodBoolean", (inst, def) => {
 function boolean2(params) {
   return _boolean(ZodBoolean, params);
 }
+var ZodAny = /* @__PURE__ */ $constructor("ZodAny", (inst, def) => {
+  $ZodAny.init(inst, def);
+  ZodType.init(inst, def);
+  inst._zod.processJSONSchema = (ctx, json, params) => anyProcessor(inst, ctx, json, params);
+});
+function any() {
+  return _any(ZodAny);
+}
 var ZodUnknown = /* @__PURE__ */ $constructor("ZodUnknown", (inst, def) => {
   $ZodUnknown.init(inst, def);
   ZodType.init(inst, def);
@@ -7260,12 +8447,14 @@ var IdentifierTypeSchema = _enum([
   "AU_ABN",
   "AU_ACN",
   "SG_UEN",
+  "NATIONAL_ID",
   "DOMAIN",
   "NAME"
 ]);
 var ClassifiedQuerySchema = object({
   raw: string2(),
   type: IdentifierTypeSchema,
+  scheme: string2().optional(),
   cleanedValue: string2(),
   normalizedName: string2(),
   detectedLegalForm: string2().nullable(),
@@ -7368,10 +8557,17 @@ var SanctionsMatchSchema = object({
 });
 var SanctionsScreenResultSchema = object({
   sanctioned: boolean2(),
-  riskLevel: _enum(["CLEAR", "POTENTIAL_MATCH", "EXACT_MATCH"]),
+  riskLevel: _enum(["CLEAR", "POTENTIAL_MATCH", "EXACT_MATCH", "UNKNOWN"]),
   matchScore: number2(),
   matchedLists: array(string2()),
-  matches: array(SanctionsMatchSchema)
+  matches: array(SanctionsMatchSchema),
+  degraded: boolean2().default(false),
+  degradedReason: string2().optional(),
+  coverage: object({
+    recordCount: number2(),
+    sourcesScreened: array(string2()),
+    lastSyncAt: string2().nullable().optional()
+  }).optional()
 });
 var ResolveEntityCommandSchema = object({
   query: string2().min(1).describe("Company name, domain, or registration number (LEI, CIK, EIN, UK Company No, Swiss UID, ABN/ACN, UEN, JAR, VAT)"),
@@ -7380,7 +8576,8 @@ var ResolveEntityCommandSchema = object({
   verifyVat: boolean2().optional().describe("Verify EU VAT number against live VIES if available"),
   includeParent: boolean2().optional().describe("Include parent and ultimate parent LEI relationships"),
   checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN & EU Financial Sanctions (default true)"),
-  includeOfficers: boolean2().optional().describe("Include corporate directors, executives, and officers when available")
+  includeOfficers: boolean2().optional().describe("Include corporate directors, executives, and officers when available"),
+  allowPaidSources: boolean2().optional().describe("Allow fallback to commercial paid aggregators when official registries are paywalled or unavailable")
 });
 var ResolveEntityResultSchema = object({
   resolved: boolean2(),
@@ -7391,6 +8588,12 @@ var ResolveEntityResultSchema = object({
   compliance: SanctionsScreenResultSchema.nullable(),
   vatVerification: VatVerificationResultSchema.nullable(),
   candidates: array(CanonicalEntityRecordSchema),
+  coverage: object({
+    country: string2(),
+    level: string2(),
+    sourcesTried: array(any()),
+    paidSourceUsed: boolean2()
+  }).optional(),
   latencyMs: number2()
 });
 var VerifyVatCommandSchema = object({
@@ -7428,7 +8631,8 @@ var CheckVendorResultSchema = object({
 var VerifyBankPayeeCommandSchema = object({
   iban: string2().min(10).describe("International Bank Account Number (IBAN), spaces permitted"),
   expectedCountry: string2().optional().describe("Expected 2-letter ISO country code of the payee/vendor (e.g. 'DE')"),
-  payeeName: string2().optional().describe("Optional legal payee name to cross-check against bank account jurisdiction")
+  payeeName: string2().optional().describe("Optional legal payee name to cross-check against bank account jurisdiction"),
+  payeeTaxId: string2().optional().describe("National tax/business registration number (e.g. Polish NIP or Czech I\u010CO) to verify account ownership against official public registers")
 });
 var VerifyBankPayeeResultSchema = object({
   valid: boolean2(),
@@ -7439,6 +8643,8 @@ var VerifyBankPayeeResultSchema = object({
   countryMatch: boolean2().nullable(),
   expectedLength: number2().nullable(),
   actualLength: number2(),
+  ownershipVerified: boolean2().nullable().optional(),
+  ownershipSource: string2().nullable().optional(),
   issues: array(string2()),
   checkedAt: string2()
 });
@@ -7587,6 +8793,7 @@ function loadConfig(env = process.env) {
     redisUrl: env.REDIS_URL ?? "",
     freeCallsPerDay: Number.parseInt(env.FREE_CALLS_PER_DAY ?? "5", 10) || 5,
     priceEntityResolveUsd: env.PRICE_ENTITY_RESOLVE_USD ?? "0.005",
+    priceEntityResolvePaidUsd: env.PRICE_ENTITY_RESOLVE_PAID_USD ?? "0.050",
     priceVatVerifyUsd: env.PRICE_VAT_VERIFY_USD ?? "0.005",
     priceSanctionsCheckUsd: env.PRICE_SANCTIONS_CHECK_USD ?? "0.005",
     priceCheckVendorUsd: env.PRICE_CHECK_VENDOR_USD ?? "0.010",
@@ -7607,7 +8814,14 @@ function loadConfig(env = process.env) {
     tempoTestnet: (env.TEMPO_TESTNET ?? "true").toLowerCase() !== "false",
     secEdgarUserAgent: env.SEC_EDGAR_USER_AGENT ?? "Agentum/1.0 (algimantask@wix.com)",
     viesTimeoutMs: Number.parseInt(env.VIES_TIMEOUT_MS ?? "4000", 10) || 4000,
-    adminSyncToken: env.ADMIN_SYNC_TOKEN ?? "agm_sync_7c4f9b2e8a1d6f3c5e0b9a4d2f7e1c8b"
+    adminSyncToken: (() => {
+      const DEFAULT_DEV_ADMIN_TOKEN = "agm_sync_7c4f9b2e8a1d6f3c5e0b9a4d2f7e1c8b";
+      const token = env.ADMIN_SYNC_TOKEN ?? DEFAULT_DEV_ADMIN_TOKEN;
+      if (nodeEnv === "production" && (!env.ADMIN_SYNC_TOKEN || env.ADMIN_SYNC_TOKEN === DEFAULT_DEV_ADMIN_TOKEN)) {
+        throw new Error("ADMIN_SYNC_TOKEN must be explicitly configured in production");
+      }
+      return token;
+    })()
   };
 }
 var config2 = loadConfig();
@@ -9876,6 +11090,26 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
       }
     });
   });
+  app.get("/v1/coverage", (c) => {
+    const level = c.req.query("level");
+    const all = listCoverage();
+    const filtered = level ? all.filter((p) => p.coverage === level) : all;
+    return c.json({
+      totalCountries: all.length,
+      byLevel: {
+        L3_ENRICHED: all.filter((p) => p.coverage === "L3_ENRICHED").length,
+        L2_VERIFIED: all.filter((p) => p.coverage === "L2_VERIFIED").length,
+        L1_VALIDATED: all.filter((p) => p.coverage === "L1_VALIDATED").length,
+        L0_SCREENED: all.filter((p) => p.coverage === "L0_SCREENED").length
+      },
+      countries: filtered
+    });
+  });
+  app.get("/v1/coverage/:country", (c) => {
+    const code = c.req.param("country");
+    const profile = getCountryProfile(code);
+    return c.json(profile);
+  });
   app.get("/openapi.json", (c) => {
     const paths = {};
     for (const tool of registry.getAll()) {
@@ -10647,7 +11881,8 @@ function computeCallerFingerprint(headers) {
       normalized[key.toLowerCase()] = value;
     }
   }
-  const raw = normalized["x-agent-id"] || normalized["x-forwarded-for"] || "anonymous-local";
+  const clientIp = normalized["cf-connecting-ip"] || normalized["x-real-ip"] || (normalized["x-forwarded-for"] ? normalized["x-forwarded-for"].split(",")[0].trim() : undefined);
+  const raw = clientIp || normalized["x-agent-id"] || "anonymous-local";
   return crypto3.createHash("sha256").update(raw).digest("hex");
 }
 async function evaluateDual402Gate(opts) {
@@ -10707,7 +11942,8 @@ async function evaluateDual402Gate(opts) {
     mppCred = authHeader;
   }
   if (mppCred) {
-    const spentKey = `agentum:spent:mpp:${crypto3.createHash("sha256").update(mppCred.trim()).digest("hex")}`;
+    const piMatch = mppCred.match(/\b(pi_[A-Za-z0-9_]{10,})\b/);
+    const spentKey = piMatch ? `agentum:spent:stripe:${piMatch[1]}` : `agentum:spent:mpp:${crypto3.createHash("sha256").update(mppCred.trim()).digest("hex")}`;
     if (opts.config.featureReplayProtection) {
       const alreadySpent = await opts.cacheStore.getCache(spentKey);
       if (alreadySpent) {
@@ -11545,6 +12781,7 @@ function mountMcpHttpAdapter(app, deps) {
           };
         }
         if (uri === "agentum://registries/coverage") {
+          const all = listCoverage();
           return {
             isNotification: false,
             body: {
@@ -11556,19 +12793,41 @@ function mountMcpHttpAdapter(app, deps) {
                     uri,
                     mimeType: "application/json",
                     text: JSON.stringify({
-                      corporateRegistries: [
-                        "GLEIF Global LEI Index (ISO 17442)",
-                        "US SEC EDGAR Company Submissions & CIK Index",
-                        "Lithuania Registr\u0173 centras (JAR Open Data)"
+                      totalCountries: all.length,
+                      summary: {
+                        L3_ENRICHED: all.filter((p) => p.coverage === "L3_ENRICHED").length,
+                        L2_VERIFIED: all.filter((p) => p.coverage === "L2_VERIFIED").length,
+                        L1_VALIDATED: all.filter((p) => p.coverage === "L1_VALIDATED").length,
+                        L0_SCREENED: all.filter((p) => p.coverage === "L0_SCREENED").length
+                      },
+                      liveOfficialRegistries: [
+                        "UK Companies House (GB)",
+                        "Swiss ZEFIX (CH)",
+                        "Australian ABR (AU)",
+                        "Singapore ACRA (SG)",
+                        "US SEC EDGAR (US)",
+                        "Lithuania Registr\u0173 centras JAR (LT)",
+                        "France Recherche Entreprises (FR)",
+                        "Czech ARES (CZ)",
+                        "Norway Br\xF8nn\xF8ysundregistrene (NO)",
+                        "Finland PRH Virre (FI)",
+                        "New Zealand NZBN (NZ)",
+                        "Brazil Receita Federal CNPJ (BR)",
+                        "Canada Corporations (CA)",
+                        "Japan National Tax Agency (JP)",
+                        "GLEIF Global LEI Index (GLOBAL)"
                       ],
-                      taxRegistries: [
-                        "European Commission VIES VAT Validation API (27 EU Member States)"
+                      taxAndAccountRegistries: [
+                        "European Commission VIES VAT Validation API (27 EU Member States)",
+                        "Poland Ministry of Finance White List (Bia\u0142a lista VAT)",
+                        "Czech Republic MoF Unreliable VAT Payers & Bank Accounts"
                       ],
                       sanctionsLists: [
                         "US Treasury OFAC Specially Designated Nationals (SDN)",
                         "European Union Consolidated Financial Sanctions (FSF)",
                         "United Nations Security Council Consolidated List (UN SC)"
-                      ]
+                      ],
+                      fallbackAggregator: "OpenCorporates API (commercial paid fallback)"
                     }, null, 2)
                   }
                 ]
@@ -12488,17 +13747,20 @@ class InMemoryEntityRepositoryAdapter {
   entities = new Map;
   constructor(initialEntities = SEED_ENTITIES) {
     for (const entity of initialEntities) {
-      const key = `${entity.primaryIdType}:${entity.primaryIdValue}`;
+      const key = `${entity.jurisdiction}:${entity.primaryIdType}:${entity.primaryIdValue}`;
       this.entities.set(key, { ...entity });
     }
   }
-  async findByIdentifier(type, value) {
+  async findByIdentifier(type, value, jurisdiction) {
     const rawVal = value.trim();
     if (!rawVal)
       return null;
     if (type === "DOMAIN") {
       const domainClean = rawVal.toLowerCase().replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0];
       for (const entity of this.entities.values()) {
+        if (jurisdiction && entity.jurisdiction.toUpperCase() !== jurisdiction.toUpperCase()) {
+          continue;
+        }
         if (entity.domains.some((d) => d.toLowerCase() === domainClean)) {
           return { ...entity };
         }
@@ -12507,23 +13769,29 @@ class InMemoryEntityRepositoryAdapter {
     }
     const valUpper = rawVal.toUpperCase();
     const cleanNoSpaces = valUpper.replace(/[\s\-. ]/g, "");
+    const targetJur = jurisdiction?.toUpperCase();
     for (const entity of this.entities.values()) {
-      if (entity.primaryIdValue.toUpperCase() === valUpper || entity.primaryIdValue.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces) {
+      if (targetJur && entity.jurisdiction.toUpperCase() !== targetJur) {
+        if (type !== "LEI") {
+          continue;
+        }
+      }
+      if (entity.primaryIdType === type && (entity.primaryIdValue.toUpperCase() === valUpper || entity.primaryIdValue.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces)) {
         return { ...entity };
       }
-      if (entity.lei && entity.lei.toUpperCase() === valUpper) {
+      if (type === "LEI" && entity.lei && entity.lei.toUpperCase() === valUpper) {
         return { ...entity };
       }
-      if (entity.vatNumber && entity.vatNumber.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces) {
+      if ((type === "EU_VAT" || type === "VAT") && entity.vatNumber && entity.vatNumber.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces) {
         return { ...entity };
       }
-      if (entity.registrationNumber && (entity.registrationNumber.toUpperCase() === valUpper || entity.registrationNumber.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces)) {
+      if ((type === "LT_JAR" || type === "NATIONAL_ID" || type === "NATIONAL_REG") && entity.registrationNumber && (entity.registrationNumber.toUpperCase() === valUpper || entity.registrationNumber.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces)) {
         return { ...entity };
       }
-      if (entity.taxId && (entity.taxId.toUpperCase() === valUpper || entity.taxId.toUpperCase().replace(/[\s-]/g, "") === valUpper.replace(/[\s-]/g, ""))) {
+      if ((type === "US_EIN" || type === "TAX") && entity.taxId && (entity.taxId.toUpperCase() === valUpper || entity.taxId.toUpperCase().replace(/[\s-]/g, "") === valUpper.replace(/[\s-]/g, ""))) {
         return { ...entity };
       }
-      if (entity.cik && (entity.cik.toUpperCase() === valUpper || entity.cik.replace(/^0+/, "") === valUpper.replace(/^0+/, ""))) {
+      if ((type === "US_CIK" || type === "CIK") && entity.cik && (entity.cik.toUpperCase() === valUpper || entity.cik.replace(/^0+/, "") === valUpper.replace(/^0+/, ""))) {
         return { ...entity };
       }
     }
@@ -12563,7 +13831,7 @@ class InMemoryEntityRepositoryAdapter {
   async upsertMany(entities) {
     let count = 0;
     for (const entity of entities) {
-      const key = `${entity.primaryIdType}:${entity.primaryIdValue}`;
+      const key = `${entity.jurisdiction}:${entity.primaryIdType}:${entity.primaryIdValue}`;
       this.entities.set(key, { ...entity });
       count++;
     }
@@ -12591,20 +13859,31 @@ class HybridPostgresEntityRepositoryAdapter {
       }
     }
   }
-  async findByIdentifier(type, value) {
+  async findByIdentifier(type, value, jurisdiction) {
     if (this.sql && this.sqlHealthy) {
       try {
         const cleanVal = value.trim();
-        const rows = await this.sql`
-          SELECT * FROM entities
-          WHERE primary_id_value = ${cleanVal}
-             OR lei = ${cleanVal}
-             OR vat_number = ${cleanVal}
-             OR registration_number = ${cleanVal}
-             OR tax_id = ${cleanVal}
-             OR cik = ${cleanVal}
-          LIMIT 1
-        `;
+        const jurFilter = jurisdiction ? jurisdiction.toUpperCase() : null;
+        const rows = jurFilter ? await this.sql`
+              SELECT * FROM entities
+              WHERE (primary_id_value = ${cleanVal}
+                 OR lei = ${cleanVal}
+                 OR vat_number = ${cleanVal}
+                 OR registration_number = ${cleanVal}
+                 OR tax_id = ${cleanVal}
+                 OR cik = ${cleanVal})
+                AND (jurisdiction = ${jurFilter} OR primary_id_type = 'LEI')
+              LIMIT 1
+            ` : await this.sql`
+              SELECT * FROM entities
+              WHERE primary_id_value = ${cleanVal}
+                 OR lei = ${cleanVal}
+                 OR vat_number = ${cleanVal}
+                 OR registration_number = ${cleanVal}
+                 OR tax_id = ${cleanVal}
+                 OR cik = ${cleanVal}
+              LIMIT 1
+            `;
         if (rows && rows.length > 0) {
           return mapRowToEntity(rows[0]);
         }
@@ -12612,7 +13891,7 @@ class HybridPostgresEntityRepositoryAdapter {
         this.sqlHealthy = false;
       }
     }
-    return this.memory.findByIdentifier(type, value);
+    return this.memory.findByIdentifier(type, value, jurisdiction);
   }
   async searchFuzzy(normalizedName, opts) {
     if (this.sql && this.sqlHealthy) {
@@ -12640,7 +13919,7 @@ class HybridPostgresEntityRepositoryAdapter {
       try {
         const dedupedMap = new Map;
         for (const e of entities) {
-          const key = `${e.primaryIdType}:${e.primaryIdValue}`;
+          const key = `${e.jurisdiction}:${e.primaryIdType}:${e.primaryIdValue}`;
           const prev = dedupedMap.get(key);
           if (prev) {
             prev.tickers = Array.from(new Set([...prev.tickers, ...e.tickers]));
@@ -12653,7 +13932,7 @@ class HybridPostgresEntityRepositoryAdapter {
         const BATCH_SIZE = 500;
         for (let i = 0;i < deduped.length; i += BATCH_SIZE) {
           const chunk = deduped.slice(i, i + BATCH_SIZE).map((e) => ({
-            id: e.id ?? `${e.primaryIdType}:${e.primaryIdValue}`,
+            id: e.id ?? `${e.jurisdiction}:${e.primaryIdType}:${e.primaryIdValue}`,
             canonical_name: e.canonicalName,
             normalized_name: e.normalizedName || e.canonicalName.toUpperCase(),
             jurisdiction: e.jurisdiction,
@@ -12870,10 +14149,53 @@ var SEED_SANCTIONS = [
 
 class InMemorySanctionsRepositoryAdapter {
   entries = new Map;
-  constructor(initialEntries = SEED_SANCTIONS) {
+  feedStatus = new Map;
+  minRecords;
+  maxAgeMs;
+  lastRefreshedAt = null;
+  constructor(initialEntries = SEED_SANCTIONS, options = {}) {
+    this.minRecords = options.minRecords ?? 100;
+    this.maxAgeMs = (options.maxAgeHours ?? 168) * 3600 * 1000;
     for (const entry of initialEntries) {
       this.entries.set(`${entry.listSource}:${entry.externalId}`, { ...entry });
     }
+    if (initialEntries.length > 0) {
+      this.lastRefreshedAt = new Date().toISOString();
+      this.feedStatus.set("SEED", {
+        source: "SEED",
+        recordCount: initialEntries.length,
+        lastRefreshedAt: this.lastRefreshedAt,
+        status: initialEntries.length >= this.minRecords ? "OK" : "DEGRADED"
+      });
+    }
+  }
+  async recordFeedSync(status) {
+    this.feedStatus.set(status.source, status);
+    if (status.status === "OK") {
+      this.lastRefreshedAt = status.lastRefreshedAt ?? new Date().toISOString();
+    }
+  }
+  async getFeedStatus() {
+    const totalRecords = this.entries.size;
+    let degraded = totalRecords < this.minRecords;
+    let degradedReason;
+    if (totalRecords === 0) {
+      degraded = true;
+      degradedReason = "Sanctions database is empty (0 records indexed)";
+    } else if (totalRecords < this.minRecords) {
+      degraded = true;
+      degradedReason = `Sanctions database contains only ${totalRecords} records (minimum ${this.minRecords} required for production clearance)`;
+    } else if (this.lastRefreshedAt && Date.now() - new Date(this.lastRefreshedAt).getTime() > this.maxAgeMs) {
+      degraded = true;
+      degradedReason = `Sanctions feed data is stale (last refreshed at ${this.lastRefreshedAt})`;
+    }
+    return {
+      totalRecords,
+      lastRefreshedAt: this.lastRefreshedAt,
+      degraded,
+      degradedReason,
+      feeds: Object.fromEntries(this.feedStatus.entries())
+    };
   }
   async screen(input) {
     const threshold = input.threshold ?? 0.75;
@@ -12902,14 +14224,23 @@ class InMemorySanctionsRepositoryAdapter {
     }
     matches.sort((a, b) => b.score - a.score);
     const maxScore = matches.length > 0 ? matches[0].score : 0;
-    const riskLevel = maxScore >= 0.95 ? "EXACT_MATCH" : matches.length > 0 ? "POTENTIAL_MATCH" : "CLEAR";
+    const feedStatus = await this.getFeedStatus();
+    let riskLevel = maxScore >= 0.95 ? "EXACT_MATCH" : matches.length > 0 ? "POTENTIAL_MATCH" : this.entries.size === 0 ? "UNKNOWN" : "CLEAR";
     const matchedLists = Array.from(new Set(matches.map((m) => m.listSource)));
+    const sourcesScreened = Array.from(new Set(Array.from(this.entries.values()).map((e) => e.listSource)));
     return {
       sanctioned: matches.length > 0,
       riskLevel,
       matchScore: maxScore,
       matchedLists,
-      matches
+      matches,
+      degraded: feedStatus.degraded,
+      degradedReason: feedStatus.degradedReason,
+      coverage: {
+        recordCount: this.entries.size,
+        sourcesScreened: sourcesScreened.length > 0 ? sourcesScreened : ["OFAC_SDN", "EU_FSF"],
+        lastSyncAt: this.lastRefreshedAt
+      }
     };
   }
   async upsertMany(entries) {
@@ -12918,6 +14249,7 @@ class InMemorySanctionsRepositoryAdapter {
       this.entries.set(`${entry.listSource}:${entry.externalId}`, { ...entry });
       count++;
     }
+    this.lastRefreshedAt = new Date().toISOString();
     return count;
   }
   async count() {
@@ -12930,6 +14262,8 @@ class HybridPostgresSanctionsRepositoryAdapter {
   fallback = new InMemorySanctionsRepositoryAdapter;
   sql = null;
   initPromise = null;
+  lastRefreshedAt = null;
+  feedStatus = new Map;
   constructor(databaseUrl) {
     this.databaseUrl = databaseUrl;
   }
@@ -12955,10 +14289,51 @@ class HybridPostgresSanctionsRepositoryAdapter {
     await this.initPromise;
     return this.sql;
   }
+  async recordFeedSync(status) {
+    this.feedStatus.set(status.source, status);
+    await this.fallback.recordFeedSync(status);
+    if (status.status === "OK") {
+      this.lastRefreshedAt = status.lastRefreshedAt ?? new Date().toISOString();
+    }
+  }
+  async getFeedStatus() {
+    const db = await this.ensureDb();
+    if (!db) {
+      const fb = await this.fallback.getFeedStatus();
+      return {
+        ...fb,
+        degraded: true,
+        degradedReason: "PostgreSQL database unavailable; operating in degraded fallback mode"
+      };
+    }
+    try {
+      const count = await this.count();
+      const isDegraded = count < 100;
+      return {
+        totalRecords: count,
+        lastRefreshedAt: this.lastRefreshedAt,
+        degraded: isDegraded,
+        degradedReason: isDegraded ? `Sanctions database contains only ${count} records (minimum 100 required for production clearance)` : undefined,
+        feeds: Object.fromEntries(this.feedStatus.entries())
+      };
+    } catch {
+      const fb = await this.fallback.getFeedStatus();
+      return {
+        ...fb,
+        degraded: true,
+        degradedReason: "Database query error checking sanctions feed status"
+      };
+    }
+  }
   async screen(input) {
     const db = await this.ensureDb();
     if (!db) {
-      return this.fallback.screen(input);
+      const fallbackRes = await this.fallback.screen(input);
+      return {
+        ...fallbackRes,
+        degraded: true,
+        degradedReason: "PostgreSQL database connection unavailable; fell back to in-memory dataset"
+      };
     }
     try {
       const threshold = input.threshold ?? 0.75;
@@ -12999,24 +14374,36 @@ class HybridPostgresSanctionsRepositoryAdapter {
         score: Math.round(Number(r.score) * 1e4) / 1e4,
         remarks: r.remarks ? String(r.remarks) : undefined
       })).filter((m) => m.score >= threshold);
-      if (matches.length === 0) {
-        return this.fallback.screen(input);
-      }
-      const maxScore = matches[0].score;
-      const riskLevel = maxScore >= 0.95 ? "EXACT_MATCH" : matches.length > 0 ? "POTENTIAL_MATCH" : "CLEAR";
+      const totalCount = await this.count();
+      const isDegraded = totalCount < 100;
+      const maxScore = matches.length > 0 ? matches[0].score : 0;
+      const riskLevel = maxScore >= 0.95 ? "EXACT_MATCH" : matches.length > 0 ? "POTENTIAL_MATCH" : isDegraded && totalCount === 0 ? "UNKNOWN" : "CLEAR";
       return {
         sanctioned: matches.length > 0,
         riskLevel,
         matchScore: maxScore,
         matchedLists: Array.from(new Set(matches.map((m) => m.listSource))),
-        matches
+        matches,
+        degraded: isDegraded,
+        degradedReason: isDegraded ? `Sanctions database contains only ${totalCount} records (minimum 100 required for production clearance)` : undefined,
+        coverage: {
+          recordCount: totalCount,
+          sourcesScreened: ["OFAC_SDN", "EU_FSF", "UN_SC"],
+          lastSyncAt: this.lastRefreshedAt
+        }
       };
     } catch {
-      return this.fallback.screen(input);
+      const fallbackRes = await this.fallback.screen(input);
+      return {
+        ...fallbackRes,
+        degraded: true,
+        degradedReason: "PostgreSQL query failed; fell back to degraded in-memory dataset"
+      };
     }
   }
   async upsertMany(entries) {
     await this.fallback.upsertMany(entries);
+    this.lastRefreshedAt = new Date().toISOString();
     const db = await this.ensureDb();
     if (!db)
       return entries.length;
@@ -13342,6 +14729,12 @@ class DatasetIngestWorkerAdapter {
           status: "ok",
           recordsLoaded: SEED_SANCTIONS.length
         };
+        await this.deps.sanctionsRepo.recordFeedSync?.({
+          source: "SEED",
+          recordCount: SEED_SANCTIONS.length,
+          lastRefreshedAt: new Date().toISOString(),
+          status: "DEGRADED"
+        });
         continue;
       }
       if (src === "ofac_sdn_live") {
@@ -13352,12 +14745,26 @@ class DatasetIngestWorkerAdapter {
           const csv = await res.text();
           const parsed = parseOfacSdnCsv(csv);
           await this.deps.sanctionsRepo.upsertMany(parsed);
+          await this.deps.sanctionsRepo.recordFeedSync?.({
+            source: "OFAC_SDN",
+            recordCount: parsed.length,
+            lastRefreshedAt: new Date().toISOString(),
+            status: parsed.length >= 100 ? "OK" : "DEGRADED"
+          });
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          await this.deps.sanctionsRepo.recordFeedSync?.({
+            source: "OFAC_SDN",
+            recordCount: 0,
+            lastRefreshedAt: null,
+            status: "FAILED",
+            error: errMsg
+          });
           sourceDetails[src] = {
             status: "skipped_or_offline",
             recordsLoaded: 0,
-            error: err instanceof Error ? err.message : String(err)
+            error: errMsg
           };
         }
         continue;
@@ -13372,12 +14779,26 @@ class DatasetIngestWorkerAdapter {
           const csv = await res.text();
           const parsed = parseOpenSanctionsSimpleCsv(csv, listSource);
           await this.deps.sanctionsRepo.upsertMany(parsed);
+          await this.deps.sanctionsRepo.recordFeedSync?.({
+            source: listSource,
+            recordCount: parsed.length,
+            lastRefreshedAt: new Date().toISOString(),
+            status: parsed.length >= 100 ? "OK" : "DEGRADED"
+          });
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          await this.deps.sanctionsRepo.recordFeedSync?.({
+            source: listSource,
+            recordCount: 0,
+            lastRefreshedAt: null,
+            status: "FAILED",
+            error: errMsg
+          });
           sourceDetails[src] = {
             status: "skipped_or_offline",
             recordsLoaded: 0,
-            error: err instanceof Error ? err.message : String(err)
+            error: errMsg
           };
         }
         continue;
@@ -13511,6 +14932,22 @@ class MppPaymentAdapter {
             verified: false,
             rail: "MPP",
             error: `Stripe PaymentIntent status is '${piData.status ?? "unknown"}', expected 'succeeded'`
+          };
+        }
+        if ((piData.currency ?? "").toLowerCase() !== "usd") {
+          return {
+            verified: false,
+            rail: "MPP",
+            error: `Stripe PaymentIntent currency is '${piData.currency ?? "unknown"}', expected 'usd'`
+          };
+        }
+        const requiredCents = Math.round(parseFloat(ctx.priceUsd) * 100);
+        const minCents = Math.max(1, requiredCents);
+        if (typeof piData.amount === "number" && piData.amount < minCents) {
+          return {
+            verified: false,
+            rail: "MPP",
+            error: `Stripe PaymentIntent amount ${piData.amount} cents is less than required ${minCents} cents`
           };
         }
         const receipt = {
@@ -13685,6 +15122,20 @@ class X402PaymentAdapter {
             rail: "X402",
             error: data.error ?? "Facilitator verification rejected"
           };
+        }
+        let settlementRef = data.txHash || data.settlementId;
+        if (!settlementRef) {
+          try {
+            const settleRes = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/settle`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ credential: decoded, context: ctx })
+            });
+            if (settleRes.ok) {
+              const settleData = await settleRes.json().catch(() => ({}));
+              settlementRef = settleData.txHash || settleData.settlementId;
+            }
+          } catch {}
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Facilitator verification error";
@@ -14856,11 +16307,11 @@ class SingaporeAcraAdapter {
   }
   mapStatus(statusRaw) {
     const s = String(statusRaw ?? "").toLowerCase();
+    if (s.includes("inactive") || s.includes("struck") || s.includes("dissolved") || s.includes("winding") || s.includes("liquidation") || s.includes("ceased")) {
+      return "INACTIVE";
+    }
     if (s.includes("live") || s.includes("registered") || s.includes("active")) {
       return "ACTIVE";
-    }
-    if (s.includes("struck") || s.includes("dissolved") || s.includes("winding") || s.includes("liquidation") || s.includes("ceased") || s.includes("inactive")) {
-      return "INACTIVE";
     }
     return "UNKNOWN";
   }
@@ -14916,6 +16367,472 @@ class SingaporeAcraAdapter {
   }
 }
 
+// src/adapters/outbound/upstreams/configurable-registry.adapter.ts
+var EU_COUNTRIES2 = new Set([
+  "AT",
+  "BE",
+  "BG",
+  "CY",
+  "CZ",
+  "DE",
+  "DK",
+  "EE",
+  "ES",
+  "FI",
+  "FR",
+  "GR",
+  "HR",
+  "HU",
+  "IE",
+  "IT",
+  "LT",
+  "LU",
+  "LV",
+  "MT",
+  "NL",
+  "PL",
+  "PT",
+  "RO",
+  "SE",
+  "SI",
+  "SK"
+]);
+function getByDotPath(obj, path) {
+  if (!obj || !path)
+    return;
+  const parts = path.split(".");
+  let cur = obj;
+  for (const part of parts) {
+    if (cur == null || typeof cur !== "object")
+      return;
+    cur = cur[part];
+  }
+  return cur;
+}
+
+class ConfigurableRegistryAdapter {
+  sourceName;
+  config;
+  fetchImpl;
+  env;
+  constructor(config, deps) {
+    this.config = config;
+    this.sourceName = config.sourceName;
+    this.fetchImpl = deps?.fetchImpl ?? fetch;
+    this.env = deps?.env ?? (typeof process !== "undefined" ? process.env : {});
+  }
+  supports(query, jurisdiction) {
+    if (query.scheme && this.config.schemes.includes(query.scheme)) {
+      return true;
+    }
+    if (query.type === "NAME" && this.config.searchUrl) {
+      const targetCountry = jurisdiction || query.inferredCountry;
+      if (targetCountry && targetCountry.toUpperCase() === this.config.country.toUpperCase()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  async search(query, opts) {
+    let url;
+    const isIdLookup = query.scheme && this.config.schemes.includes(query.scheme);
+    if (isIdLookup) {
+      url = this.config.lookupUrl.replace("{id}", encodeURIComponent(query.cleanedValue));
+    } else if (query.type === "NAME" && this.config.searchUrl) {
+      url = this.config.searchUrl.replace("{q}", encodeURIComponent(query.cleanedValue || query.raw));
+    } else {
+      return [];
+    }
+    const headers = {
+      Accept: "application/json"
+    };
+    if (this.config.headers) {
+      for (const [key, rawVal] of Object.entries(this.config.headers)) {
+        const val = rawVal.replace(/\$\{([^}]+)\}/g, (_, varName) => {
+          return this.env[varName] || "";
+        });
+        headers[key] = val;
+      }
+    }
+    const timeout = opts?.timeoutMs || this.config.timeoutMs || 2500;
+    try {
+      const response = await this.fetchImpl(url, {
+        method: "GET",
+        headers,
+        signal: AbortSignal.timeout(timeout)
+      });
+      if (!response.ok) {
+        return [];
+      }
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        return [];
+      }
+      if (!data)
+        return [];
+      let items = [];
+      if (this.config.resultsPath && getByDotPath(data, this.config.resultsPath)) {
+        const extracted = getByDotPath(data, this.config.resultsPath);
+        if (Array.isArray(extracted)) {
+          items = extracted;
+        } else if (extracted != null && typeof extracted === "object") {
+          items = [extracted];
+        }
+      } else {
+        items = Array.isArray(data) ? data : [data];
+      }
+      const records = [];
+      const now = new Date().toISOString();
+      for (const item of items) {
+        const idVal = getByDotPath(item, this.config.fieldMap.id);
+        const nameVal = getByDotPath(item, this.config.fieldMap.name);
+        if (!nameVal)
+          continue;
+        let status = "UNKNOWN";
+        if (this.config.fieldMap.status) {
+          const rawStatus = String(getByDotPath(item, this.config.fieldMap.status) ?? "");
+          status = this.config.statusMap[rawStatus] || this.config.statusMap["*"] || "UNKNOWN";
+        } else {
+          status = this.config.statusMap["*"] || this.config.statusMap["ACTIVE"] || "ACTIVE";
+        }
+        const street = this.config.fieldMap.street ? String(getByDotPath(item, this.config.fieldMap.street) ?? "") : undefined;
+        const city = this.config.fieldMap.city ? String(getByDotPath(item, this.config.fieldMap.city) ?? "") : undefined;
+        const postalCode = this.config.fieldMap.postalCode ? String(getByDotPath(item, this.config.fieldMap.postalCode) ?? "") : undefined;
+        const cleanName = String(nameVal).trim();
+        const { normalizedName, detectedLegalForm } = normalizeCompanyName(cleanName);
+        const jurUpper = this.config.country.toUpperCase();
+        const region = jurUpper === "US" ? "US" : EU_COUNTRIES2.has(jurUpper) ? "EU" : "OTHER";
+        const cleanId = idVal ? String(idVal).trim() : query.cleanedValue;
+        const entityId = `${jurUpper}_${query.scheme || "REG"}:${cleanId}`;
+        records.push({
+          id: entityId,
+          canonicalName: cleanName,
+          normalizedName,
+          jurisdiction: jurUpper,
+          region,
+          primaryIdType: "NATIONAL_REG",
+          primaryIdValue: cleanId,
+          lei: null,
+          registrationNumber: cleanId,
+          registrationAuthority: this.sourceName,
+          vatNumber: null,
+          vatValid: null,
+          taxId: null,
+          cik: null,
+          tickers: [],
+          legalForm: this.config.fieldMap.legalForm ? getByDotPath(item, this.config.fieldMap.legalForm) ?? detectedLegalForm : detectedLegalForm,
+          status,
+          incorporationDate: this.config.fieldMap.incorporationDate ? getByDotPath(item, this.config.fieldMap.incorporationDate) ?? null : null,
+          legalAddress: {
+            street: street || undefined,
+            city: city || undefined,
+            postalCode: postalCode || undefined,
+            country: jurUpper
+          },
+          headquartersAddress: null,
+          parentLei: null,
+          ultimateParentLei: null,
+          domains: [],
+          aliases: [],
+          confidence: 1,
+          sources: [
+            {
+              source: this.sourceName,
+              sourceId: cleanId,
+              fetchedAt: now,
+              score: 1
+            }
+          ]
+        });
+      }
+      return records;
+    } catch {
+      return [];
+    }
+  }
+}
+
+// src/adapters/outbound/upstreams/registry-configs.ts
+var REGISTRY_CONFIGS = [
+  {
+    sourceName: "FR_RECHERCHE_ENTREPRISES",
+    country: "FR",
+    schemes: ["FR_SIREN", "FR_SIRET"],
+    lookupUrl: "https://recherche-entreprises.api.gouv.fr/search?q={id}",
+    searchUrl: "https://recherche-entreprises.api.gouv.fr/search?q={q}",
+    resultsPath: "results",
+    fieldMap: {
+      id: "siren",
+      name: "nom_complet",
+      status: "etat_administratif",
+      street: "siege.adresse",
+      city: "siege.libelle_commune",
+      postalCode: "siege.code_postal"
+    },
+    statusMap: {
+      A: "ACTIVE",
+      C: "DISSOLVED",
+      ACTIVE: "ACTIVE"
+    }
+  },
+  {
+    sourceName: "CZ_ARES",
+    country: "CZ",
+    schemes: ["CZ_ICO"],
+    lookupUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{id}",
+    searchUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty?obchodniJmeno={q}",
+    fieldMap: {
+      id: "ico",
+      name: "obchodniJmeno",
+      city: "sidlo.nazevObce",
+      postalCode: "sidlo.psc"
+    },
+    statusMap: {
+      ACTIVE: "ACTIVE"
+    }
+  },
+  {
+    sourceName: "NO_BRREG",
+    country: "NO",
+    schemes: ["NO_ORGNR"],
+    lookupUrl: "https://data.brreg.no/enhetsregisteret/api/enheter/{id}",
+    searchUrl: "https://data.brreg.no/enhetsregisteret/api/enheter?navn={q}",
+    resultsPath: "_embedded.enheter",
+    fieldMap: {
+      id: "organisasjonsnummer",
+      name: "navn",
+      city: "forretningsadresse.poststed",
+      postalCode: "forretningsadresse.postnummer"
+    },
+    statusMap: {
+      ACTIVE: "ACTIVE",
+      SLETTET: "DISSOLVED"
+    }
+  },
+  {
+    sourceName: "FI_PRH_YTJ",
+    country: "FI",
+    schemes: ["FI_YTUNNUS"],
+    lookupUrl: "https://avoindata.prh.fi/bis/v1/{id}",
+    searchUrl: "https://avoindata.prh.fi/bis/v1?totalResults=true&name={q}",
+    resultsPath: "results",
+    fieldMap: {
+      id: "businessId",
+      name: "name",
+      street: "addresses.0.street",
+      city: "addresses.0.city",
+      postalCode: "addresses.0.postCode"
+    },
+    statusMap: {
+      ACTIVE: "ACTIVE"
+    }
+  },
+  {
+    sourceName: "NZ_NZBN",
+    country: "NZ",
+    schemes: ["NZ_NZBN"],
+    lookupUrl: "https://api.business.govt.nz/services/v4/nzbn/entities/{id}",
+    searchUrl: "https://api.business.govt.nz/services/v4/nzbn/entities?search-term={q}",
+    headers: {
+      "Ocp-Apim-Subscription-Key": "${NZBN_API_KEY}"
+    },
+    fieldMap: {
+      id: "nzbn",
+      name: "entityName",
+      status: "entityStatusDescription"
+    },
+    statusMap: {
+      Registered: "ACTIVE",
+      Removed: "DISSOLVED",
+      ACTIVE: "ACTIVE"
+    }
+  },
+  {
+    sourceName: "BR_CNPJ",
+    country: "BR",
+    schemes: ["BR_CNPJ"],
+    lookupUrl: "https://brasilapi.com.br/api/cnpj/v1/{id}",
+    fieldMap: {
+      id: "cnpj",
+      name: "razao_social",
+      status: "descricao_situacao_cadastral",
+      city: "municipio",
+      street: "logradouro",
+      postalCode: "cep"
+    },
+    statusMap: {
+      ATIVA: "ACTIVE",
+      BAIXADA: "DISSOLVED",
+      SUSPENSA: "INACTIVE",
+      INAPTA: "INACTIVE"
+    }
+  },
+  {
+    sourceName: "CA_CORP",
+    country: "CA",
+    schemes: ["CA_BN"],
+    lookupUrl: "https://ised-isde.canada.ca/corp/api/corporations/{id}",
+    searchUrl: "https://ised-isde.canada.ca/corp/api/corporations?q={q}",
+    fieldMap: {
+      id: "corporationNumber",
+      name: "corporateName",
+      status: "status"
+    },
+    statusMap: {
+      Active: "ACTIVE",
+      Dissolved: "DISSOLVED",
+      ACTIVE: "ACTIVE"
+    }
+  },
+  {
+    sourceName: "JP_NTA",
+    country: "JP",
+    schemes: ["JP_CN"],
+    lookupUrl: "https://api.houjin-bangou.nta.go.jp/4/num?id=${JP_NTA_APP_ID}&number={id}&type=12",
+    searchUrl: "https://api.houjin-bangou.nta.go.jp/4/name?id=${JP_NTA_APP_ID}&name={q}&type=12",
+    resultsPath: "corporation",
+    fieldMap: {
+      id: "corporateNumber",
+      name: "name",
+      city: "cityName"
+    },
+    statusMap: {
+      ACTIVE: "ACTIVE"
+    }
+  }
+];
+
+// src/adapters/outbound/upstreams/commercial-aggregator.adapter.ts
+var EU_COUNTRIES3 = new Set([
+  "AT",
+  "BE",
+  "BG",
+  "CY",
+  "CZ",
+  "DE",
+  "DK",
+  "EE",
+  "ES",
+  "FI",
+  "FR",
+  "GR",
+  "HR",
+  "HU",
+  "IE",
+  "IT",
+  "LT",
+  "LU",
+  "LV",
+  "MT",
+  "NL",
+  "PL",
+  "PT",
+  "RO",
+  "SE",
+  "SI",
+  "SK"
+]);
+
+class OpenCorporatesAggregatorAdapter {
+  sourceName = "OPENCORPORATES";
+  costPerCallUsd;
+  fetchImpl;
+  apiKey;
+  constructor(deps) {
+    this.fetchImpl = deps?.fetchImpl ?? fetch;
+    this.apiKey = deps?.apiKey ?? (typeof process !== "undefined" ? process.env.OPENCORPORATES_API_KEY : undefined);
+    this.costPerCallUsd = deps?.costPerCallUsd ?? 0.05;
+  }
+  supports(query, jurisdiction) {
+    return true;
+  }
+  async search(query, opts) {
+    const term = query.cleanedValue || query.raw;
+    if (!term)
+      return [];
+    let url = `https://api.opencorporates.com/v0.4/companies/search?q=${encodeURIComponent(term)}`;
+    const jur = opts?.jurisdiction || query.inferredCountry;
+    if (jur) {
+      url += `&jurisdiction_code=${encodeURIComponent(jur.toLowerCase())}`;
+    }
+    if (this.apiKey) {
+      url += `&api_token=${encodeURIComponent(this.apiKey)}`;
+    }
+    const timeout = opts?.timeoutMs || 2500;
+    try {
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(timeout)
+      });
+      if (!res.ok) {
+        return [];
+      }
+      const data = await res.json();
+      const companies = data?.results?.companies;
+      if (!Array.isArray(companies)) {
+        return [];
+      }
+      const now = new Date().toISOString();
+      const records = [];
+      for (const item of companies) {
+        const c = item.company;
+        if (!c?.name)
+          continue;
+        const cleanName = String(c.name).trim();
+        const { normalizedName, detectedLegalForm } = normalizeCompanyName(cleanName);
+        const jurUpper = (c.jurisdiction_code || jur || "XX").toUpperCase();
+        const region = jurUpper === "US" ? "US" : EU_COUNTRIES3.has(jurUpper) ? "EU" : "OTHER";
+        const cleanId = String(c.company_number || cleanName).trim();
+        const entityId = `OC_${jurUpper}:${cleanId}`;
+        records.push({
+          id: entityId,
+          canonicalName: cleanName,
+          normalizedName,
+          jurisdiction: jurUpper,
+          region,
+          primaryIdType: "NATIONAL_REG",
+          primaryIdValue: cleanId,
+          lei: null,
+          registrationNumber: cleanId,
+          registrationAuthority: "OpenCorporates",
+          vatNumber: null,
+          vatValid: null,
+          taxId: null,
+          cik: null,
+          tickers: [],
+          legalForm: c.company_type || detectedLegalForm,
+          status: c.current_status?.toLowerCase().includes("dissolved") ? "DISSOLVED" : c.current_status?.toLowerCase().includes("inactive") ? "INACTIVE" : "ACTIVE",
+          incorporationDate: c.incorporation_date || null,
+          legalAddress: {
+            street: c.registered_address_in_full || undefined,
+            country: jurUpper
+          },
+          headquartersAddress: null,
+          parentLei: null,
+          ultimateParentLei: null,
+          domains: [],
+          aliases: [],
+          confidence: 1,
+          sources: [
+            {
+              source: this.sourceName,
+              sourceId: cleanId,
+              fetchedAt: now,
+              score: 1
+            }
+          ]
+        });
+      }
+      return records;
+    } catch {
+      return [];
+    }
+  }
+}
+
 // src/app.ts
 function createApp(overrides = {}, customDeps) {
   const appConfig = {
@@ -14926,6 +16843,7 @@ function createApp(overrides = {}, customDeps) {
   const cacheStore = createQuotaAndCacheAdapter(appConfig.redisUrl);
   const entityRepo = appConfig.databaseUrl ? new HybridPostgresEntityRepositoryAdapter(appConfig.databaseUrl) : new InMemoryEntityRepositoryAdapter;
   const sanctionsRepo = appConfig.databaseUrl ? new HybridPostgresSanctionsRepositoryAdapter(appConfig.databaseUrl) : new InMemorySanctionsRepositoryAdapter;
+  const configurableAdapters = REGISTRY_CONFIGS.map((cfg) => new ConfigurableRegistryAdapter(cfg, { fetchImpl }));
   const upstreamProviders = [
     new GleifUpstreamAdapter(fetchImpl),
     new LithuaniaJarUpstreamAdapter(fetchImpl),
@@ -14933,7 +16851,8 @@ function createApp(overrides = {}, customDeps) {
     new UkCompaniesHouseAdapter({ fetchImpl }),
     new SwissZefixAdapter({ fetchImpl }),
     new AustralianAbrAdapter({ fetchImpl }),
-    new SingaporeAcraAdapter({ fetchImpl })
+    new SingaporeAcraAdapter({ fetchImpl }),
+    ...configurableAdapters
   ];
   const vatValidator = new EuViesVatAdapter(fetchImpl, appConfig.viesTimeoutMs);
   const entityService = new EntityApplicationService({
@@ -14942,6 +16861,7 @@ function createApp(overrides = {}, customDeps) {
     sanctionsRepo,
     cacheStore,
     upstreamProviders,
+    commercialAggregator: new OpenCorporatesAggregatorAdapter({ fetchImpl }),
     vatValidator
   });
   const registry = new ToolRegistry;
@@ -15019,8 +16939,9 @@ function createApp(overrides = {}, customDeps) {
 // src/index.ts
 var { app, config: config3, ingestWorker } = createApp();
 if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
-  ingestWorker.runSync().catch((err) => {
-    console.error("[agentum:worker] initial seed sync error:", err);
+  const syncSources = config3.isProduction ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
+  ingestWorker.runSync(syncSources).catch((err) => {
+    console.error("[agentum:worker] initial sync error:", err);
   });
 }
 console.log(`[agentum] starting serviceRole=${config3.serviceRole} resolverMode=${config3.resolverMode} port=${config3.port}`);

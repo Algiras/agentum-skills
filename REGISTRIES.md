@@ -4,6 +4,21 @@ This document tracks all platforms, AI assistant ecosystems, MCP directories, se
 
 ---
 
+## 0. Worldwide Registry Coverage Architecture (249 ISO Countries)
+
+Agentum implements a deterministic 4-tier coverage taxonomy covering all 249 ISO 3166-1 alpha-2 nations, queryable dynamically via `GET /v1/coverage` and MCP resource `agentum://registries/coverage`:
+
+| Level | Name | Description | Count | Sources & Capabilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **L3** | **Enriched** | Live corporate registry + national bank account ownership & VAT registers | 3 countries | **Poland** (CEIDG/KRS + Biała lista VAT bank accounts), **Czech Republic** (ARES + Unreliable VAT Payers bank accounts), **Lithuania** (JAR + EU VIES). |
+| **L2** | **Verified** | Live official open-government or public company registries with zero scraping | 14+ countries | **United Kingdom** (Companies House), **Switzerland** (ZEFIX), **Australia** (ABR), **Singapore** (ACRA), **United States** (SEC EDGAR), **France** (Recherche Entreprises), **Norway** (Brønnøysundregistrene), **Finland** (PRH Virre), **New Zealand** (NZBN), **Brazil** (Receita Federal CNPJ), **Canada** (Corporations Canada), **Japan** (National Tax Agency), **Global** (GLEIF LEI). |
+| **L1** | **Validated** | Table-driven national identifier checksum validation & legal form detection | 40+ countries | Deterministic Modulo-10, Modulo-11, Luhn, ISO 7064, and Mod-97 checksums for SIREN/SIRET, OrgNr, IČO, CNPJ, NZBN, Y-tunnus, etc. Prevents querying upstream on corrupt IDs. |
+| **L0** | **Screened** | Trigram & fuzzy screening against consolidated global sanctions | **249 countries** | Universal baseline: OFAC SDN, EU Consolidated Financial Sanctions (FSF), UN Security Council lists. |
+
+**Paid Source Router:** When public open data is unavailable or when instructed via `allowPaidSources: true`, Agentum routes requests through a cost-aware `SourceRouter` utilizing `OpenCorporates` with strict client budget caps ($0.05/call max).
+
+---
+
 ## 1. AI Assistant Ecosystems & Marketplaces
 
 | Platform | Listing Type | Identifier / URL | Status | Notes |

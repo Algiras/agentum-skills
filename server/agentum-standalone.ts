@@ -3838,28 +3838,86 @@ class EntityApplicationService {
       auditTrail.push(`      \u26A0\uFE0F Entity resolution yielded no exact match (confidence=${entityRes.confidence})`);
     }
     let vatValid = null;
+    let vatOwnershipMismatch = false;
+    let vatOwnershipConfirmed = false;
     if (vatRes) {
       vatValid = vatRes.valid;
       auditTrail.push(`[2/3] EU VIES VAT Check '${cmd.vatNumber}': ${vatValid ? "VALID (registered)" : "INVALID / UNCONFIRMED"}`);
+      if (vatValid && entity) {
+        const entityVat = entity.vatNumber?.replace(/\s+/g, "").toUpperCase();
+        const inputVat = cmd.vatNumber?.replace(/\s+/g, "").toUpperCase();
+        if (entityVat && inputVat && entityVat === inputVat) {
+          vatOwnershipConfirmed = true;
+          auditTrail.push(`      \u2713 VAT Ownership Confirmed: Entity record contains registered VAT '${inputVat}'`);
+        } else if (vatRes.linkedEntity) {
+          const isSameEntity = vatRes.linkedEntity.id === entity.id || vatRes.linkedEntity.jurisdiction === entity.jurisdiction && vatRes.linkedEntity.primaryIdValue === entity.primaryIdValue;
+          if (isSameEntity) {
+            vatOwnershipConfirmed = true;
+            auditTrail.push(`      \u2713 VAT Ownership Confirmed: Linked entity matches resolved entity (${entity.canonicalName})`);
+          } else {
+            vatOwnershipMismatch = true;
+            auditTrail.push(`      \uD83D\uDEA8 VAT OWNERSHIP MISMATCH: VAT '${cmd.vatNumber}' is registered to '${vatRes.linkedEntity.canonicalName}' (${vatRes.linkedEntity.primaryIdValue}), NOT '${entity.canonicalName}'`);
+          }
+        } else if (vatRes.registeredName) {
+          const sim = trigramSimilarity(vatRes.registeredName, entity.canonicalName);
+          if (sim >= 0.6) {
+            vatOwnershipConfirmed = true;
+            auditTrail.push(`      \u2713 VAT Ownership Confirmed via registered name similarity (${Math.round(sim * 100)}%)`);
+          } else if (sim < 0.3) {
+            vatOwnershipMismatch = true;
+            auditTrail.push(`      \uD83D\uDEA8 VAT OWNERSHIP MISMATCH: VAT '${cmd.vatNumber}' registered name '${vatRes.registeredName}' does not match '${entity.canonicalName}' (similarity ${Math.round(sim * 100)}%)`);
+          }
+        }
+      }
     } else {
       auditTrail.push(`[2/3] VAT Check: Skipped (no EU VAT number provided)`);
     }
-    const sanctionsHit = sanctionsRes.sanctioned === true;
-    auditTrail.push(`[3/3] Sanctions Screening (OFAC/EU/UN): ${sanctionsHit ? "\uD83D\uDEA8 HIT DETECTED" : "\u2705 CLEAR"} (riskLevel=${sanctionsRes.riskLevel})`);
+    const canonicalSanctions = entityRes.compliance;
+    const suppliedHit = sanctionsRes.sanctioned === true;
+    const canonicalHit = canonicalSanctions?.sanctioned === true;
+    const sanctionsHit = suppliedHit || canonicalHit;
+    if (canonicalHit) {
+      auditTrail.push(`[3/3] \uD83D\uDEA8 SANCTIONS HIT ON RESOLVED ENTITY: '${entity?.canonicalName}' matches list(s): ${canonicalSanctions?.matchedLists.join(", ")}`);
+    }
+    if (suppliedHit) {
+      auditTrail.push(`[3/3] \uD83D\uDEA8 SANCTIONS HIT ON SUPPLIED VENDOR NAME: '${cmd.name}' matches list(s): ${sanctionsRes.matchedLists.join(", ")}`);
+    }
+    if (!sanctionsHit) {
+      auditTrail.push(`[3/3] Sanctions Screening (OFAC/EU/UN): \u2705 CLEAR (riskLevel=${sanctionsRes.riskLevel})`);
+    }
+    const sanctionsDegraded = Boolean(sanctionsRes.degraded || canonicalSanctions?.degraded);
+    const degradedReason = sanctionsRes.degradedReason || canonicalSanctions?.degradedReason;
+    const allMatches = [...sanctionsRes.matches, ...canonicalSanctions?.matches ?? []];
+    const allMatchedLists = Array.from(new Set([...sanctionsRes.matchedLists, ...canonicalSanctions?.matchedLists ?? []]));
+    const maxMatchScore = Math.max(sanctionsRes.matchScore, canonicalSanctions?.matchScore ?? 0);
+    const combinedSanctions = {
+      sanctioned: sanctionsHit,
+      riskLevel: sanctionsHit ? maxMatchScore >= 0.95 ? "EXACT_MATCH" : "POTENTIAL_MATCH" : sanctionsDegraded ? "UNKNOWN" : sanctionsRes.riskLevel === "POTENTIAL_MATCH" || canonicalSanctions?.riskLevel === "POTENTIAL_MATCH" ? "POTENTIAL_MATCH" : "CLEAR",
+      matchScore: maxMatchScore,
+      matchedLists: allMatchedLists,
+      matches: allMatches,
+      degraded: sanctionsDegraded,
+      degradedReason,
+      coverage: sanctionsRes.coverage || canonicalSanctions?.coverage
+    };
     let verdict = "APPROVED";
     let riskLevel = "CLEAR";
     if (sanctionsHit) {
       verdict = "REJECTED";
       riskLevel = "CRITICAL";
-      auditTrail.push(`[VERDICT] \u274C REJECTED due to sanctions match on lists: ${sanctionsRes.matchedLists.join(", ")}`);
-    } else if (sanctionsRes.degraded) {
+      auditTrail.push(`[VERDICT] \u274C REJECTED due to sanctions match on lists: ${allMatchedLists.join(", ")}`);
+    } else if (sanctionsDegraded) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Sanctions screening is in degraded mode (${sanctionsRes.degradedReason ?? "coverage threshold unmet"}). Unqualified approval is prohibited.`);
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Sanctions screening is in degraded mode (${degradedReason ?? "coverage threshold unmet"}). Unqualified approval is prohibited.`);
     } else if (entity && entity.status && ["INACTIVE", "DISSOLVED", "LIQUIDATION"].includes(entity.status)) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is '${entity.status}' (not active). Verification cannot be approved.`);
+    } else if (vatOwnershipMismatch) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number belongs to a different entity than the resolved vendor.`);
     } else if (vatValid === false) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
@@ -3868,7 +3926,7 @@ class EntityApplicationService {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "MEDIUM_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity identity resolution confidence is low (${Math.round(entityRes.confidence * 100)}%)`);
-    } else if (sanctionsRes.riskLevel === "POTENTIAL_MATCH") {
+    } else if (combinedSanctions.riskLevel === "POTENTIAL_MATCH") {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "MEDIUM_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Near-threshold fuzzy sanctions similarity match requiring compliance review`);
@@ -3878,7 +3936,7 @@ class EntityApplicationService {
       auditTrail.push(`[VERDICT] \u2705 APPROVED: Verified corporate entity, clean sanctions record, valid VAT status`);
     }
     const baseConfidence = entityRes.confidence || 0.5;
-    const vatBonus = vatValid === true ? 0.1 : vatValid === false ? -0.2 : 0;
+    const vatBonus = vatOwnershipMismatch ? -0.3 : vatOwnershipConfirmed ? 0.1 : vatValid === false ? -0.2 : 0;
     const confidence = Math.min(1, Math.max(0, baseConfidence + vatBonus));
     return {
       vendorName: cmd.name,
@@ -3889,13 +3947,59 @@ class EntityApplicationService {
       vatValid,
       entity,
       vatVerification: vatRes,
-      sanctionsScreening: sanctionsRes,
+      sanctionsScreening: combinedSanctions,
       auditTrail,
       evaluatedAt
     };
   }
   async verifyBankPayee(cmd) {
-    return verifyBankPayee(cmd);
+    const base = verifyBankPayee(cmd);
+    if (!base.valid) {
+      return base;
+    }
+    if (cmd.payeeTaxId && this.deps.bankOwnershipAdapters && this.deps.bankOwnershipAdapters.length > 0) {
+      const adapter = this.deps.bankOwnershipAdapters.find((a) => a.supports(base.countryCode));
+      if (adapter) {
+        try {
+          const res = await adapter.verify(base.normalizedIban, cmd.payeeTaxId);
+          if (res.matched === true) {
+            return {
+              ...base,
+              ownershipVerified: true,
+              ownershipSource: adapter.sourceName
+            };
+          } else if (res.matched === false) {
+            return {
+              ...base,
+              valid: false,
+              ownershipVerified: false,
+              ownershipSource: adapter.sourceName,
+              issues: [
+                ...base.issues,
+                `Bank account '${base.normalizedIban}' is not registered to taxpayer '${cmd.payeeTaxId}' in official ${adapter.sourceName} register`
+              ]
+            };
+          } else {
+            return {
+              ...base,
+              ownershipVerified: null,
+              ownershipSource: adapter.sourceName
+            };
+          }
+        } catch {
+          return {
+            ...base,
+            ownershipVerified: null,
+            ownershipSource: adapter.sourceName
+          };
+        }
+      }
+    }
+    return {
+      ...base,
+      ownershipVerified: null,
+      ownershipSource: null
+    };
   }
   async batchResolve(cmd) {
     const startedAt = Date.now();
@@ -11268,6 +11372,15 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
   app.get("/.well-known/oauth-authorization-server", handleOAuthServerMetadata);
   app.get("/.well-known/oauth-authorization-server/:name", handleOAuthServerMetadata);
   app.get("/.well-known/openid-configuration", handleOAuthServerMetadata);
+  const oauthClients = new Map;
+  const oauthAuthCodes = new Map;
+  oauthClients.set("anon", {
+    clientId: "anon",
+    clientName: "Anonymous Agent Client",
+    redirectUris: [],
+    grantTypes: ["authorization_code", "client_credentials"],
+    createdAt: Date.now()
+  });
   app.post("/oauth/register", async (c) => {
     let body = {};
     try {
@@ -11275,18 +11388,28 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
     } catch {}
     const clientId = `agm_client_${crypto2.randomUUID().replace(/-/g, "").slice(0, 16)}`;
     const clientSecret = `agm_secret_${crypto2.randomUUID().replace(/-/g, "")}`;
+    const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris : [];
+    const grantTypes = body.grant_types ?? [
+      "authorization_code",
+      "refresh_token",
+      "client_credentials"
+    ];
+    oauthClients.set(clientId, {
+      clientId,
+      clientSecret,
+      clientName: body.client_name ?? "MCP Agent Client",
+      redirectUris,
+      grantTypes,
+      createdAt: Date.now()
+    });
     return c.json({
       client_id: clientId,
       client_secret: clientSecret,
       client_id_issued_at: Math.floor(Date.now() / 1000),
       client_secret_expires_at: 0,
       client_name: body.client_name ?? "MCP Agent Client",
-      redirect_uris: Array.isArray(body.redirect_uris) ? body.redirect_uris : [],
-      grant_types: body.grant_types ?? [
-        "authorization_code",
-        "refresh_token",
-        "client_credentials"
-      ],
+      redirect_uris: redirectUris,
+      grant_types: grantTypes,
       response_types: body.response_types ?? ["code"],
       token_endpoint_auth_method: body.token_endpoint_auth_method ?? "none"
     }, 201);
@@ -11295,7 +11418,27 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
     const redirectUri = c.req.query("redirect_uri");
     const state = c.req.query("state");
     const clientId = c.req.query("client_id") ?? "anon";
-    const code = `agm_code_${clientId}_${crypto2.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    const codeChallenge = c.req.query("code_challenge");
+    const codeChallengeMethod = c.req.query("code_challenge_method") ?? "S256";
+    const scope = c.req.query("scope") ?? "mcp:tools mcp:resources mcp:prompts";
+    const client = oauthClients.get(clientId);
+    if (!client) {
+      return c.json({ error: "invalid_client", error_description: "Unknown client_id" }, 400);
+    }
+    if (redirectUri && client.redirectUris.length > 0 && !client.redirectUris.includes(redirectUri)) {
+      return c.json({ error: "invalid_request", error_description: "redirect_uri mismatch for registered client" }, 400);
+    }
+    const code = `agm_code_${crypto2.randomUUID().replace(/-/g, "")}`;
+    oauthAuthCodes.set(code, {
+      code,
+      clientId,
+      redirectUri: redirectUri || undefined,
+      codeChallenge: codeChallenge || undefined,
+      codeChallengeMethod: codeChallengeMethod || undefined,
+      scope,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      used: false
+    });
     if (redirectUri) {
       let target;
       try {
@@ -11311,9 +11454,10 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         "chat.mistral.ai",
         "gemini.google.com"
       ];
+      const isRegisteredUri = client.redirectUris.includes(redirectUri);
       const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname);
       const isAllowedHost = target.protocol === "https:" && allowedHosts.some((h) => target.hostname === h || target.hostname.endsWith(`.${h}`));
-      if (!isLoopback && !isAllowedHost) {
+      if (!isRegisteredUri && !isLoopback && !isAllowedHost) {
         return c.json({ error: "invalid_redirect_uri" }, 400);
       }
       target.searchParams.set("code", code);
@@ -11324,23 +11468,105 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
     return c.json({ code, state });
   });
   app.post("/oauth/token", async (c) => {
+    let body = {};
+    const contentType = c.req.header("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ error: "invalid_request", error_description: "Malformed JSON body" }, 400);
+      }
+    } else {
+      try {
+        const formData = await c.req.formData();
+        for (const [k, v] of formData.entries()) {
+          body[k] = typeof v === "string" ? v : v.name;
+        }
+      } catch {
+        body = c.req.query();
+      }
+    }
+    const grantType = body.grant_type;
+    const supportedGrants = ["authorization_code", "client_credentials", "refresh_token"];
+    if (!grantType || !supportedGrants.includes(grantType)) {
+      return c.json({
+        error: "unsupported_grant_type",
+        error_description: `grant_type must be one of: ${supportedGrants.join(", ")}`
+      }, 400);
+    }
+    let sub = "agent_anonymous";
+    let tokenScope = "mcp:tools mcp:resources mcp:prompts";
+    if (grantType === "authorization_code") {
+      const code = body.code;
+      if (!code || typeof code !== "string") {
+        return c.json({ error: "invalid_grant", error_description: "Missing authorization code" }, 400);
+      }
+      const authCode = oauthAuthCodes.get(code);
+      if (!authCode) {
+        return c.json({ error: "invalid_grant", error_description: "Invalid or unissued authorization code" }, 400);
+      }
+      if (authCode.used) {
+        return c.json({ error: "invalid_grant", error_description: "Authorization code has already been used" }, 400);
+      }
+      if (Date.now() > authCode.expiresAt) {
+        return c.json({ error: "invalid_grant", error_description: "Authorization code has expired" }, 400);
+      }
+      authCode.used = true;
+      const clientId = body.client_id ?? "anon";
+      if (authCode.clientId && authCode.clientId !== clientId) {
+        return c.json({ error: "invalid_grant", error_description: "client_id mismatch for authorization code" }, 400);
+      }
+      if (authCode.redirectUri && body.redirect_uri && authCode.redirectUri !== body.redirect_uri) {
+        return c.json({ error: "invalid_grant", error_description: "redirect_uri mismatch for authorization code" }, 400);
+      }
+      if (authCode.codeChallenge) {
+        const codeVerifier = body.code_verifier;
+        if (!codeVerifier || typeof codeVerifier !== "string") {
+          return c.json({ error: "invalid_grant", error_description: "Missing PKCE code_verifier" }, 400);
+        }
+        let computedChallenge = codeVerifier;
+        if (authCode.codeChallengeMethod === "S256" || !authCode.codeChallengeMethod) {
+          computedChallenge = crypto2.createHash("sha256").update(codeVerifier).digest("base64url");
+        }
+        if (computedChallenge !== authCode.codeChallenge) {
+          return c.json({ error: "invalid_grant", error_description: "PKCE verification failed" }, 400);
+        }
+      }
+      sub = `agent_${authCode.clientId}_${authCode.code.slice(-8)}`;
+      tokenScope = authCode.scope || tokenScope;
+    } else if (grantType === "client_credentials") {
+      const clientId = body.client_id;
+      const clientSecret = body.client_secret;
+      if (!clientId) {
+        return c.json({ error: "invalid_client", error_description: "Missing client_id" }, 401);
+      }
+      const client = oauthClients.get(clientId);
+      if (!client) {
+        return c.json({ error: "invalid_client", error_description: "Unknown client_id" }, 401);
+      }
+      if (client.clientSecret && client.clientSecret !== clientSecret) {
+        return c.json({ error: "invalid_client", error_description: "Invalid client_secret" }, 401);
+      }
+      sub = `client_${clientId}`;
+    }
     const now = Math.floor(Date.now() / 1000);
     const jti = crypto2.randomUUID();
+    const expiresIn = 3600;
     const secret = process.env.JWT_SECRET || crypto2.createHmac("sha256", config.adminSyncToken || "agentum-dev-only").update("agentum:jwt:v1").digest("hex");
     const accessToken = await sign2({
       iss: config.publicBaseUrl,
-      sub: `agent_${jti.slice(0, 12)}`,
+      sub,
       jti,
-      scope: "mcp:tools mcp:resources mcp:prompts",
+      scope: tokenScope,
       iat: now,
-      exp: now + 31536000
+      exp: now + expiresIn
     }, secret, "HS256");
     return c.json({
       access_token: accessToken,
       token_type: "Bearer",
-      expires_in: 31536000,
+      expires_in: expiresIn,
       refresh_token: `agm_ref_${crypto2.randomUUID().replace(/-/g, "")}`,
-      scope: "mcp:tools mcp:resources mcp:prompts"
+      scope: tokenScope
     });
   });
   app.get("/privacy", (c) => c.html(`<!DOCTYPE html>
@@ -12071,7 +12297,7 @@ function mountRestToolsAdapter(app, deps) {
       priceUsd: tool.priceUsd,
       description: tool.summary
     });
-    app.on(tool.httpMethod, tool.httpPath, paymentGate, async (c) => {
+    const validateInput = async (c, next) => {
       let rawBody = {};
       try {
         rawBody = await c.req.json();
@@ -12085,10 +12311,15 @@ function mountRestToolsAdapter(app, deps) {
           issues: parsed.error.issues
         }, 400);
       }
+      c.set("validatedBody", parsed.data);
+      await next();
+    };
+    app.on(tool.httpMethod, tool.httpPath, validateInput, paymentGate, async (c) => {
+      const parsedData = c.get("validatedBody");
       const verification = c.get("paymentVerification");
       const fingerprint = c.get("callerFingerprint") ?? "anonymous";
       const startMs = Date.now();
-      const result = await tool.handler(parsed.data, {
+      const result = await tool.handler(parsedData, {
         callerFingerprint: fingerprint,
         paymentRail: verification?.rail ?? "FREE",
         remainingFreeCalls: verification?.remainingFreeCalls,
@@ -13266,6 +13497,34 @@ function mountMcpHttpAdapter(app, deps) {
             }
           };
         }
+        const parsedArgs = tool.inputSchema.safeParse(rpc.params?.arguments ?? {});
+        if (!parsedArgs.success) {
+          return {
+            isNotification: false,
+            body: {
+              jsonrpc: "2.0",
+              id,
+              result: {
+                isError: true,
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      error: "Validation Error",
+                      issues: parsedArgs.error.issues
+                    })
+                  }
+                ],
+                _meta: {
+                  elicitation: buildElicitationPayload({
+                    reason: "entity_disambiguation",
+                    query: String(rpc.params?.arguments?.query ?? "")
+                  })
+                }
+              }
+            }
+          };
+        }
         const fingerprint = computeCallerFingerprint(rawHeaders);
         const argsObj = rpc.params?.arguments && typeof rpc.params.arguments === "object" ? rpc.params.arguments : {};
         const metaObj = rpc.params?._meta && typeof rpc.params._meta === "object" ? rpc.params._meta : {};
@@ -13328,34 +13587,6 @@ function mountMcpHttpAdapter(app, deps) {
                     mppChallengeId: gate.challenge.mppChallengeId
                   },
                   elicitation: paymentElicitation
-                }
-              }
-            }
-          };
-        }
-        const parsedArgs = tool.inputSchema.safeParse(rpc.params?.arguments ?? {});
-        if (!parsedArgs.success) {
-          return {
-            isNotification: false,
-            body: {
-              jsonrpc: "2.0",
-              id,
-              result: {
-                isError: true,
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify({
-                      error: "Validation Error",
-                      issues: parsedArgs.error.issues
-                    })
-                  }
-                ],
-                _meta: {
-                  elicitation: buildElicitationPayload({
-                    reason: "entity_disambiguation",
-                    query: String(rpc.params?.arguments?.query ?? "")
-                  })
                 }
               }
             }
@@ -16833,6 +17064,84 @@ class OpenCorporatesAggregatorAdapter {
   }
 }
 
+// src/adapters/outbound/upstreams/poland-whitelist.adapter.ts
+class PolandWhiteListAdapter {
+  sourceName = "PL_MF_WHITELIST";
+  fetchImpl;
+  constructor(deps) {
+    this.fetchImpl = deps?.fetchImpl ?? fetch;
+  }
+  supports(country) {
+    return country?.toUpperCase() === "PL";
+  }
+  async verify(iban, taxId, timeoutMs = 2500) {
+    const cleanTax = taxId.replace(/\D/g, "");
+    const cleanIban = iban.replace(/\s+/g, "").toUpperCase();
+    const accountNum = cleanIban.startsWith("PL") ? cleanIban.slice(2) : cleanIban;
+    if (!cleanTax || accountNum.length !== 26) {
+      return { matched: null };
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const url = `https://wl-api.mf.gov.pl/api/search/nip/${cleanTax}?date=${today}`;
+    try {
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      if (!res.ok) {
+        return { matched: null };
+      }
+      const data = await res.json();
+      const subject = data?.result?.subject;
+      if (!subject) {
+        return { matched: false };
+      }
+      const accountNumbers = subject.accountNumbers || [];
+      const matched = accountNumbers.some((acc) => acc.replace(/\D/g, "") === accountNum);
+      return { matched };
+    } catch {
+      return { matched: null };
+    }
+  }
+}
+
+// src/adapters/outbound/upstreams/czech-vat-accounts.adapter.ts
+class CzechVatAccountsAdapter {
+  sourceName = "CZ_ARES_VAT_ACCOUNTS";
+  fetchImpl;
+  constructor(deps) {
+    this.fetchImpl = deps?.fetchImpl ?? fetch;
+  }
+  supports(country) {
+    return country?.toUpperCase() === "CZ";
+  }
+  async verify(iban, taxId, timeoutMs = 2500) {
+    const cleanIco = taxId.replace(/\D/g, "");
+    const cleanIban = iban.replace(/\s+/g, "").toUpperCase();
+    if (!cleanIco || !cleanIban.startsWith("CZ")) {
+      return { matched: null };
+    }
+    const url = `https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty-vr/${cleanIco}`;
+    try {
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      if (!res.ok) {
+        return { matched: null };
+      }
+      const data = await res.json();
+      const accounts = data?.bankovniUcty || [];
+      const matched = accounts.some((acc) => acc.replace(/\s+/g, "").toUpperCase() === cleanIban);
+      return { matched };
+    } catch {
+      return { matched: null };
+    }
+  }
+}
+
 // src/app.ts
 function createApp(overrides = {}, customDeps) {
   const appConfig = {
@@ -16862,6 +17171,10 @@ function createApp(overrides = {}, customDeps) {
     cacheStore,
     upstreamProviders,
     commercialAggregator: new OpenCorporatesAggregatorAdapter({ fetchImpl }),
+    bankOwnershipAdapters: [
+      new PolandWhiteListAdapter({ fetchImpl }),
+      new CzechVatAccountsAdapter({ fetchImpl })
+    ],
     vatValidator
   });
   const registry = new ToolRegistry;

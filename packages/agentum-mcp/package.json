@@ -1,13 +1,14 @@
 {
   "name": "agentum-mcp",
-  "version": "0.1.0",
-  "description": "Zero-config stdio MCP bridge for Agentum EU/US corporate entity, EU VIES VAT, and OFAC/EU/UN sanctions resolver.",
+  "version": "0.2.0",
+  "description": "Zero-config stdio MCP bridge with autonomous Base EVM wallet & x402 micropayment management for Agentum EU/US corporate entity, EU VIES VAT, and OFAC/EU/UN sanctions resolver.",
   "main": "bin/agentum-mcp.js",
   "bin": {
     "agentum-mcp": "./bin/agentum-mcp.js"
   },
   "files": [
     "bin",
+    "lib",
     "README.md",
     "LICENSE"
   ],
@@ -31,7 +32,11 @@
     "sanctions",
     "ofac",
     "x402",
-    "mpp"
+    "mpp",
+    "base",
+    "usdc",
+    "micropayments",
+    "agent-wallet"
   ],
   "author": "Algimantas Krasauskas / Agentum Network <compliance@asimplek.cloud>",
   "license": "MIT",

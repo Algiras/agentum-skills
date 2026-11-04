@@ -3,8 +3,10 @@
 var CREATE_TABLE = `CREATE TABLE IF NOT EXISTS payment_consumptions (
   payment_key TEXT PRIMARY KEY, rail TEXT NOT NULL, resource TEXT NOT NULL,
   price_usd TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL,
+  provider_reference TEXT, settlement_reference TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`;
+);
+CREATE INDEX IF NOT EXISTS payment_consumptions_created_at_idx ON payment_consumptions (created_at DESC)`;
 class PostgresPaymentLedger {
   databaseUrl;
   sql = null;
@@ -34,16 +36,21 @@ class PostgresPaymentLedger {
       throw error;
     }
   }
+  async find(key) {
+    const db = await this.db();
+    const rows = await db`SELECT status FROM payment_consumptions WHERE payment_key=${key}`;
+    return rows[0]?.status ?? null;
+  }
   async claim(claim) {
     const db = await this.db();
-    const rows = await db`INSERT INTO payment_consumptions (payment_key,rail,resource,price_usd,fingerprint,status)
-      VALUES (${claim.key},${claim.rail},${claim.resource},${claim.priceUsd},${claim.fingerprint},'CLAIMED')
+    const rows = await db`INSERT INTO payment_consumptions (payment_key,rail,resource,price_usd,fingerprint,provider_reference,status)
+      VALUES (${claim.key},${claim.rail},${claim.resource},${claim.priceUsd},${claim.fingerprint},${claim.providerReference ?? null},'CLAIMED')
       ON CONFLICT (payment_key) DO NOTHING RETURNING payment_key`;
     return rows.length === 1;
   }
-  async complete(key, status) {
+  async complete(key, status, settlementReference) {
     const db = await this.db();
-    const rows = await db`UPDATE payment_consumptions SET status=${status},updated_at=NOW()
+    const rows = await db`UPDATE payment_consumptions SET status=${status},settlement_reference=${settlementReference ?? null},updated_at=NOW()
       WHERE payment_key=${key} AND status='CLAIMED' RETURNING payment_key`;
     if (rows.length !== 1)
       throw new Error("Payment claim is not pending");
@@ -51,7 +58,7 @@ class PostgresPaymentLedger {
   async listRecent(limit) {
     const db = await this.db();
     const bounded = Number.isFinite(limit) ? Math.max(0, Math.min(100, Math.floor(limit))) : 0;
-    const rows = await db`SELECT payment_key,rail,resource,price_usd,fingerprint,status,created_at,updated_at
+    const rows = await db`SELECT payment_key,rail,resource,price_usd,fingerprint,provider_reference,settlement_reference,status,created_at,updated_at
       FROM payment_consumptions ORDER BY created_at DESC LIMIT ${bounded}`;
     return rows.map((r) => ({
       key: r.payment_key,
@@ -59,6 +66,8 @@ class PostgresPaymentLedger {
       resource: r.resource,
       priceUsd: r.price_usd,
       fingerprint: r.fingerprint,
+      providerReference: r.provider_reference ?? undefined,
+      settlementReference: r.settlement_reference ?? undefined,
       status: r.status,
       createdAt: new Date(r.created_at).toISOString(),
       updatedAt: new Date(r.updated_at).toISOString()
@@ -13072,6 +13081,13 @@ Sitemap: ${config.publicBaseUrl}/sitemap.xml
   app.get("/sitemap.xml", (c) => {
     const urls = [
       "",
+      "/health",
+      "/v1/entity/resolve",
+      "/v1/entity/vat-verify",
+      "/v1/entity/sanctions-screen",
+      "/v1/compliance/check-vendor",
+      "/v1/compliance/verify-bank-payee",
+      "/v1/entity/batch-resolve",
       "/llms.txt",
       "/llms-full.txt",
       "/openapi.json",
@@ -13090,8 +13106,8 @@ Sitemap: ${config.publicBaseUrl}/sitemap.xml
 ${urls.map((u) => `  <url>
     <loc>${config.publicBaseUrl}${u}</loc>
     <lastmod>${now}</lastmod>
-    <changefreq>${u === "" ? "daily" : "weekly"}</changefreq>
-    <priority>${u === "" ? "1.0" : u.includes("llms") || u.includes("mcp") ? "0.9" : "0.7"}</priority>
+    <changefreq>${u === "" || u.startsWith("/v1/") ? "daily" : "weekly"}</changefreq>
+    <priority>${u === "" ? "1.0" : u.startsWith("/v1/") ? "0.95" : u.includes("llms") || u.includes("mcp") ? "0.9" : "0.7"}</priority>
   </url>`).join(`
 `)}
 </urlset>`;
@@ -13116,7 +13132,7 @@ ${urls.map((u) => `  <url>
 `);
     const body = `# Agentum \u2014 Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening.
+> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
 
 ## Access & Pricing
 - **Free Tier:** ${config.freeCallsPerDay} free calls/day per agent (\`X-Agent-Id\` or IP) \u2014 zero signup or API keys required.
@@ -13166,8 +13182,8 @@ npx skills add Algiras/agentum-skills
 ${detailedTools}
 
 ## 3. MCP Capabilities
-- Tools: \`resolve_entity\`, \`verify_eu_vat\`, \`screen_sanctions\` (pass \`_meta: { "compact": true }\` for compact summaries + \`resource_link\`)
-- Resources: \`agentum://entity/{query}/compact\`, \`agentum://entity/{query}\`, \`agentum://vat/{vatNumber}\`, \`agentum://sanctions/{name}\`, \`agentum://results/{requestId}\`, \`agentum://pricing\`, \`agentum://jurisdictions\`
+- Tools: \`resolve_entity\`, \`verify_eu_vat\`, \`screen_sanctions\`, \`check_vendor\`, \`verify_bank_payee\`, \`batch_resolve\` (pass \`_meta: { "compact": true }\` for compact summaries + \`resource_link\`)
+- Resources: \`agentum://entity/{query}/compact\`, \`agentum://entity/{query}\`, \`agentum://vat/{vatNumber}\`, \`agentum://sanctions/{name}\`, \`agentum://results/{requestId}\`, \`agentum://pricing\`, \`agentum://jurisdictions\`, \`agentum://registries/coverage\`
 - Prompts: \`kyb_due_diligence_report\`, \`sanctions_escalation_review\`, \`vendor_onboarding_check\`
 - Elicitation & Sampling: \`elicitation/prepare\`, \`sampling/prepare\`, inline \`_meta.elicitation\` and \`_meta.samplingRequest\`
 `;
@@ -13431,10 +13447,13 @@ async function evaluateDual402Gate(opts) {
     return { allowed: false, challenge: buildChallenge(), error: "Live production payments require shared replay protection" };
   }
   const verifyPayment = async (credential, spentKey, rail, verifier) => {
+    const ledger = opts.config.paymentMode === "live" ? opts.paymentLedger : undefined;
     const serviceFailure = () => ({ allowed: false, challenge: buildChallenge(), reconciliationRequired: true, error: "Payment status requires reconciliation; do not pay again" });
-    if (opts.config.nodeEnv === "production" && opts.config.paymentMode === "live" && !opts.paymentLedger)
+    if (opts.config.nodeEnv === "production" && opts.config.paymentMode === "live" && (!ledger || !opts.config.featureStrictPayments))
       return serviceFailure();
-    if (!opts.paymentLedger && opts.config.featureReplayProtection) {
+    if (credential.length > 16384)
+      return { allowed: false, challenge: buildChallenge(), error: "Payment credential exceeds size limit" };
+    if (!ledger && opts.config.featureReplayProtection) {
       try {
         if (!await opts.cacheStore.claimOnce(spentKey, 604800))
           return { allowed: false, challenge: buildChallenge(), error: "Payment credential replay detected" };
@@ -13443,21 +13462,42 @@ async function evaluateDual402Gate(opts) {
       }
     }
     const key = crypto3.createHash("sha256").update(spentKey).digest("hex");
-    const bounded = async (promise) => {
+    const bounded = async (promise, timeoutMs = 2000) => {
       let timer;
       try {
         return await Promise.race([promise, new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error("Payment ledger timeout")), 2000);
+          timer = setTimeout(() => reject(new Error("Payment ledger timeout")), timeoutMs);
         })]);
       } finally {
         if (timer)
           clearTimeout(timer);
       }
     };
-    if (opts.paymentLedger) {
+    let authenticated;
+    let settle;
+    if (ledger) {
       try {
+        if (await bounded(ledger.find(key)))
+          return serviceFailure();
+        const day = new Date().toISOString().slice(0, 10);
+        if (await bounded(opts.cacheStore.incrementDailyQuota(`payment-preflight:${opts.fingerprint}`, day)) > 100)
+          return serviceFailure();
+        if (rail === "X402" && verifier.prepareForClaim) {
+          const prepared = await bounded(verifier.prepareForClaim(credential, challengeContext), 12000);
+          authenticated = prepared.authentication;
+          settle = prepared.settle;
+        } else {
+          if (!verifier.verifyBeforeClaim)
+            return serviceFailure();
+          authenticated = await bounded(verifier.verifyBeforeClaim(credential, challengeContext), 12000);
+        }
+        if (!authenticated.verified) {
+          if (authenticated.outcome === "REJECTED")
+            return { allowed: false, challenge: buildChallenge(), error: authenticated.error };
+          return serviceFailure();
+        }
         const path = new URL(opts.resource, opts.config.publicBaseUrl).pathname;
-        if (!await bounded(opts.paymentLedger.claim({ key, rail, resource: path, priceUsd: opts.priceUsd, fingerprint: opts.fingerprint })))
+        if (!await bounded(ledger.claim({ key, rail, resource: path, priceUsd: opts.priceUsd, fingerprint: opts.fingerprint, providerReference: rail === "MPP" ? credential.match(/\b(pi_[A-Za-z0-9_]{10,})\b/)?.[1] : undefined })))
           return serviceFailure();
       } catch {
         return serviceFailure();
@@ -13465,21 +13505,21 @@ async function evaluateDual402Gate(opts) {
     }
     let verification;
     try {
-      verification = await verifier.verifyAndSettle(credential, challengeContext);
+      verification = authenticated && rail === "MPP" ? authenticated : settle ? await bounded(settle(), 12000) : await bounded(verifier.verifyAndSettle(credential, challengeContext), 12000);
     } catch {
       verification = { verified: false, rail, outcome: "UNCERTAIN" };
     }
     const status = verification.verified ? "SETTLED" : verification.outcome === "REJECTED" ? "REJECTED" : "UNCERTAIN";
-    if (opts.paymentLedger) {
+    if (ledger) {
       try {
-        await bounded(opts.paymentLedger.complete(key, status));
+        await bounded(ledger.complete(key, status, verification.settlementReference));
       } catch {
         return serviceFailure();
       }
     }
     if (verification.verified)
       return { allowed: true, verification };
-    if (status === "UNCERTAIN" && opts.paymentLedger)
+    if (status === "UNCERTAIN" && ledger)
       return serviceFailure();
     return { allowed: false, challenge: buildChallenge(), error: verification.error };
   };
@@ -13671,6 +13711,24 @@ function mountRestToolsAdapter(app, deps) {
       return crypto4.timingSafeEqual(a, b);
     }
   }));
+  app.get("/v1/admin/payment-consumptions", async (c) => {
+    if (!deps.paymentLedger)
+      return c.json({ error: "Payment ledger unavailable" }, 503);
+    const raw = Number(c.req.query("limit") ?? "50");
+    const limit = Number.isInteger(raw) ? Math.max(1, Math.min(raw, 100)) : 50;
+    let timer;
+    try {
+      const records = await Promise.race([deps.paymentLedger.listRecent(limit), new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("timeout")), 2000);
+      })]);
+      return c.json({ records });
+    } catch {
+      return c.json({ error: "Payment ledger unavailable" }, 503);
+    } finally {
+      if (timer)
+        clearTimeout(timer);
+    }
+  });
   app.get("/v1/admin/telemetry", (c) => {
     return c.json(globalTelemetry.getFullReport(), 200);
   });
@@ -16843,6 +16901,12 @@ class MppPaymentAdapter {
       }
     };
   }
+  async verifyBeforeClaim(credential, ctx) {
+    if (!this.config.featureStrictPayments || !this.config.stripeSecretKey || !/\bpi_[A-Za-z0-9_]{10,}\b/.test(credential)) {
+      return { verified: false, rail: "MPP", outcome: "REJECTED", error: "A live Stripe PaymentIntent is required" };
+    }
+    return this.verifyAndSettle(credential, ctx);
+  }
   async verifyAndSettle(credential, ctx) {
     if (!credential || typeof credential !== "string") {
       return {
@@ -16871,7 +16935,8 @@ class MppPaymentAdapter {
           method: "GET",
           headers: {
             Authorization: `Bearer ${this.config.stripeSecretKey}`
-          }
+          },
+          signal: AbortSignal.timeout(1e4)
         });
         if (!res.ok) {
           return {
@@ -16922,6 +16987,7 @@ class MppPaymentAdapter {
           verified: true,
           rail: "MPP",
           payer: `stripe:${piData.id ?? piId}`,
+          settlementReference: piId,
           receiptHeaderName: "Payment-Receipt",
           receiptHeaderValue: Buffer.from(JSON.stringify(receipt)).toString("base64url")
         };
@@ -17028,6 +17094,65 @@ class X402PaymentAdapter {
       payload
     };
   }
+  async verifyBeforeClaim(credential, ctx) {
+    let decoded;
+    try {
+      const input = credential.trim();
+      decoded = JSON.parse(input.startsWith("{") ? input : Buffer.from(input, "base64").toString("utf8"));
+    } catch {
+      return { verified: false, rail: "X402", outcome: "REJECTED", error: "Invalid x402 payload" };
+    }
+    if (!decoded || typeof decoded !== "object" || !this.config.x402FacilitatorUrl)
+      return { verified: false, rail: "X402", outcome: "REJECTED", error: "Live facilitator verification is required" };
+    const requirements = this.buildChallenge(ctx).payload.accepts[0];
+    try {
+      const response = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x402Version: decoded.x402Version ?? 2, paymentPayload: decoded, paymentRequirements: requirements }),
+        signal: AbortSignal.timeout(1e4)
+      });
+      if (!response.ok)
+        return { verified: false, rail: "X402", outcome: "UNCERTAIN", error: "Facilitator verification unavailable" };
+      const data = await response.json();
+      const valid = data.isValid ?? data.valid ?? data.verified;
+      if (valid !== true)
+        return { verified: false, rail: "X402", outcome: valid === false ? "REJECTED" : "UNCERTAIN", error: "Facilitator verification rejected or unconfirmed" };
+      return { verified: true, rail: "X402" };
+    } catch {
+      return { verified: false, rail: "X402", outcome: "UNCERTAIN", error: "Facilitator verification unavailable" };
+    }
+  }
+  async prepareForClaim(credential, ctx) {
+    const context = { ...ctx };
+    const authentication = await this.verifyBeforeClaim(credential, context);
+    const decoded = authentication.verified ? JSON.parse(credential.trim().startsWith("{") ? credential.trim() : Buffer.from(credential.trim(), "base64").toString("utf8")) : null;
+    const requirements = this.buildChallenge(context).payload.accepts[0];
+    const body = JSON.stringify({ x402Version: decoded?.x402Version ?? 2, paymentPayload: decoded, paymentRequirements: requirements });
+    return { authentication, settle: async () => {
+      if (!authentication.verified)
+        return authentication;
+      try {
+        const response = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/settle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          signal: AbortSignal.timeout(1e4)
+        });
+        if (!response.ok)
+          return { verified: false, rail: "X402", outcome: "UNCERTAIN", error: "Facilitator settlement failed" };
+        const settlement = await response.json();
+        const transaction = settlement?.transaction ?? settlement?.txHash ?? settlement?.settlementId;
+        if (settlement?.success !== true || typeof transaction !== "string" || !transaction || settlement.network !== undefined && settlement.network !== this.config.x402Network)
+          return { verified: false, rail: "X402", outcome: "UNCERTAIN", error: "Facilitator settlement rejected or unconfirmed" };
+        const payer = decoded.payer ?? decoded.payload?.payer ?? decoded.payload?.authorization?.from ?? "0xAgentPayer";
+        const receipt = { ...settlement, transaction, success: true, rail: "X402", network: this.config.x402Network, payer, settledAt: new Date().toISOString() };
+        return { verified: true, rail: "X402", payer, settlementReference: transaction, receiptHeaderName: "PAYMENT-RESPONSE", receiptHeaderValue: Buffer.from(JSON.stringify(receipt)).toString("base64") };
+      } catch {
+        return { verified: false, rail: "X402", outcome: "UNCERTAIN", error: "Facilitator settlement unavailable" };
+      }
+    } };
+  }
   async verifyAndSettle(credential, ctx) {
     if (!credential || typeof credential !== "string") {
       return { verified: false, rail: "X402", error: "Invalid x402 payload" };
@@ -17064,39 +17189,8 @@ class X402PaymentAdapter {
     const shouldCallFacilitator = Boolean(this.config.x402FacilitatorUrl) && (this.config.featureStrictPayments === true || decoded.useFacilitator === true);
     let settlement;
     if (shouldCallFacilitator) {
-      const requirements = this.buildChallenge(ctx).payload.accepts[0];
-      const facilitatorBody = JSON.stringify({ x402Version: decoded.x402Version ?? 2, paymentPayload: decoded, paymentRequirements: requirements });
-      try {
-        const res = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: facilitatorBody,
-          signal: AbortSignal.timeout(1e4)
-        });
-        if (!res.ok) {
-          return {
-            verified: false,
-            rail: "X402",
-            error: "Facilitator verification failed"
-          };
-        }
-        const data = await res.json().catch(() => ({}));
-        if ((data.isValid ?? data.valid ?? data.verified) !== true) {
-          return { verified: false, rail: "X402", error: String(data.invalidReason ?? data.error ?? "Facilitator verification rejected") };
-        }
-        const settleRes = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/settle`, { method: "POST", headers: { "Content-Type": "application/json" }, body: facilitatorBody, signal: AbortSignal.timeout(1e4) });
-        if (!settleRes.ok)
-          return { verified: false, rail: "X402", error: "Facilitator settlement failed" };
-        settlement = await settleRes.json();
-        const transaction = settlement?.transaction ?? settlement?.txHash ?? settlement?.settlementId;
-        if (settlement?.success !== true || typeof transaction !== "string" || !transaction || settlement.network !== undefined && settlement.network !== this.config.x402Network) {
-          return { verified: false, rail: "X402", error: "Facilitator settlement rejected or unconfirmed" };
-        }
-        settlement = { ...settlement, transaction };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Facilitator verification error";
-        return { verified: false, rail: "X402", error: message };
-      }
+      const prepared = await this.prepareForClaim(credential, ctx);
+      return prepared.authentication.verified ? prepared.settle() : prepared.authentication;
     } else if (this.config.featureStrictPayments) {
       return {
         verified: false,
@@ -17128,6 +17222,7 @@ class X402PaymentAdapter {
       verified: true,
       rail: "X402",
       payer,
+      settlementReference: typeof settlement?.transaction === "string" ? settlement.transaction : undefined,
       receiptHeaderName: "PAYMENT-RESPONSE",
       receiptHeaderValue: Buffer.from(JSON.stringify(receipt)).toString("base64")
     };

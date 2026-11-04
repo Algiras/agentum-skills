@@ -1,11 +1,11 @@
 # Agentum — Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening.
+> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
 
 ## Access & Pricing
 - **Free Tier:** 5 free calls/day per agent (`X-Agent-Id` or IP) — zero signup or API keys required.
 - **Inline HTTP 402 Micropayments:**
-  1. **x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on `eip155:84532` to `0x000000000000000000000000000000000000dEaD`.
+  1. **x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on Base (`eip155:8453` / testnet `eip155:84532`) to `0x000000000000000000000000000000000000dEaD`.
   2. **Stripe + Tempo MPP (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Settles Tempo stablecoins and Stripe PaymentIntents / Shared Payment Tokens.
 
 ## Machine Discovery Endpoints

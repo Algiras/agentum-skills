@@ -2008,6 +2008,45 @@ function verifyBankPayee(cmd) {
   };
 }
 
+// src/domain/countries/types.ts
+var COUNTRY_ALIASES = {
+  UK: "GB",
+  EL: "GR"
+};
+function normalizeCountryCode(code) {
+  if (!code)
+    return "";
+  const upper = code.trim().toUpperCase();
+  return COUNTRY_ALIASES[upper] || upper;
+}
+
+// src/domain/entity-identifier.ts
+function matchesEntityIdentifier(entity, query) {
+  const clean = (value) => value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const equal = (value) => Boolean(value && clean(value) === clean(query.cleanedValue));
+  const primary = entity.primaryIdType === query.type && equal(entity.primaryIdValue);
+  switch (query.type) {
+    case "LEI":
+      return primary || equal(entity.lei);
+    case "EU_VAT":
+      return primary || equal(entity.vatNumber);
+    case "US_EIN":
+      return primary || equal(entity.taxId);
+    case "US_CIK": {
+      const cik = entity.cik ?? (entity.primaryIdType === "US_CIK" ? entity.primaryIdValue : null);
+      return Boolean(cik && cik.replace(/^0+/, "") === query.cleanedValue.replace(/^0+/, ""));
+    }
+    case "DOMAIN": {
+      const domain = (value) => value.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      return entity.domains.some((value) => domain(value) === domain(query.cleanedValue));
+    }
+    case "NAME":
+      return false;
+    default:
+      return primary || equal(entity.registrationNumber) || query.type === "NATIONAL_ID" && equal(entity.taxId);
+  }
+}
+
 // src/domain/identifiers/checksums.ts
 function luhn(digits) {
   const clean = digits.replace(/\D/g, "");
@@ -2174,18 +2213,6 @@ function fiYtunnusChecksum(cleanRaw) {
     return false;
   const expected = rem === 0 ? 0 : 11 - rem;
   return expected === parseInt(clean[7], 10);
-}
-
-// src/domain/countries/types.ts
-var COUNTRY_ALIASES = {
-  UK: "GB",
-  EL: "GR"
-};
-function normalizeCountryCode(code) {
-  if (!code)
-    return "";
-  const upper = code.trim().toUpperCase();
-  return COUNTRY_ALIASES[upper] || upper;
 }
 
 // src/domain/identifiers/registry.ts
@@ -3599,8 +3626,10 @@ class EntityApplicationService {
   }
   async resolveEntity(cmd) {
     const startedAt = Date.now();
-    const effectiveJurisdiction = cmd.jurisdiction || cmd.country;
-    const classified = classifyQuery(cmd.query, effectiveJurisdiction);
+    const countryInput = cmd.jurisdiction || cmd.country;
+    const requestedJurisdiction = countryInput ? normalizeCountryCode(countryInput) : undefined;
+    const classified = classifyQuery(cmd.query, requestedJurisdiction);
+    const effectiveJurisdiction = requestedJurisdiction || (classified.type !== "NAME" ? classified.inferredCountry : undefined) || undefined;
     const cleanPart = encodeURIComponent(classified.cleanedValue.toLowerCase());
     const jurPart = encodeURIComponent((effectiveJurisdiction ?? "all").toLowerCase());
     const identityCacheKey = `agentum:identity:v1:${classified.type}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}`;
@@ -3657,10 +3686,12 @@ class EntityApplicationService {
         }
       }
       for (const c of candidates) {
+        if (effectiveJurisdiction && normalizeCountryCode(c.jurisdiction) !== normalizeCountryCode(effectiveJurisdiction)) {
+          c.confidence = 0;
+          continue;
+        }
         if (classified.type !== "NAME" && classified.cleanedValue) {
-          const idClean = c.primaryIdValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-          const queryClean = classified.cleanedValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-          if (idClean === queryClean) {
+          if (matchesEntityIdentifier(c, classified)) {
             c.confidence = Math.max(c.confidence, 0.95);
           } else {
             c.confidence = Math.min(c.confidence, 0.1);
@@ -3677,14 +3708,15 @@ class EntityApplicationService {
         }
       }
       candidates.sort((a, b) => b.confidence - a.confidence);
+      let ambiguous = false;
       if (classified.type === "NAME" && candidates.length >= 2) {
         const c1 = candidates[0];
         const c2 = candidates[1];
         if (c1 && c2 && c1.confidence - c2.confidence < 0.05) {
-          c1.confidence = Math.max(0.4, Math.round((c1.confidence - 0.2) * 100) / 100);
+          ambiguous = true;
         }
       }
-      best = candidates[0] ?? null;
+      best = ambiguous ? null : candidates[0] ?? null;
       if (best && best.confidence < 0.6) {
         best = null;
       }
@@ -3871,7 +3903,7 @@ class EntityApplicationService {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Sanctions screening is in degraded mode (${degradedReason ?? "coverage threshold unmet"}). Unqualified approval is prohibited.`);
-    } else if (entity && entity.status && ["INACTIVE", "DISSOLVED", "LIQUIDATION"].includes(entity.status)) {
+    } else if (entity && entity.status && ["INACTIVE", "DISSOLVED", "LIQUIDATING"].includes(entity.status)) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is '${entity.status}' (not active). Verification cannot be approved.`);
@@ -10186,6 +10218,7 @@ function loadConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV ?? "development";
   const paymentMode = parsePaymentMode(env.PAYMENT_MODE, nodeEnv);
   const isLive = paymentMode === "live";
+  const quotaLimit = Number(env.FREE_CALLS_PER_DAY || "5");
   return {
     port: Number.parseInt(env.PORT ?? "3000", 10) || 3000,
     nodeEnv,
@@ -10199,7 +10232,7 @@ function loadConfig(env = process.env) {
     publicBaseUrl: (env.PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/+$/, ""),
     databaseUrl: env.DATABASE_URL ?? "",
     redisUrl: env.REDIS_URL ?? "",
-    freeCallsPerDay: Number.parseInt(env.FREE_CALLS_PER_DAY ?? "5", 10) || 5,
+    freeCallsPerDay: Number.isSafeInteger(quotaLimit) && quotaLimit >= 0 ? quotaLimit : 5,
     priceEntityResolveUsd: env.PRICE_ENTITY_RESOLVE_USD ?? "0.005",
     priceEntityResolvePaidUsd: env.PRICE_ENTITY_RESOLVE_PAID_USD ?? "0.050",
     priceVatVerifyUsd: env.PRICE_VAT_VERIFY_USD ?? "0.005",
@@ -13320,22 +13353,24 @@ async function evaluateDual402Gate(opts) {
   };
   const x402Cred = normalizedHeaders["payment-signature"] ?? normalizedHeaders["x-payment"] ?? opts.metaPayment?.x402;
   if (x402Cred) {
-    const spentKey = `agentum:spent:x402:${crypto3.createHash("sha256").update(x402Cred).digest("hex")}`;
+    let identity = x402Cred.trim();
+    try {
+      const payload = JSON.parse(identity.startsWith("{") ? identity : Buffer.from(identity, "base64").toString("utf8"));
+      const auth = payload.payload?.authorization;
+      identity = auth?.nonce && auth?.from ? `${opts.config.x402Network}:${String(auth.from).toLowerCase()}:${String(auth.nonce).toLowerCase()}` : String(payload.payload?.signature ?? payload.signature ?? identity).toLowerCase();
+    } catch {}
+    const spentKey = `agentum:spent:x402:${crypto3.createHash("sha256").update(identity).digest("hex")}`;
     if (opts.config.featureReplayProtection) {
-      const alreadySpent = await opts.cacheStore.getCache(spentKey);
-      if (alreadySpent) {
-        return {
-          allowed: false,
-          challenge: buildChallenge(),
-          error: "Payment credential replay detected: x402 token already spent"
-        };
+      try {
+        if (!await opts.cacheStore.claimOnce(spentKey, 604800)) {
+          return { allowed: false, challenge: buildChallenge(), error: "Payment credential replay detected: x402 token already spent or in progress" };
+        }
+      } catch {
+        return { allowed: false, challenge: buildChallenge(), error: "Payment replay store unavailable" };
       }
     }
     const verification = await opts.x402Verifier.verifyAndSettle(x402Cred, challengeContext);
     if (verification.verified) {
-      if (opts.config.featureReplayProtection) {
-        await opts.cacheStore.setCache(spentKey, true, 604800);
-      }
       return { allowed: true, verification };
     }
     return {
@@ -13353,20 +13388,16 @@ async function evaluateDual402Gate(opts) {
     const piMatch = mppCred.match(/\b(pi_[A-Za-z0-9_]{10,})\b/);
     const spentKey = piMatch ? `agentum:spent:stripe:${piMatch[1]}` : `agentum:spent:mpp:${crypto3.createHash("sha256").update(mppCred.trim()).digest("hex")}`;
     if (opts.config.featureReplayProtection) {
-      const alreadySpent = await opts.cacheStore.getCache(spentKey);
-      if (alreadySpent) {
-        return {
-          allowed: false,
-          challenge: buildChallenge(),
-          error: "Payment credential replay detected: MPP token already spent"
-        };
+      try {
+        if (!await opts.cacheStore.claimOnce(spentKey, 604800)) {
+          return { allowed: false, challenge: buildChallenge(), error: "Payment credential replay detected: MPP token already spent or in progress" };
+        }
+      } catch {
+        return { allowed: false, challenge: buildChallenge(), error: "Payment replay store unavailable" };
       }
     }
     const verification = await opts.mppVerifier.verifyAndSettle(mppCred, challengeContext);
     if (verification.verified) {
-      if (opts.config.featureReplayProtection) {
-        await opts.cacheStore.setCache(spentKey, true, 604800);
-      }
       return { allowed: true, verification };
     }
     return {
@@ -15165,48 +15196,19 @@ class InMemoryEntityRepositoryAdapter {
     }
   }
   async findByIdentifier(type, value, jurisdiction) {
-    const rawVal = value.trim();
-    if (!rawVal)
+    if (!value.trim())
       return null;
-    if (type === "DOMAIN") {
-      const domainClean = rawVal.toLowerCase().replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0];
-      for (const entity of this.entities.values()) {
-        if (jurisdiction && entity.jurisdiction.toUpperCase() !== jurisdiction.toUpperCase()) {
-          continue;
-        }
-        if (entity.domains.some((d) => d.toLowerCase() === domainClean)) {
-          return { ...entity };
-        }
-      }
+    const aliases = { VAT: "EU_VAT", TAX: "US_EIN", CIK: "US_CIK", NATIONAL_REG: "NATIONAL_ID" };
+    const parsedType = IdentifierTypeSchema.safeParse(aliases[type] ?? type);
+    if (!parsedType.success || parsedType.data === "NAME")
       return null;
-    }
-    const valUpper = rawVal.toUpperCase();
-    const cleanNoSpaces = valUpper.replace(/[\s\-. ]/g, "");
-    const targetJur = jurisdiction?.toUpperCase();
+    const query = { ...classifyQuery(value, jurisdiction), type: parsedType.data };
+    const targetJur = normalizeCountryCode(jurisdiction || query.inferredCountry || "");
     for (const entity of this.entities.values()) {
-      if (targetJur && entity.jurisdiction.toUpperCase() !== targetJur) {
-        if (type !== "LEI") {
-          continue;
-        }
-      }
-      if (entity.primaryIdType === type && (entity.primaryIdValue.toUpperCase() === valUpper || entity.primaryIdValue.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces)) {
+      if (targetJur && entity.jurisdiction.toUpperCase() !== targetJur)
+        continue;
+      if (matchesEntityIdentifier(entity, query))
         return { ...entity };
-      }
-      if (type === "LEI" && entity.lei && entity.lei.toUpperCase() === valUpper) {
-        return { ...entity };
-      }
-      if ((type === "EU_VAT" || type === "VAT") && entity.vatNumber && entity.vatNumber.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces) {
-        return { ...entity };
-      }
-      if ((type === "LT_JAR" || type === "NATIONAL_ID" || type === "NATIONAL_REG") && entity.registrationNumber && (entity.registrationNumber.toUpperCase() === valUpper || entity.registrationNumber.toUpperCase().replace(/[\s\-. ]/g, "") === cleanNoSpaces)) {
-        return { ...entity };
-      }
-      if ((type === "US_EIN" || type === "TAX") && entity.taxId && (entity.taxId.toUpperCase() === valUpper || entity.taxId.toUpperCase().replace(/[\s-]/g, "") === valUpper.replace(/[\s-]/g, ""))) {
-        return { ...entity };
-      }
-      if ((type === "US_CIK" || type === "CIK") && entity.cik && (entity.cik.toUpperCase() === valUpper || entity.cik.replace(/^0+/, "") === valUpper.replace(/^0+/, ""))) {
-        return { ...entity };
-      }
     }
     return null;
   }
@@ -15276,30 +15278,25 @@ class HybridPostgresEntityRepositoryAdapter {
     if (this.sql && this.sqlHealthy) {
       try {
         const cleanVal = value.trim();
-        const jurFilter = jurisdiction ? jurisdiction.toUpperCase() : null;
-        const rows = jurFilter ? await this.sql`
-              SELECT * FROM entities
-              WHERE (primary_id_value = ${cleanVal}
-                 OR lei = ${cleanVal}
-                 OR vat_number = ${cleanVal}
-                 OR registration_number = ${cleanVal}
-                 OR tax_id = ${cleanVal}
-                 OR cik = ${cleanVal})
-                AND (jurisdiction = ${jurFilter} OR primary_id_type = 'LEI')
-              LIMIT 1
-            ` : await this.sql`
-              SELECT * FROM entities
-              WHERE primary_id_value = ${cleanVal}
-                 OR lei = ${cleanVal}
-                 OR vat_number = ${cleanVal}
-                 OR registration_number = ${cleanVal}
-                 OR tax_id = ${cleanVal}
-                 OR cik = ${cleanVal}
-              LIMIT 1
-            `;
-        if (rows && rows.length > 0) {
-          return mapRowToEntity(rows[0]);
-        }
+        const query = classifyQuery(cleanVal, jurisdiction);
+        const jurFilter = normalizeCountryCode(jurisdiction || query.inferredCountry || "") || null;
+        const normalized = cleanVal.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+        const domain = cleanVal.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+        const rows = await this.sql`
+          SELECT * FROM entities
+          WHERE (${jurFilter}::text IS NULL OR jurisdiction = ${jurFilter})
+            AND (regexp_replace(upper(primary_id_value), '[^A-Z0-9]', '', 'g') = ${normalized}
+              OR regexp_replace(upper(lei), '[^A-Z0-9]', '', 'g') = ${normalized}
+              OR regexp_replace(upper(vat_number), '[^A-Z0-9]', '', 'g') = ${normalized}
+              OR regexp_replace(upper(registration_number), '[^A-Z0-9]', '', 'g') = ${normalized}
+              OR regexp_replace(upper(tax_id), '[^A-Z0-9]', '', 'g') = ${normalized}
+              OR cik = ${query.type === "US_CIK" ? query.cleanedValue : cleanVal}
+              OR domains @> ${JSON.stringify([domain])}::jsonb)
+        `;
+        const candidates = rows.map(mapRowToEntity);
+        const matching = await new InMemoryEntityRepositoryAdapter(candidates).findByIdentifier(type, value, jurisdiction);
+        if (matching)
+          return matching;
       } catch {
         this.sqlHealthy = false;
       }
@@ -15517,6 +15514,29 @@ var sanctionsEntriesTable = {
       ON sanctions_entries USING GIN (normalized_name gin_trgm_ops);
   `
 };
+var syncRunsTable = {
+  tableName: "sync_runs",
+  columns: [
+    "id",
+    "dataset",
+    "status",
+    "rows_upserted",
+    "started_at",
+    "finished_at",
+    "error_message"
+  ],
+  createSql: `
+    CREATE TABLE IF NOT EXISTS sync_runs (
+      id TEXT PRIMARY KEY,
+      dataset VARCHAR(32) NOT NULL,
+      status VARCHAR(16) NOT NULL,
+      rows_upserted INTEGER NOT NULL DEFAULT 0,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      finished_at TIMESTAMPTZ,
+      error_message TEXT
+    );
+  `
+};
 
 // src/adapters/outbound/persistence/sanctions-repository.adapter.ts
 var SEED_SANCTIONS = [
@@ -15559,6 +15579,32 @@ var SEED_SANCTIONS = [
     remarks: "Designated under E.O. 13224"
   }
 ];
+var REQUIRED_FEEDS = ["OFAC_SDN", "EU_FSF", "UN_SC"];
+function assessCoverage(totalRecords, statuses, minRecords = 100, maxAgeMs = 168 * 3600 * 1000) {
+  const issues = [];
+  const refreshed = [];
+  if (totalRecords < minRecords) {
+    issues.push(`Sanctions database contains only ${totalRecords} records (minimum ${minRecords} required for production clearance)`);
+  }
+  for (const source of REQUIRED_FEEDS) {
+    const feed = statuses.get(source);
+    const timestamp = feed?.lastRefreshedAt ? Date.parse(feed.lastRefreshedAt) : NaN;
+    if (!feed || feed.status !== "OK" || !Number.isSafeInteger(feed.recordCount) || feed.recordCount < minRecords) {
+      issues.push(`${source} feed is missing, failed, or incomplete`);
+    } else if (!Number.isFinite(timestamp) || Date.now() - timestamp > maxAgeMs || timestamp > Date.now() + 300000) {
+      issues.push(`${source} feed is stale or has no valid refresh timestamp`);
+    } else {
+      refreshed.push(timestamp);
+    }
+  }
+  return {
+    totalRecords,
+    lastRefreshedAt: refreshed.length === REQUIRED_FEEDS.length ? new Date(Math.min(...refreshed)).toISOString() : null,
+    degraded: issues.length > 0,
+    degradedReason: issues.length ? issues.join("; ") : undefined,
+    feeds: Object.fromEntries(statuses)
+  };
+}
 
 class InMemorySanctionsRepositoryAdapter {
   entries = new Map;
@@ -15589,26 +15635,7 @@ class InMemorySanctionsRepositoryAdapter {
     }
   }
   async getFeedStatus() {
-    const totalRecords = this.entries.size;
-    let degraded = totalRecords < this.minRecords;
-    let degradedReason;
-    if (totalRecords === 0) {
-      degraded = true;
-      degradedReason = "Sanctions database is empty (0 records indexed)";
-    } else if (totalRecords < this.minRecords) {
-      degraded = true;
-      degradedReason = `Sanctions database contains only ${totalRecords} records (minimum ${this.minRecords} required for production clearance)`;
-    } else if (this.lastRefreshedAt && Date.now() - new Date(this.lastRefreshedAt).getTime() > this.maxAgeMs) {
-      degraded = true;
-      degradedReason = `Sanctions feed data is stale (last refreshed at ${this.lastRefreshedAt})`;
-    }
-    return {
-      totalRecords,
-      lastRefreshedAt: this.lastRefreshedAt,
-      degraded,
-      degradedReason,
-      feeds: Object.fromEntries(this.feedStatus.entries())
-    };
+    return assessCoverage(this.entries.size, this.feedStatus, this.minRecords, this.maxAgeMs);
   }
   async screen(input) {
     const threshold = input.threshold ?? 0.75;
@@ -15651,8 +15678,8 @@ class InMemorySanctionsRepositoryAdapter {
       degradedReason: feedStatus.degradedReason,
       coverage: {
         recordCount: this.entries.size,
-        sourcesScreened: sourcesScreened.length > 0 ? sourcesScreened : ["OFAC_SDN", "EU_FSF"],
-        lastSyncAt: this.lastRefreshedAt
+        sourcesScreened,
+        lastSyncAt: feedStatus.lastRefreshedAt
       }
     };
   }
@@ -15662,7 +15689,6 @@ class InMemorySanctionsRepositoryAdapter {
       this.entries.set(`${entry.listSource}:${entry.externalId}`, { ...entry });
       count++;
     }
-    this.lastRefreshedAt = new Date().toISOString();
     return count;
   }
   async count() {
@@ -15675,8 +15701,6 @@ class HybridPostgresSanctionsRepositoryAdapter {
   fallback = new InMemorySanctionsRepositoryAdapter;
   sql = null;
   initPromise = null;
-  lastRefreshedAt = null;
-  feedStatus = new Map;
   constructor(databaseUrl) {
     this.databaseUrl = databaseUrl;
   }
@@ -15693,6 +15717,7 @@ class HybridPostgresSanctionsRepositoryAdapter {
             return;
           const db = new SqlCtor(this.databaseUrl);
           await db.unsafe(sanctionsEntriesTable.createSql);
+          await db.unsafe(syncRunsTable.createSql);
           this.sql = db;
         } catch {
           this.sql = null;
@@ -15703,11 +15728,18 @@ class HybridPostgresSanctionsRepositoryAdapter {
     return this.sql;
   }
   async recordFeedSync(status) {
-    this.feedStatus.set(status.source, status);
     await this.fallback.recordFeedSync(status);
-    if (status.status === "OK") {
-      this.lastRefreshedAt = status.lastRefreshedAt ?? new Date().toISOString();
-    }
+    const db = await this.ensureDb();
+    if (!db)
+      throw new Error("Cannot persist sanctions feed status: PostgreSQL unavailable");
+    await db`
+      INSERT INTO sync_runs (id, dataset, status, rows_upserted, finished_at, error_message)
+      VALUES (${`sanctions-feed:${status.source}`}, ${status.source}, ${status.status}, ${status.recordCount}, ${status.lastRefreshedAt}, ${status.error ?? null})
+      ON CONFLICT (id) DO UPDATE SET
+        dataset = EXCLUDED.dataset, status = EXCLUDED.status,
+        rows_upserted = EXCLUDED.rows_upserted, finished_at = EXCLUDED.finished_at,
+        error_message = EXCLUDED.error_message
+    `;
   }
   async getFeedStatus() {
     const db = await this.ensureDb();
@@ -15720,15 +15752,19 @@ class HybridPostgresSanctionsRepositoryAdapter {
       };
     }
     try {
-      const count = await this.count();
-      const isDegraded = count < 100;
-      return {
-        totalRecords: count,
-        lastRefreshedAt: this.lastRefreshedAt,
-        degraded: isDegraded,
-        degradedReason: isDegraded ? `Sanctions database contains only ${count} records (minimum 100 required for production clearance)` : undefined,
-        feeds: Object.fromEntries(this.feedStatus.entries())
-      };
+      const rows = await db`SELECT COUNT(*)::int AS cnt FROM sanctions_entries`;
+      const persisted = await db`
+        SELECT dataset, status, rows_upserted, finished_at, error_message
+        FROM sync_runs WHERE id LIKE 'sanctions-feed:%'
+      `;
+      const feeds = new Map(persisted.map((row) => [String(row.dataset), {
+        source: String(row.dataset),
+        status: row.status,
+        recordCount: Number(row.rows_upserted),
+        lastRefreshedAt: row.finished_at ? new Date(row.finished_at).toISOString() : null,
+        error: row.error_message ?? undefined
+      }]));
+      return assessCoverage(Number(rows[0]?.cnt ?? 0), feeds);
     } catch {
       const fb = await this.fallback.getFeedStatus();
       return {
@@ -15787,8 +15823,9 @@ class HybridPostgresSanctionsRepositoryAdapter {
         score: Math.round(Number(r.score) * 1e4) / 1e4,
         remarks: r.remarks ? String(r.remarks) : undefined
       })).filter((m) => m.score >= threshold);
-      const totalCount = await this.count();
-      const isDegraded = totalCount < 100;
+      const feedStatus = await this.getFeedStatus();
+      const totalCount = feedStatus.totalRecords;
+      const isDegraded = feedStatus.degraded;
       const maxScore = matches.length > 0 ? matches[0].score : 0;
       const riskLevel = maxScore >= 0.95 ? "EXACT_MATCH" : matches.length > 0 ? "POTENTIAL_MATCH" : isDegraded && totalCount === 0 ? "UNKNOWN" : "CLEAR";
       return {
@@ -15798,11 +15835,11 @@ class HybridPostgresSanctionsRepositoryAdapter {
         matchedLists: Array.from(new Set(matches.map((m) => m.listSource))),
         matches,
         degraded: isDegraded,
-        degradedReason: isDegraded ? `Sanctions database contains only ${totalCount} records (minimum 100 required for production clearance)` : undefined,
+        degradedReason: feedStatus.degradedReason,
         coverage: {
           recordCount: totalCount,
           sourcesScreened: ["OFAC_SDN", "EU_FSF", "UN_SC"],
-          lastSyncAt: this.lastRefreshedAt
+          lastSyncAt: feedStatus.lastRefreshedAt
         }
       };
     } catch {
@@ -15816,10 +15853,9 @@ class HybridPostgresSanctionsRepositoryAdapter {
   }
   async upsertMany(entries) {
     await this.fallback.upsertMany(entries);
-    this.lastRefreshedAt = new Date().toISOString();
     const db = await this.ensureDb();
     if (!db)
-      return entries.length;
+      throw new Error("Cannot persist sanctions data: PostgreSQL unavailable");
     try {
       const BATCH_SIZE = 500;
       for (let i = 0;i < entries.length; i += BATCH_SIZE) {
@@ -15868,7 +15904,9 @@ class HybridPostgresSanctionsRepositoryAdapter {
             updated_at = NOW()
         `;
       }
-    } catch {}
+    } catch (error) {
+      throw error;
+    }
     return entries.length;
   }
   async count() {
@@ -16385,7 +16423,10 @@ class MppPaymentAdapter {
         }
         const requiredCents = Math.round(parseFloat(ctx.priceUsd) * 100);
         const minCents = Math.max(1, requiredCents);
-        if (typeof piData.amount === "number" && piData.amount < minCents) {
+        if (!Number.isSafeInteger(piData.amount) || typeof piData.amount !== "number" || piData.amount < 0) {
+          return { verified: false, rail: "MPP", error: "Stripe PaymentIntent amount is missing or invalid" };
+        }
+        if (piData.amount < minCents) {
           return {
             verified: false,
             rail: "MPP",
@@ -16543,12 +16584,16 @@ class X402PaymentAdapter {
       return { verified: false, rail: "X402", error: "Missing valid x402 signature" };
     }
     const shouldCallFacilitator = Boolean(this.config.x402FacilitatorUrl) && (this.config.featureStrictPayments === true || decoded.useFacilitator === true);
+    let settlement;
     if (shouldCallFacilitator) {
+      const requirements = this.buildChallenge(ctx).payload.accepts[0];
+      const facilitatorBody = JSON.stringify({ x402Version: decoded.x402Version ?? 2, paymentPayload: decoded, paymentRequirements: requirements });
       try {
         const res = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential: decoded, context: ctx })
+          body: facilitatorBody,
+          signal: AbortSignal.timeout(1e4)
         });
         if (!res.ok) {
           return {
@@ -16558,27 +16603,18 @@ class X402PaymentAdapter {
           };
         }
         const data = await res.json().catch(() => ({}));
-        if (data.valid === false || data.verified === false || this.config.featureStrictPayments && data.valid !== true && data.verified !== true) {
-          return {
-            verified: false,
-            rail: "X402",
-            error: data.error ?? "Facilitator verification rejected"
-          };
+        if ((data.isValid ?? data.valid ?? data.verified) !== true) {
+          return { verified: false, rail: "X402", error: String(data.invalidReason ?? data.error ?? "Facilitator verification rejected") };
         }
-        let settlementRef = data.txHash || data.settlementId;
-        if (!settlementRef) {
-          try {
-            const settleRes = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/settle`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ credential: decoded, context: ctx })
-            });
-            if (settleRes.ok) {
-              const settleData = await settleRes.json().catch(() => ({}));
-              settlementRef = settleData.txHash || settleData.settlementId;
-            }
-          } catch {}
+        const settleRes = await this.fetchImpl(`${this.config.x402FacilitatorUrl}/settle`, { method: "POST", headers: { "Content-Type": "application/json" }, body: facilitatorBody, signal: AbortSignal.timeout(1e4) });
+        if (!settleRes.ok)
+          return { verified: false, rail: "X402", error: "Facilitator settlement failed" };
+        settlement = await settleRes.json();
+        const transaction = settlement?.transaction ?? settlement?.txHash ?? settlement?.settlementId;
+        if (settlement?.success !== true || typeof transaction !== "string" || !transaction || settlement.network !== undefined && settlement.network !== this.config.x402Network) {
+          return { verified: false, rail: "X402", error: "Facilitator settlement rejected or unconfirmed" };
         }
+        settlement = { ...settlement, transaction };
       } catch (err) {
         const message = err instanceof Error ? err.message : "Facilitator verification error";
         return { verified: false, rail: "X402", error: message };
@@ -16603,6 +16639,7 @@ class X402PaymentAdapter {
     }
     const payer = decoded.payer ?? decoded.payload?.payer ?? decoded.payload?.authorization?.from ?? "0xAgentPayer";
     const receipt = {
+      ...settlement,
       success: true,
       rail: "X402",
       network: this.config.x402Network,
@@ -16645,6 +16682,13 @@ class InMemoryQuotaAndCacheAdapter {
     this.quotas.set(key, next);
     return next;
   }
+  async claimOnce(key, ttlSeconds) {
+    const existing = this.cache.get(key);
+    if (existing && Date.now() <= existing.expiresAt)
+      return false;
+    this.cache.set(key, { serialized: "true", expiresAt: Date.now() + ttlSeconds * 1000 });
+    return true;
+  }
   async getDailyQuota(fingerprint, dateKey) {
     const key = `agentum:free:${dateKey}:${fingerprint}`;
     return this.quotas.get(key) ?? 0;
@@ -16666,6 +16710,26 @@ class RedisQuotaAndCacheAdapter {
         this.redisClient = null;
         this.redisHealthy = false;
       }
+    }
+  }
+  async claimOnce(key, ttlSeconds) {
+    if (!this.redisClient || !this.redisHealthy)
+      throw new Error("Payment replay store unavailable");
+    let timer;
+    try {
+      const result = await Promise.race([
+        this.redisClient.send("SET", [key, "true", "NX", "EX", String(ttlSeconds)]),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            this.redisHealthy = false;
+            this.redisClient?.close();
+            reject(new Error("Payment replay store timed out"));
+          }, 2000);
+        })
+      ]);
+      return result === "OK";
+    } finally {
+      clearTimeout(timer);
     }
   }
   async getCache(key) {
@@ -18567,7 +18631,7 @@ function createApp(overrides = {}, customDeps) {
 // src/index.ts
 var { app, config: config3, ingestWorker } = createApp();
 if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
-  const syncSources = config3.isProduction ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
+  const syncSources = config3.nodeEnv === "production" ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
   ingestWorker.runSync(syncSources).catch((err) => {
     console.error("[agentum:worker] initial sync error:", err);
   });

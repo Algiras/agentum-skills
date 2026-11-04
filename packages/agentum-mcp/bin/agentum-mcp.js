@@ -289,7 +289,7 @@ function startBridge() {
 
       // Handle payment challenge autonomously
       if (isPaymentChallenge) {
-        const challenge = parse402Challenge(rawHeaders, data);
+        const challenge = parse402Challenge(rawHeaders, data, config.network);
 
         if (challenge && config.privateKey) {
           log(`Payment challenge received on ${challenge.network}. Signing autonomous x402 micropayment...`);

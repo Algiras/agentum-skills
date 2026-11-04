@@ -3680,78 +3680,120 @@ class EntityApplicationService {
     const startedAt = Date.now();
     const effectiveJurisdiction = cmd.jurisdiction || cmd.country;
     const classified = classifyQuery(cmd.query, effectiveJurisdiction);
-    const checkSanctionsFlag = cmd.checkSanctions !== false;
     const cleanPart = encodeURIComponent(classified.cleanedValue.toLowerCase());
     const jurPart = encodeURIComponent((effectiveJurisdiction ?? "all").toLowerCase());
-    const cacheKey = `agentum:resolve:v1:${classified.type}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}:${checkSanctionsFlag}`;
-    const cached = await this.deps.cacheStore.getCache(cacheKey);
-    if (cached) {
-      return {
-        ...cached,
-        modeUsed: "cache",
-        latencyMs: Math.max(1, Date.now() - startedAt)
-      };
-    }
+    const identityCacheKey = `agentum:identity:v1:${classified.type}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}`;
     let candidates = [];
-    const modeUsed = this.deps.config.resolverMode;
-    if (this.deps.config.resolverMode !== "live") {
-      if (classified.type !== "NAME") {
-        const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction);
-        if (exact) {
-          candidates.push({ ...exact, confidence: 0.99 });
-        }
-      }
-      if (candidates.length === 0) {
-        const fuzzy = await this.deps.entityRepo.searchFuzzy(classified.normalizedName, { jurisdiction: effectiveJurisdiction, limit: 5 });
-        candidates.push(...fuzzy);
-      }
-      candidates.sort((a, b) => b.confidence - a.confidence);
-    }
-    const shouldQueryUpstream = this.deps.config.resolverMode === "live" || this.deps.config.resolverMode === "hybrid" && (candidates.length === 0 || candidates[0].confidence < 0.82);
+    let best = null;
+    let modeUsed = this.deps.config.resolverMode;
+    let vatVerification = null;
     let routerAttempts = [];
     let paidUsed = false;
-    if (shouldQueryUpstream) {
-      const routerRes = await this.sourceRouter.resolve(classified, {
-        jurisdiction: effectiveJurisdiction,
-        allowPaidSources: cmd.allowPaidSources
-      });
-      routerAttempts = routerRes.sourcesTried;
-      paidUsed = routerRes.costUsd > 0;
-      const upstreamRecords = routerRes.records;
-      if (upstreamRecords.length > 0) {
-        await this.deps.entityRepo.upsertMany(upstreamRecords);
-        const combined = [...candidates, ...upstreamRecords];
-        combined.sort((a, b) => b.confidence - a.confidence);
-        const seen = new Set;
-        const deduplicated = [];
-        for (const item of combined) {
-          const key = `${item.jurisdiction}:${item.primaryIdType}:${item.primaryIdValue}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            deduplicated.push(item);
+    const cachedIdentity = await this.deps.cacheStore.getCache(identityCacheKey);
+    if (cachedIdentity) {
+      best = cachedIdentity.best;
+      candidates = cachedIdentity.candidates;
+      modeUsed = "cache";
+      vatVerification = cachedIdentity.vatVerification;
+      routerAttempts = cachedIdentity.routerAttempts;
+      paidUsed = cachedIdentity.paidUsed;
+    } else {
+      if (this.deps.config.resolverMode !== "live") {
+        if (classified.type !== "NAME") {
+          const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction);
+          if (exact) {
+            candidates.push({ ...exact, confidence: 0.99 });
           }
         }
-        candidates = deduplicated;
+        if (candidates.length === 0) {
+          const fuzzy = await this.deps.entityRepo.searchFuzzy(classified.normalizedName, { jurisdiction: effectiveJurisdiction, limit: 5 });
+          candidates.push(...fuzzy);
+        }
+        candidates.sort((a, b) => b.confidence - a.confidence);
       }
-    }
-    const best = candidates[0] ?? null;
-    let vatVerification = null;
-    if (cmd.verifyVat && (best?.vatNumber || classified.type === "EU_VAT")) {
-      const vatToVerify = best?.vatNumber ?? classified.cleanedValue;
-      try {
-        vatVerification = await this.deps.vatValidator.verifyVat(vatToVerify, this.deps.config.viesTimeoutMs);
-      } catch (err) {
-        vatVerification = {
-          valid: false,
-          countryCode: vatToVerify.slice(0, 2).toUpperCase(),
-          vatNumber: vatToVerify.slice(2),
-          fullVat: vatToVerify.toUpperCase(),
-          registeredName: null,
-          registeredAddress: null,
-          checkedAt: new Date().toISOString(),
-          source: "EU_VIES",
-          error: err instanceof Error ? err.message : String(err)
-        };
+      const shouldQueryUpstream = this.deps.config.resolverMode === "live" || this.deps.config.resolverMode === "hybrid" && (candidates.length === 0 || candidates[0].confidence < 0.82);
+      if (shouldQueryUpstream) {
+        const routerRes = await this.sourceRouter.resolve(classified, {
+          jurisdiction: effectiveJurisdiction,
+          allowPaidSources: cmd.allowPaidSources
+        });
+        routerAttempts = routerRes.sourcesTried;
+        paidUsed = routerRes.costUsd > 0;
+        const upstreamRecords = routerRes.records;
+        if (upstreamRecords.length > 0) {
+          await this.deps.entityRepo.upsertMany(upstreamRecords);
+          const combined = [...candidates, ...upstreamRecords];
+          const seen = new Set;
+          const deduplicated = [];
+          for (const item of combined) {
+            const key = `${item.jurisdiction}:${item.primaryIdType}:${item.primaryIdValue}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              deduplicated.push(item);
+            }
+          }
+          candidates = deduplicated;
+        }
+      }
+      for (const c of candidates) {
+        if (classified.type !== "NAME" && classified.cleanedValue) {
+          const idClean = c.primaryIdValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+          const queryClean = classified.cleanedValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+          if (idClean === queryClean) {
+            c.confidence = Math.max(c.confidence, 0.95);
+          } else {
+            c.confidence = Math.min(c.confidence, 0.1);
+          }
+        } else {
+          const queryTerm = classified.normalizedName || classified.cleanedValue || classified.raw;
+          const nameSim = Math.max(trigramSimilarity(queryTerm, c.normalizedName), wordTrigramSimilarity(queryTerm, c.normalizedName));
+          const aliasSims = (c.aliases || []).map((a) => {
+            const { normalizedName: aNorm } = normalizeCompanyName(a);
+            return Math.max(trigramSimilarity(queryTerm, aNorm), wordTrigramSimilarity(queryTerm, aNorm));
+          });
+          const bestSim = Math.max(nameSim, ...aliasSims);
+          c.confidence = Math.round(bestSim * 100) / 100;
+        }
+      }
+      candidates.sort((a, b) => b.confidence - a.confidence);
+      if (classified.type === "NAME" && candidates.length >= 2) {
+        const c1 = candidates[0];
+        const c2 = candidates[1];
+        if (c1 && c2 && c1.confidence - c2.confidence < 0.05) {
+          c1.confidence = Math.max(0.4, Math.round((c1.confidence - 0.2) * 100) / 100);
+        }
+      }
+      best = candidates[0] ?? null;
+      if (best && best.confidence < 0.6) {
+        best = null;
+      }
+      if (cmd.verifyVat && (best?.vatNumber || classified.type === "EU_VAT")) {
+        const vatToVerify = best?.vatNumber ?? classified.cleanedValue;
+        try {
+          vatVerification = await this.deps.vatValidator.verifyVat(vatToVerify, this.deps.config.viesTimeoutMs);
+        } catch (err) {
+          vatVerification = {
+            valid: false,
+            countryCode: vatToVerify.slice(0, 2).toUpperCase(),
+            vatNumber: vatToVerify.slice(2),
+            fullVat: vatToVerify.toUpperCase(),
+            registeredName: null,
+            registeredAddress: null,
+            checkedAt: new Date().toISOString(),
+            source: "EU_VIES",
+            error: err instanceof Error ? err.message : String(err)
+          };
+        }
+      }
+      if (best !== null) {
+        await this.deps.cacheStore.setCache(identityCacheKey, {
+          best,
+          candidates,
+          modeUsed,
+          vatVerification,
+          routerAttempts,
+          paidUsed
+        }, 3600);
       }
     }
     let compliance = null;
@@ -3764,8 +3806,9 @@ class EntityApplicationService {
     }
     const targetCountry = effectiveJurisdiction || classified.inferredCountry || "XX";
     const profile = getCountryProfile(targetCountry);
+    const isResolved = best !== null && best.confidence >= 0.6;
     const result = {
-      resolved: best !== null,
+      resolved: isResolved,
       confidence: best ? best.confidence : 0,
       queryType: classified.type,
       modeUsed,
@@ -3781,9 +3824,6 @@ class EntityApplicationService {
       },
       latencyMs: Math.max(1, Date.now() - startedAt)
     };
-    if (best !== null) {
-      await this.deps.cacheStore.setCache(cacheKey, result, 3600);
-    }
     return result;
   }
   async verifyVat(input) {
@@ -3914,6 +3954,10 @@ class EntityApplicationService {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is '${entity.status}' (not active). Verification cannot be approved.`);
+    } else if (entity && (!entity.status || entity.status === "UNKNOWN")) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is 'UNKNOWN' (standing unverified). Unqualified approval is prohibited.`);
     } else if (vatOwnershipMismatch) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
@@ -14711,37 +14755,69 @@ var DEFAULT_BULK_FEED_URLS = {
   ltJarBulkJsonUrl: "https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo?limit(500)",
   gleifBulkJsonUrl: "https://api.gleif.org/api/v1/lei-records?page[size]=200&page[number]=1"
 };
-function parseCsvLine(line) {
-  const fields = [];
-  let current = "";
+function parseCsvRows(csvText) {
+  if (!csvText)
+    return [];
+  const text = csvText.charCodeAt(0) === 65279 ? csvText.slice(1) : csvText;
+  const rows = [];
+  let currentRow = [];
+  let currentField = "";
   let inQuotes = false;
-  for (let i = 0;i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
+  const len = text.length;
+  for (let i = 0;i < len; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < len && text[i + 1] === '"') {
+          currentField += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
       } else {
-        inQuotes = !inQuotes;
+        currentField += ch;
       }
-    } else if (ch === "," && !inQuotes) {
-      fields.push(current.trim());
-      current = "";
     } else {
-      current += ch;
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        currentRow.push(currentField.trim());
+        currentField = "";
+      } else if (ch === "\r") {
+        if (i + 1 < len && text[i + 1] === `
+`)
+          i++;
+        currentRow.push(currentField.trim());
+        currentField = "";
+        if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+      } else if (ch === `
+`) {
+        currentRow.push(currentField.trim());
+        currentField = "";
+        if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+      } else {
+        currentField += ch;
+      }
     }
   }
-  fields.push(current.trim());
-  return fields;
+  if (currentField.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentField.trim());
+    if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
+      rows.push(currentRow);
+    }
+  }
+  return rows;
 }
 function parseOfacSdnCsv(csvText) {
   const entries = [];
-  const lines = csvText.split(/\r?\n/);
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || line === "\x1A")
-      continue;
-    const cols = parseCsvLine(line);
+  const rows = parseCsvRows(csvText);
+  for (const cols of rows) {
     const entNum = cols[0]?.replace(/^-0-$/, "").trim();
     const sdnName = cols[1]?.replace(/^-0-$/, "").trim();
     if (!entNum || !sdnName || !/^\d+$/.test(entNum))
@@ -14780,10 +14856,10 @@ function parseOfacSdnCsv(csvText) {
 }
 function parseOpenSanctionsSimpleCsv(csvText, listSource) {
   const entries = [];
-  const lines = csvText.split(/\r?\n/);
-  if (lines.length <= 1)
+  const rows = parseCsvRows(csvText);
+  if (rows.length <= 1)
     return entries;
-  const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+  const header = rows[0].map((h) => h.toLowerCase());
   const idxId = header.indexOf("id");
   const idxSchema = header.indexOf("schema");
   const idxName = header.indexOf("name");
@@ -14791,11 +14867,8 @@ function parseOpenSanctionsSimpleCsv(csvText, listSource) {
   const idxCountries = header.indexOf("countries");
   const idxIdentifiers = header.indexOf("identifiers");
   const idxSanctions = header.indexOf("sanctions");
-  for (let i = 1;i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line)
-      continue;
-    const cols = parseCsvLine(line);
+  for (let i = 1;i < rows.length; i++) {
+    const cols = rows[i];
     const id = cols[idxId >= 0 ? idxId : 0]?.trim();
     const name = cols[idxName >= 0 ? idxName : 2]?.trim();
     if (!id || !name)
@@ -16652,6 +16725,34 @@ class ConfigurableRegistryAdapter {
     this.fetchImpl = deps?.fetchImpl ?? fetch;
     this.env = deps?.env ?? (typeof process !== "undefined" ? process.env : {});
   }
+  hasRequiredCredentials(isIdLookup) {
+    const template = isIdLookup ? this.config.lookupUrl : this.config.searchUrl;
+    if (!template)
+      return false;
+    const urlMatches = template.match(/\$\{([^}]+)\}/g);
+    if (urlMatches) {
+      for (const m of urlMatches) {
+        const varName = m.slice(2, -1);
+        if (!this.env[varName] && !process.env[varName]) {
+          return false;
+        }
+      }
+    }
+    if (this.config.headers) {
+      for (const rawVal of Object.values(this.config.headers)) {
+        const hMatches = rawVal.match(/\$\{([^}]+)\}/g);
+        if (hMatches) {
+          for (const m of hMatches) {
+            const varName = m.slice(2, -1);
+            if (!this.env[varName] && !process.env[varName]) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+    return true;
+  }
   supports(query, jurisdiction) {
     if (query.scheme && this.config.schemes.includes(query.scheme)) {
       return true;
@@ -16666,21 +16767,34 @@ class ConfigurableRegistryAdapter {
   }
   async search(query, opts) {
     let url;
-    const isIdLookup = query.scheme && this.config.schemes.includes(query.scheme);
+    const isIdLookup = Boolean(query.scheme && this.config.schemes.includes(query.scheme));
     if (isIdLookup) {
+      if (!this.hasRequiredCredentials(true))
+        return [];
       url = this.config.lookupUrl.replace("{id}", encodeURIComponent(query.cleanedValue));
     } else if (query.type === "NAME" && this.config.searchUrl) {
+      if (!this.hasRequiredCredentials(false))
+        return [];
       url = this.config.searchUrl.replace("{q}", encodeURIComponent(query.cleanedValue || query.raw));
     } else {
       return [];
     }
+    let hasMissingCred = false;
+    url = url.replace(/\$\{([^}]+)\}/g, (_, varName) => {
+      const val = this.env[varName] || process.env[varName] || "";
+      if (!val)
+        hasMissingCred = true;
+      return encodeURIComponent(val);
+    });
+    if (hasMissingCred)
+      return [];
     const headers = {
       Accept: "application/json"
     };
     if (this.config.headers) {
       for (const [key, rawVal] of Object.entries(this.config.headers)) {
         const val = rawVal.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-          return this.env[varName] || "";
+          return this.env[varName] || process.env[varName] || "";
         });
         headers[key] = val;
       }
@@ -16722,11 +16836,28 @@ class ConfigurableRegistryAdapter {
         if (!nameVal)
           continue;
         let status = "UNKNOWN";
-        if (this.config.fieldMap.status) {
-          const rawStatus = String(getByDotPath(item, this.config.fieldMap.status) ?? "");
-          status = this.config.statusMap[rawStatus] || this.config.statusMap["*"] || "UNKNOWN";
+        const slettedato = item.slettedato || item.deletionDate || item.datumZaniku;
+        const isDeleted = Boolean(slettedato || item.deleted === true || item.isDeleted === true);
+        const isLiquidation = Boolean(item.konkurs === true || item.underAvvikling === true || item.underTvangsavviklingEllerTvangsopplosning === true || item.inLiquidation === true);
+        if (isDeleted) {
+          status = "DISSOLVED";
+        } else if (isLiquidation) {
+          status = "LIQUIDATION";
+        } else if (item.registrertIEnhetsregisteret === true) {
+          status = "ACTIVE";
+        } else if (this.config.fieldMap.status) {
+          const rawStatus = String(getByDotPath(item, this.config.fieldMap.status) ?? "").trim();
+          if (rawStatus && this.config.statusMap[rawStatus]) {
+            status = this.config.statusMap[rawStatus];
+          } else if (rawStatus && this.config.statusMap[rawStatus.toUpperCase()]) {
+            status = this.config.statusMap[rawStatus.toUpperCase()];
+          } else if (rawStatus && this.config.statusMap["*"]) {
+            status = this.config.statusMap["*"];
+          } else {
+            status = "UNKNOWN";
+          }
         } else {
-          status = this.config.statusMap["*"] || this.config.statusMap["ACTIVE"] || "ACTIVE";
+          status = "UNKNOWN";
         }
         const street = this.config.fieldMap.street ? String(getByDotPath(item, this.config.fieldMap.street) ?? "") : undefined;
         const city = this.config.fieldMap.city ? String(getByDotPath(item, this.config.fieldMap.city) ?? "") : undefined;
@@ -16737,6 +16868,16 @@ class ConfigurableRegistryAdapter {
         const region = jurUpper === "US" ? "US" : EU_COUNTRIES2.has(jurUpper) ? "EU" : "OTHER";
         const cleanId = idVal ? String(idVal).trim() : query.cleanedValue;
         const entityId = `${jurUpper}_${query.scheme || "REG"}:${cleanId}`;
+        let confidence = 0.5;
+        if (isIdLookup) {
+          const idClean = cleanId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+          const queryClean = query.cleanedValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+          confidence = idClean === queryClean ? 0.99 : 0.1;
+        } else {
+          const queryTerm = query.normalizedName || query.cleanedValue || query.raw;
+          const sim = trigramSimilarity(queryTerm, normalizedName);
+          confidence = Math.round(sim * 100) / 100;
+        }
         records.push({
           id: entityId,
           canonicalName: cleanName,
@@ -16767,13 +16908,13 @@ class ConfigurableRegistryAdapter {
           ultimateParentLei: null,
           domains: [],
           aliases: [],
-          confidence: 1,
+          confidence,
           sources: [
             {
               source: this.sourceName,
               sourceId: cleanId,
               fetchedAt: now,
-              score: 1
+              score: confidence
             }
           ]
         });
@@ -16817,10 +16958,13 @@ var REGISTRY_CONFIGS = [
     fieldMap: {
       id: "ico",
       name: "obchodniJmeno",
+      status: "stavSubjektu",
       city: "sidlo.nazevObce",
       postalCode: "sidlo.psc"
     },
     statusMap: {
+      AKTIVNI: "ACTIVE",
+      ZANIKLY: "DISSOLVED",
       ACTIVE: "ACTIVE"
     }
   },
@@ -16852,11 +16996,14 @@ var REGISTRY_CONFIGS = [
     fieldMap: {
       id: "businessId",
       name: "name",
+      status: "status",
       street: "addresses.0.street",
       city: "addresses.0.city",
       postalCode: "addresses.0.postCode"
     },
     statusMap: {
+      "0": "ACTIVE",
+      "1": "DISSOLVED",
       ACTIVE: "ACTIVE"
     }
   },
@@ -16927,9 +17074,15 @@ var REGISTRY_CONFIGS = [
     fieldMap: {
       id: "corporateNumber",
       name: "name",
+      status: "process",
       city: "cityName"
     },
     statusMap: {
+      "01": "ACTIVE",
+      "11": "ACTIVE",
+      "12": "ACTIVE",
+      "71": "DISSOLVED",
+      "72": "DISSOLVED",
       ACTIVE: "ACTIVE"
     }
   }
@@ -17035,7 +17188,24 @@ class OpenCorporatesAggregatorAdapter {
           cik: null,
           tickers: [],
           legalForm: c.company_type || detectedLegalForm,
-          status: c.current_status?.toLowerCase().includes("dissolved") ? "DISSOLVED" : c.current_status?.toLowerCase().includes("inactive") ? "INACTIVE" : "ACTIVE",
+          status: (() => {
+            if (!c.current_status)
+              return "UNKNOWN";
+            const raw = String(c.current_status).toLowerCase();
+            if (raw.includes("dissolved") || raw.includes("struck off") || raw.includes("deleted")) {
+              return "DISSOLVED";
+            }
+            if (raw.includes("liquidation") || raw.includes("bankruptcy") || raw.includes("insolvent")) {
+              return "LIQUIDATION";
+            }
+            if (raw.includes("inactive") || raw.includes("dormant") || raw.includes("suspended")) {
+              return "INACTIVE";
+            }
+            if (raw.includes("active") || raw.includes("live") || raw.includes("registered") || raw.includes("existing")) {
+              return "ACTIVE";
+            }
+            return "UNKNOWN";
+          })(),
           incorporationDate: c.incorporation_date || null,
           legalAddress: {
             street: c.registered_address_in_full || undefined,
@@ -17046,13 +17216,31 @@ class OpenCorporatesAggregatorAdapter {
           ultimateParentLei: null,
           domains: [],
           aliases: [],
-          confidence: 1,
+          confidence: (() => {
+            if (query.type !== "NAME" && query.cleanedValue) {
+              const idClean = cleanId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+              const queryClean = query.cleanedValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+              return idClean === queryClean ? 0.95 : 0.1;
+            }
+            const queryTerm = query.normalizedName || query.cleanedValue || query.raw;
+            const sim = trigramSimilarity(queryTerm, normalizedName);
+            return Math.round(sim * 100) / 100;
+          })(),
           sources: [
             {
               source: this.sourceName,
               sourceId: cleanId,
               fetchedAt: now,
-              score: 1
+              score: (() => {
+                if (query.type !== "NAME" && query.cleanedValue) {
+                  const idClean = cleanId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                  const queryClean = query.cleanedValue.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                  return idClean === queryClean ? 0.95 : 0.1;
+                }
+                const queryTerm = query.normalizedName || query.cleanedValue || query.raw;
+                const sim = trigramSimilarity(queryTerm, normalizedName);
+                return Math.round(sim * 100) / 100;
+              })()
             }
           ]
         });

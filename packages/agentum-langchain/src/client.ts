@@ -34,6 +34,24 @@ export interface ScreenSanctionsInput {
   threshold?: number;
 }
 
+export interface CheckVendorInput {
+  name: string;
+  country?: string;
+  vatNumber?: string;
+  registrationNumber?: string;
+  domain?: string;
+}
+
+export interface VerifyBankPayeeInput {
+  iban: string;
+  expectedCountry?: string;
+  payeeName?: string;
+}
+
+export interface BatchResolveInput {
+  items: Array<{ query: string; country?: string; jurisdiction?: string }>;
+}
+
 export class AgentumClient {
   readonly baseUrl: string;
   readonly agentId: string;
@@ -58,7 +76,7 @@ export class AgentumClient {
     }
   }
 
-  private async postJson(endpoint: string, body: Record<string, unknown>): Promise<any> {
+  private async postJson(endpoint: string, body: unknown): Promise<any> {
     const url = `${this.baseUrl}${endpoint}`;
     const res = await this.fetchFn(url, {
       method: "POST",
@@ -97,5 +115,17 @@ export class AgentumClient {
       country: input.country,
       threshold: input.threshold ?? 0.75,
     });
+  }
+
+  async checkVendor(input: CheckVendorInput): Promise<any> {
+    return this.postJson("/v1/compliance/check-vendor", input);
+  }
+
+  async verifyBankPayee(input: VerifyBankPayeeInput): Promise<any> {
+    return this.postJson("/v1/compliance/verify-bank-payee", input);
+  }
+
+  async batchResolve(input: BatchResolveInput): Promise<any> {
+    return this.postJson("/v1/entity/batch-resolve", input);
   }
 }

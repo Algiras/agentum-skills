@@ -6,14 +6,23 @@
 - **Free Tier:** 5 free calls/day per agent (`X-Agent-Id` or IP) — zero signup or API keys required.
 - **Inline HTTP 402 Micropayments:**
   1. **x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on `eip155:84532` to `0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e`.
-  2. **Stripe + Tempo MPP (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Settles Tempo stablecoins and Stripe Shared Payment Tokens.
+  2. **Stripe + Tempo MPP (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Settles Tempo stablecoins and Stripe PaymentIntents / Shared Payment Tokens.
 
 ## Machine Discovery Endpoints
-- OpenAPI 3.1 Spec: https://agentum.asimplek.cloud/openapi.json
-- MCP Manifest: https://agentum.asimplek.cloud/.well-known/mcp.json
-- Streamable HTTP MCP Server: https://agentum.asimplek.cloud/mcp
+- Streamable HTTP MCP Server: http://localhost:3000/mcp
+- MCP Manifest: http://localhost:3000/.well-known/mcp.json
+- OpenAPI 3.1 Spec: http://localhost:3000/openapi.json
+- OpenAI Plugin Manifest: http://localhost:3000/.well-known/ai-plugin.json
+- A2A Agent Card: http://localhost:3000/.well-known/agent.json
+- x402 Bazaar Manifest: http://localhost:3000/.well-known/x402.json
+- MPP Manifest: http://localhost:3000/.well-known/mpp.json
+- Full LLM Guide: http://localhost:3000/llms-full.txt
+- Skills & Plugin Repo: https://github.com/Algiras/agentum-skills
 
 ## Available Tools
-- `POST /v1/entity/resolve` (MCP: `resolve_entity`, $0.005/call): Resolve legal entity by identifier or name — Resolves companies and organizations across global registers (GLEIF, EU VAT, SEC EDGAR, State Registrars) with optional sanctions screening and live VAT verification.
+- `POST /v1/entity/resolve` (MCP: `resolve_entity`, $0.005/call): Deterministic Global Corporate Entity & Registry Resolver — Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK, EU-27, Switzerland, Australia, Singapore, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.
 - `POST /v1/entity/vat-verify` (MCP: `verify_eu_vat`, $0.005/call): Verify EU VAT registration status via VIES — Validates European Union VAT identification numbers against the live official EU VIES system, linking against known company profiles.
 - `POST /v1/entity/sanctions-screen` (MCP: `screen_sanctions`, $0.005/call): Screen entity or individual against global sanctions lists — Performs fuzzy and exact sanctions screening against OFAC SDN and EU Financial Sanctions with configurable similarity thresholds.
+- `POST /v1/compliance/check-vendor` (MCP: `check_vendor`, $0.010/call): All-in-one 1-shot vendor KYB due diligence & compliance verdict — Composite autonomous KYB vendor due diligence tool. Concurrently resolves corporate identity across global registers, validates European Commission VIES VAT numbers, and screens global sanctions (OFAC/EU/UN). Returns a definitive compliance verdict (APPROVED, FLAGGED_FOR_REVIEW, or REJECTED) with a full audit trail in a single round trip.
+- `POST /v1/compliance/verify-bank-payee` (MCP: `verify_bank_payee`, $0.003/call): Verify SEPA / international IBAN format, checksum, and country alignment — Validates International Bank Account Numbers (IBAN) using ISO 13616 specifications and MOD-97 checksum validation. Verifies whether the issuing country matches the expected corporate jurisdiction to prevent invoice fraud and redirection attacks.
+- `POST /v1/entity/batch-resolve` (MCP: `batch_resolve`, $0.025/call): Batch resolve multiple corporate entities concurrently (up to 25) — Concurrently resolves multiple corporate entity names, registration numbers, or domains across national registries. Optimized for agent data pipelines, CSV processing, and batch supplier onboarding.

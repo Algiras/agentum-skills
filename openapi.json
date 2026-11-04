@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://agentum.asimplek.cloud"
+      "url": "http://localhost:3000"
     }
   ],
   "paths": {
@@ -68,6 +68,10 @@
                   },
                   "checkSanctions": {
                     "description": "Cross-screen entity against OFAC SDN & EU Financial Sanctions (default true)",
+                    "type": "boolean"
+                  },
+                  "includeOfficers": {
+                    "description": "Include corporate directors, executives, and officers when available",
                     "type": "boolean"
                   }
                 },
@@ -385,6 +389,37 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1
+                            },
+                            "officers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "type": "string"
+                                  },
+                                  "appointedOn": {
+                                    "type": "string"
+                                  },
+                                  "resignedOn": {
+                                    "type": "string"
+                                  },
+                                  "nationality": {
+                                    "type": "string"
+                                  },
+                                  "occupation": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "role"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -841,6 +876,37 @@
                             "type": "number",
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "officers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string"
+                                },
+                                "appointedOn": {
+                                  "type": "string"
+                                },
+                                "resignedOn": {
+                                  "type": "string"
+                                },
+                                "nationality": {
+                                  "type": "string"
+                                },
+                                "occupation": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "role"
+                              ],
+                              "additionalProperties": false
+                            }
                           }
                         },
                         "required": [
@@ -1267,6 +1333,37 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 1
+                            },
+                            "officers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "type": "string"
+                                  },
+                                  "appointedOn": {
+                                    "type": "string"
+                                  },
+                                  "resignedOn": {
+                                    "type": "string"
+                                  },
+                                  "nationality": {
+                                    "type": "string"
+                                  },
+                                  "occupation": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "role"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
@@ -1468,6 +1565,1251 @@
                     "matchScore",
                     "matchedLists",
                     "matches"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required — returns PAYMENT-REQUIRED (x402 v2) and WWW-Authenticate: Payment (Stripe/Tempo MPP) headers"
+          }
+        }
+      }
+    },
+    "/v1/compliance/check-vendor": {
+      "post": {
+        "operationId": "check_vendor",
+        "summary": "All-in-one 1-shot vendor KYB due diligence & compliance verdict",
+        "description": "Composite autonomous KYB vendor due diligence tool. Concurrently resolves corporate identity across global registers, validates European Commission VIES VAT numbers, and screens global sanctions (OFAC/EU/UN). Returns a definitive compliance verdict (APPROVED, FLAGGED_FOR_REVIEW, or REJECTED) with a full audit trail in a single round trip.",
+        "tags": [
+          "compliance"
+        ],
+        "x-402": {
+          "version": 2,
+          "scheme": "exact",
+          "priceUsd": "0.010",
+          "network": "eip155:84532",
+          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "facilitatorUrl": "https://x402.org/facilitator",
+          "freeCallsPerDay": 5
+        },
+        "x-mpp": {
+          "priceUsd": "0.010",
+          "currency": "USD",
+          "methods": [
+            "tempo",
+            "stripe"
+          ],
+          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "testnet": true
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Legal or trade name of the vendor/counterparty"
+                  },
+                  "country": {
+                    "description": "2-letter ISO country code (e.g. 'DE', 'GB', 'US', 'CH', 'AU', 'SG')",
+                    "type": "string"
+                  },
+                  "vatNumber": {
+                    "description": "EU VAT number with 2-letter country prefix (e.g. 'DE129274202')",
+                    "type": "string"
+                  },
+                  "registrationNumber": {
+                    "description": "National registration number (CRN, UID, ABN, UEN, CIK, or LEI)",
+                    "type": "string"
+                  },
+                  "domain": {
+                    "description": "Vendor primary web domain (e.g. 'siemens.com')",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deterministic tool execution response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vendorName": {
+                      "type": "string"
+                    },
+                    "verdict": {
+                      "type": "string",
+                      "enum": [
+                        "APPROVED",
+                        "FLAGGED_FOR_REVIEW",
+                        "REJECTED"
+                      ]
+                    },
+                    "riskLevel": {
+                      "type": "string",
+                      "enum": [
+                        "CLEAR",
+                        "LOW_RISK",
+                        "MEDIUM_RISK",
+                        "HIGH_RISK",
+                        "CRITICAL"
+                      ]
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "sanctionsHit": {
+                      "type": "boolean"
+                    },
+                    "vatValid": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "entity": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "canonicalName": {
+                              "type": "string"
+                            },
+                            "normalizedName": {
+                              "type": "string"
+                            },
+                            "jurisdiction": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "EU",
+                                "US",
+                                "OTHER"
+                              ]
+                            },
+                            "primaryIdType": {
+                              "type": "string",
+                              "enum": [
+                                "LEI",
+                                "LT_JAR",
+                                "US_CIK",
+                                "US_EIN",
+                                "EU_VAT",
+                                "NATIONAL_REG"
+                              ]
+                            },
+                            "primaryIdValue": {
+                              "type": "string"
+                            },
+                            "lei": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "registrationNumber": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "registrationAuthority": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "vatNumber": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "vatValid": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "taxId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "cik": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "tickers": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "legalForm": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ACTIVE",
+                                "INACTIVE",
+                                "DISSOLVED",
+                                "LIQUIDATING",
+                                "UNKNOWN"
+                              ]
+                            },
+                            "incorporationDate": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "legalAddress": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "street": {
+                                      "type": "string"
+                                    },
+                                    "city": {
+                                      "type": "string"
+                                    },
+                                    "postalCode": {
+                                      "type": "string"
+                                    },
+                                    "region": {
+                                      "type": "string"
+                                    },
+                                    "country": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "country"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "headquartersAddress": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "street": {
+                                      "type": "string"
+                                    },
+                                    "city": {
+                                      "type": "string"
+                                    },
+                                    "postalCode": {
+                                      "type": "string"
+                                    },
+                                    "region": {
+                                      "type": "string"
+                                    },
+                                    "country": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "country"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "parentLei": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "ultimateParentLei": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "domains": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "aliases": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string"
+                                  },
+                                  "sourceId": {
+                                    "type": "string"
+                                  },
+                                  "fetchedAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "sourceId",
+                                  "fetchedAt"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "officers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "type": "string"
+                                  },
+                                  "appointedOn": {
+                                    "type": "string"
+                                  },
+                                  "resignedOn": {
+                                    "type": "string"
+                                  },
+                                  "nationality": {
+                                    "type": "string"
+                                  },
+                                  "occupation": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "role"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "canonicalName",
+                            "normalizedName",
+                            "jurisdiction",
+                            "region",
+                            "primaryIdType",
+                            "primaryIdValue",
+                            "lei",
+                            "registrationNumber",
+                            "registrationAuthority",
+                            "vatNumber",
+                            "vatValid",
+                            "taxId",
+                            "cik",
+                            "tickers",
+                            "legalForm",
+                            "status",
+                            "incorporationDate",
+                            "legalAddress",
+                            "headquartersAddress",
+                            "parentLei",
+                            "ultimateParentLei",
+                            "domains",
+                            "aliases",
+                            "sources",
+                            "confidence"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "vatVerification": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "valid": {
+                              "type": "boolean"
+                            },
+                            "countryCode": {
+                              "type": "string"
+                            },
+                            "vatNumber": {
+                              "type": "string"
+                            },
+                            "fullVat": {
+                              "type": "string"
+                            },
+                            "registeredName": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "registeredAddress": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "checkedAt": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "EU_VIES",
+                                "CACHE",
+                                "SYNTAX_ONLY"
+                              ]
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "valid",
+                            "countryCode",
+                            "vatNumber",
+                            "fullVat",
+                            "registeredName",
+                            "registeredAddress",
+                            "checkedAt",
+                            "source"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sanctionsScreening": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "sanctioned": {
+                              "type": "boolean"
+                            },
+                            "riskLevel": {
+                              "type": "string",
+                              "enum": [
+                                "CLEAR",
+                                "POTENTIAL_MATCH",
+                                "EXACT_MATCH"
+                              ]
+                            },
+                            "matchScore": {
+                              "type": "number"
+                            },
+                            "matchedLists": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "matches": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "listSource": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OFAC_SDN",
+                                      "EU_FSF"
+                                    ]
+                                  },
+                                  "externalId": {
+                                    "type": "string"
+                                  },
+                                  "primaryName": {
+                                    "type": "string"
+                                  },
+                                  "entityType": {
+                                    "type": "string"
+                                  },
+                                  "programs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "score": {
+                                    "type": "number"
+                                  },
+                                  "remarks": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "listSource",
+                                  "externalId",
+                                  "primaryName",
+                                  "entityType",
+                                  "programs",
+                                  "score"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "sanctioned",
+                            "riskLevel",
+                            "matchScore",
+                            "matchedLists",
+                            "matches"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "auditTrail": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "evaluatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "vendorName",
+                    "verdict",
+                    "riskLevel",
+                    "confidence",
+                    "sanctionsHit",
+                    "vatValid",
+                    "entity",
+                    "vatVerification",
+                    "sanctionsScreening",
+                    "auditTrail",
+                    "evaluatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required — returns PAYMENT-REQUIRED (x402 v2) and WWW-Authenticate: Payment (Stripe/Tempo MPP) headers"
+          }
+        }
+      }
+    },
+    "/v1/compliance/verify-bank-payee": {
+      "post": {
+        "operationId": "verify_bank_payee",
+        "summary": "Verify SEPA / international IBAN format, checksum, and country alignment",
+        "description": "Validates International Bank Account Numbers (IBAN) using ISO 13616 specifications and MOD-97 checksum validation. Verifies whether the issuing country matches the expected corporate jurisdiction to prevent invoice fraud and redirection attacks.",
+        "tags": [
+          "compliance"
+        ],
+        "x-402": {
+          "version": 2,
+          "scheme": "exact",
+          "priceUsd": "0.003",
+          "network": "eip155:84532",
+          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "facilitatorUrl": "https://x402.org/facilitator",
+          "freeCallsPerDay": 5
+        },
+        "x-mpp": {
+          "priceUsd": "0.003",
+          "currency": "USD",
+          "methods": [
+            "tempo",
+            "stripe"
+          ],
+          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "testnet": true
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "iban": {
+                    "type": "string",
+                    "minLength": 10,
+                    "description": "International Bank Account Number (IBAN), spaces permitted"
+                  },
+                  "expectedCountry": {
+                    "description": "Expected 2-letter ISO country code of the payee/vendor (e.g. 'DE')",
+                    "type": "string"
+                  },
+                  "payeeName": {
+                    "description": "Optional legal payee name to cross-check against bank account jurisdiction",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "iban"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deterministic tool execution response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "normalizedIban": {
+                      "type": "string"
+                    },
+                    "countryCode": {
+                      "type": "string"
+                    },
+                    "bankCode": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "checksumValid": {
+                      "type": "boolean"
+                    },
+                    "countryMatch": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "expectedLength": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "actualLength": {
+                      "type": "number"
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "checkedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid",
+                    "normalizedIban",
+                    "countryCode",
+                    "bankCode",
+                    "checksumValid",
+                    "countryMatch",
+                    "expectedLength",
+                    "actualLength",
+                    "issues",
+                    "checkedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required — returns PAYMENT-REQUIRED (x402 v2) and WWW-Authenticate: Payment (Stripe/Tempo MPP) headers"
+          }
+        }
+      }
+    },
+    "/v1/entity/batch-resolve": {
+      "post": {
+        "operationId": "batch_resolve",
+        "summary": "Batch resolve multiple corporate entities concurrently (up to 25)",
+        "description": "Concurrently resolves multiple corporate entity names, registration numbers, or domains across national registries. Optimized for agent data pipelines, CSV processing, and batch supplier onboarding.",
+        "tags": [
+          "entity"
+        ],
+        "x-402": {
+          "version": 2,
+          "scheme": "exact",
+          "priceUsd": "0.025",
+          "network": "eip155:84532",
+          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "facilitatorUrl": "https://x402.org/facilitator",
+          "freeCallsPerDay": 5
+        },
+        "x-mpp": {
+          "priceUsd": "0.025",
+          "currency": "USD",
+          "methods": [
+            "tempo",
+            "stripe"
+          ],
+          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "testnet": true
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "minItems": 1,
+                    "maxItems": 25,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "query": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Company name, domain, or registration number"
+                        },
+                        "country": {
+                          "description": "Optional 2-letter ISO country code",
+                          "type": "string"
+                        },
+                        "jurisdiction": {
+                          "description": "Alias for country",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "query"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "List of entities to resolve (1 to 25 items)"
+                  }
+                },
+                "required": [
+                  "items"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deterministic tool execution response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "number"
+                    },
+                    "resolvedCount": {
+                      "type": "number"
+                    },
+                    "unresolvedCount": {
+                      "type": "number"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "query": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "resolved": {
+                            "type": "boolean"
+                          },
+                          "entity": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "canonicalName": {
+                                    "type": "string"
+                                  },
+                                  "normalizedName": {
+                                    "type": "string"
+                                  },
+                                  "jurisdiction": {
+                                    "type": "string"
+                                  },
+                                  "region": {
+                                    "type": "string",
+                                    "enum": [
+                                      "EU",
+                                      "US",
+                                      "OTHER"
+                                    ]
+                                  },
+                                  "primaryIdType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "LEI",
+                                      "LT_JAR",
+                                      "US_CIK",
+                                      "US_EIN",
+                                      "EU_VAT",
+                                      "NATIONAL_REG"
+                                    ]
+                                  },
+                                  "primaryIdValue": {
+                                    "type": "string"
+                                  },
+                                  "lei": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "registrationNumber": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "registrationAuthority": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "vatNumber": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "vatValid": {
+                                    "anyOf": [
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "taxId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "cik": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "tickers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "legalForm": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ACTIVE",
+                                      "INACTIVE",
+                                      "DISSOLVED",
+                                      "LIQUIDATING",
+                                      "UNKNOWN"
+                                    ]
+                                  },
+                                  "incorporationDate": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "legalAddress": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "street": {
+                                            "type": "string"
+                                          },
+                                          "city": {
+                                            "type": "string"
+                                          },
+                                          "postalCode": {
+                                            "type": "string"
+                                          },
+                                          "region": {
+                                            "type": "string"
+                                          },
+                                          "country": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "country"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "headquartersAddress": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "street": {
+                                            "type": "string"
+                                          },
+                                          "city": {
+                                            "type": "string"
+                                          },
+                                          "postalCode": {
+                                            "type": "string"
+                                          },
+                                          "region": {
+                                            "type": "string"
+                                          },
+                                          "country": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "country"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "parentLei": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "ultimateParentLei": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "domains": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "aliases": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "sources": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "source": {
+                                          "type": "string"
+                                        },
+                                        "sourceId": {
+                                          "type": "string"
+                                        },
+                                        "fetchedAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "sourceId",
+                                        "fetchedAt"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "confidence": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  "officers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "role": {
+                                          "type": "string"
+                                        },
+                                        "appointedOn": {
+                                          "type": "string"
+                                        },
+                                        "resignedOn": {
+                                          "type": "string"
+                                        },
+                                        "nationality": {
+                                          "type": "string"
+                                        },
+                                        "occupation": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "role"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "canonicalName",
+                                  "normalizedName",
+                                  "jurisdiction",
+                                  "region",
+                                  "primaryIdType",
+                                  "primaryIdValue",
+                                  "lei",
+                                  "registrationNumber",
+                                  "registrationAuthority",
+                                  "vatNumber",
+                                  "vatValid",
+                                  "taxId",
+                                  "cik",
+                                  "tickers",
+                                  "legalForm",
+                                  "status",
+                                  "incorporationDate",
+                                  "legalAddress",
+                                  "headquartersAddress",
+                                  "parentLei",
+                                  "ultimateParentLei",
+                                  "domains",
+                                  "aliases",
+                                  "sources",
+                                  "confidence"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "query",
+                          "resolved",
+                          "entity",
+                          "confidence"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "durationMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "resolvedCount",
+                    "unresolvedCount",
+                    "results",
+                    "durationMs"
                   ],
                   "additionalProperties": false
                 }

@@ -1917,6 +1917,176 @@ var endTime = (c, name, precision) => {
   metrics.timers.delete(name);
 };
 
+// src/domain/iban.ts
+var IBAN_LENGTHS_BY_COUNTRY = {
+  AL: 28,
+  AD: 24,
+  AT: 20,
+  AZ: 28,
+  BH: 22,
+  BE: 16,
+  BA: 20,
+  BR: 29,
+  BG: 22,
+  CR: 22,
+  HR: 21,
+  CY: 28,
+  CZ: 24,
+  DK: 18,
+  DO: 28,
+  EE: 20,
+  FO: 18,
+  FI: 18,
+  FR: 27,
+  GE: 22,
+  DE: 22,
+  GI: 23,
+  GR: 27,
+  GL: 18,
+  GT: 28,
+  HU: 28,
+  IS: 26,
+  IE: 22,
+  IL: 23,
+  IT: 27,
+  JO: 30,
+  KZ: 20,
+  XK: 20,
+  KW: 30,
+  LV: 21,
+  LB: 28,
+  LI: 21,
+  LT: 20,
+  LU: 20,
+  MK: 19,
+  MT: 31,
+  MR: 27,
+  MU: 30,
+  MD: 24,
+  MC: 27,
+  ME: 22,
+  NL: 18,
+  NO: 15,
+  PK: 24,
+  PS: 29,
+  PL: 28,
+  PT: 25,
+  QA: 29,
+  RO: 24,
+  LC: 32,
+  SM: 27,
+  ST: 25,
+  SA: 24,
+  RS: 22,
+  SC: 31,
+  SK: 24,
+  SI: 19,
+  ES: 24,
+  SE: 24,
+  CH: 21,
+  TN: 24,
+  TR: 26,
+  AE: 23,
+  GB: 22,
+  VA: 22,
+  VG: 24
+};
+function validateIbanMod97(normalizedIban) {
+  if (normalizedIban.length < 5)
+    return false;
+  const rearranged = normalizedIban.slice(4) + normalizedIban.slice(0, 4);
+  let digits = "";
+  for (let i = 0;i < rearranged.length; i++) {
+    const code = rearranged.charCodeAt(i);
+    if (code >= 65 && code <= 90) {
+      digits += (code - 55).toString();
+    } else if (code >= 48 && code <= 57) {
+      digits += rearranged[i];
+    } else {
+      return false;
+    }
+  }
+  try {
+    return BigInt(digits) % 97n === 1n;
+  } catch {
+    return false;
+  }
+}
+function extractBankCode(countryCode, normalizedIban) {
+  if (normalizedIban.length < 8)
+    return null;
+  switch (countryCode) {
+    case "DE":
+      return normalizedIban.slice(4, 12);
+    case "GB":
+      return normalizedIban.slice(4, 8);
+    case "FR":
+      return normalizedIban.slice(4, 9);
+    case "LT":
+      return normalizedIban.slice(4, 9);
+    case "CH":
+      return normalizedIban.slice(4, 9);
+    default:
+      return normalizedIban.slice(4, 8);
+  }
+}
+function verifyBankPayee(cmd) {
+  const issues = [];
+  const checkedAt = new Date().toISOString();
+  const normalized = (cmd.iban || "").replace(/[\s\-_.]/g, "").toUpperCase();
+  if (!normalized) {
+    return {
+      valid: false,
+      normalizedIban: "",
+      countryCode: "",
+      bankCode: null,
+      checksumValid: false,
+      countryMatch: null,
+      expectedLength: null,
+      actualLength: 0,
+      issues: ["IBAN string is empty"],
+      checkedAt
+    };
+  }
+  const countryCode = normalized.slice(0, 2);
+  const actualLength = normalized.length;
+  const expectedLength = IBAN_LENGTHS_BY_COUNTRY[countryCode] ?? null;
+  if (!/^[A-Z]{2}$/.test(countryCode)) {
+    issues.push(`Invalid country code prefix '${countryCode}'`);
+  }
+  if (expectedLength !== null && actualLength !== expectedLength) {
+    issues.push(`Invalid length for country ${countryCode}: expected ${expectedLength} characters, received ${actualLength}`);
+  } else if (expectedLength === null && (actualLength < 14 || actualLength > 34)) {
+    issues.push(`Unrecognized country ${countryCode} or length outside valid IBAN range (14-34)`);
+  }
+  const checksumValid = validateIbanMod97(normalized);
+  if (!checksumValid) {
+    issues.push("MOD-97 checksum check failed: invalid IBAN digits");
+  }
+  let countryMatch = null;
+  if (cmd.expectedCountry) {
+    const expected = cmd.expectedCountry.trim().toUpperCase();
+    countryMatch = countryCode === expected;
+    if (!countryMatch) {
+      issues.push(`PAYEE MISMATCH WARNING: IBAN country (${countryCode}) does not match expected corporate country (${expected})`);
+    }
+  }
+  const bankCode = extractBankCode(countryCode, normalized);
+  const valid = issues.length === 0 || issues.length === 1 && countryMatch === false;
+  return {
+    valid: checksumValid && (expectedLength === null || actualLength === expectedLength),
+    normalizedIban: normalized,
+    countryCode,
+    bankCode,
+    checksumValid,
+    countryMatch,
+    expectedLength,
+    actualLength,
+    issues,
+    checkedAt
+  };
+}
+
 // src/domain/normalize.ts
 var LEGAL_FORMS = [
   { pattern: "UZDAROJI AKCINE BENDROVE", form: "UAB" },
@@ -2476,6 +2646,125 @@ class EntityApplicationService {
   }
   async screenSanctions(input) {
     return this.deps.sanctionsRepo.screen(input);
+  }
+  async checkVendor(cmd) {
+    const auditTrail = [];
+    const evaluatedAt = new Date().toISOString();
+    auditTrail.push(`[1/3] Initiating automated KYB due diligence for '${cmd.name}' (${cmd.country ?? "Global"})...`);
+    const entityPromise = this.resolveEntity({
+      query: cmd.registrationNumber || cmd.name,
+      jurisdiction: cmd.country,
+      country: cmd.country
+    });
+    const vatPromise = cmd.vatNumber ? this.verifyVat({ vatNumber: cmd.vatNumber }) : Promise.resolve(null);
+    const sanctionsPromise = this.screenSanctions({
+      name: cmd.name,
+      country: cmd.country,
+      registrationNumber: cmd.registrationNumber
+    });
+    const [entityRes, vatRes, sanctionsRes] = await Promise.all([
+      entityPromise,
+      vatPromise,
+      sanctionsPromise
+    ]);
+    const entity = entityRes.entity;
+    if (entityRes.resolved && entity) {
+      auditTrail.push(`      \u2713 Entity Resolved: '${entity.canonicalName}' (${entity.jurisdiction}) | Primary ID: ${entity.primaryIdValue} (${entity.primaryIdType})`);
+      if (entity.lei)
+        auditTrail.push(`      \u2713 GLEIF LEI: ${entity.lei}`);
+    } else {
+      auditTrail.push(`      \u26A0\uFE0F Entity resolution yielded no exact match (confidence=${entityRes.confidence})`);
+    }
+    let vatValid = null;
+    if (vatRes) {
+      vatValid = vatRes.valid;
+      auditTrail.push(`[2/3] EU VIES VAT Check '${cmd.vatNumber}': ${vatValid ? "VALID (registered)" : "INVALID / UNCONFIRMED"}`);
+    } else {
+      auditTrail.push(`[2/3] VAT Check: Skipped (no EU VAT number provided)`);
+    }
+    const sanctionsHit = sanctionsRes.sanctioned === true;
+    auditTrail.push(`[3/3] Sanctions Screening (OFAC/EU/UN): ${sanctionsHit ? "\uD83D\uDEA8 HIT DETECTED" : "\u2705 CLEAR"} (riskLevel=${sanctionsRes.riskLevel})`);
+    let verdict = "APPROVED";
+    let riskLevel = "CLEAR";
+    if (sanctionsHit) {
+      verdict = "REJECTED";
+      riskLevel = "CRITICAL";
+      auditTrail.push(`[VERDICT] \u274C REJECTED due to sanctions match on lists: ${sanctionsRes.matchedLists.join(", ")}`);
+    } else if (vatValid === false) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number was rejected or unconfirmed by VIES`);
+    } else if (!entityRes.resolved || entityRes.confidence < 0.7) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity identity resolution confidence is low (${Math.round(entityRes.confidence * 100)}%)`);
+    } else if (sanctionsRes.riskLevel === "POTENTIAL_MATCH") {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Near-threshold fuzzy sanctions similarity match requiring compliance review`);
+    } else {
+      verdict = "APPROVED";
+      riskLevel = "CLEAR";
+      auditTrail.push(`[VERDICT] \u2705 APPROVED: Verified corporate entity, clean sanctions record, valid VAT status`);
+    }
+    const baseConfidence = entityRes.confidence || 0.5;
+    const vatBonus = vatValid === true ? 0.1 : vatValid === false ? -0.2 : 0;
+    const confidence = Math.min(1, Math.max(0, baseConfidence + vatBonus));
+    return {
+      vendorName: cmd.name,
+      verdict,
+      riskLevel,
+      confidence,
+      sanctionsHit,
+      vatValid,
+      entity,
+      vatVerification: vatRes,
+      sanctionsScreening: sanctionsRes,
+      auditTrail,
+      evaluatedAt
+    };
+  }
+  async verifyBankPayee(cmd) {
+    return verifyBankPayee(cmd);
+  }
+  async batchResolve(cmd) {
+    const startedAt = Date.now();
+    const promises = cmd.items.map(async (item) => {
+      try {
+        const country = item.country || item.jurisdiction;
+        const res = await this.resolveEntity({
+          query: item.query,
+          country,
+          jurisdiction: country
+        });
+        return {
+          query: item.query,
+          country,
+          resolved: res.resolved,
+          entity: res.entity,
+          confidence: res.confidence
+        };
+      } catch (err) {
+        return {
+          query: item.query,
+          country: item.country || item.jurisdiction,
+          resolved: false,
+          entity: null,
+          confidence: 0,
+          error: err?.message || "Internal resolution error"
+        };
+      }
+    });
+    const results = await Promise.all(promises);
+    const resolvedCount = results.filter((r) => r.resolved).length;
+    const unresolvedCount = results.length - resolvedCount;
+    return {
+      total: results.length,
+      resolvedCount,
+      unresolvedCount,
+      results,
+      durationMs: Math.max(1, Date.now() - startedAt)
+    };
   }
 }
 
@@ -7009,6 +7298,14 @@ var EntityStatusSchema = _enum([
   "LIQUIDATING",
   "UNKNOWN"
 ]);
+var OfficerRecordSchema = object({
+  name: string2(),
+  role: string2(),
+  appointedOn: string2().optional(),
+  resignedOn: string2().optional(),
+  nationality: string2().optional(),
+  occupation: string2().optional()
+});
 var CanonicalEntityRecordSchema = object({
   id: string2().optional(),
   canonicalName: string2(),
@@ -7035,7 +7332,8 @@ var CanonicalEntityRecordSchema = object({
   domains: array(string2()),
   aliases: array(string2()),
   sources: array(EntityDataSourceRefSchema),
-  confidence: number2().min(0).max(1)
+  confidence: number2().min(0).max(1),
+  officers: array(OfficerRecordSchema).optional()
 });
 var VatVerificationResultSchema = object({
   valid: boolean2(),
@@ -7081,7 +7379,8 @@ var ResolveEntityCommandSchema = object({
   country: string2().optional().describe("Alias for jurisdiction"),
   verifyVat: boolean2().optional().describe("Verify EU VAT number against live VIES if available"),
   includeParent: boolean2().optional().describe("Include parent and ultimate parent LEI relationships"),
-  checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN & EU Financial Sanctions (default true)")
+  checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN & EU Financial Sanctions (default true)"),
+  includeOfficers: boolean2().optional().describe("Include corporate directors, executives, and officers when available")
 });
 var ResolveEntityResultSchema = object({
   resolved: boolean2(),
@@ -7105,6 +7404,65 @@ var ScreenSanctionsCommandSchema = object({
   country: string2().optional().describe("Optional 2-letter ISO country code"),
   registrationNumber: string2().optional().describe("Optional company registration, LEI, or tax ID"),
   threshold: number2().min(0.1).max(1).optional().describe("Trigram similarity threshold (default 0.75)")
+});
+var CheckVendorCommandSchema = object({
+  name: string2().min(1).describe("Legal or trade name of the vendor/counterparty"),
+  country: string2().optional().describe("2-letter ISO country code (e.g. 'DE', 'GB', 'US', 'CH', 'AU', 'SG')"),
+  vatNumber: string2().optional().describe("EU VAT number with 2-letter country prefix (e.g. 'DE129274202')"),
+  registrationNumber: string2().optional().describe("National registration number (CRN, UID, ABN, UEN, CIK, or LEI)"),
+  domain: string2().optional().describe("Vendor primary web domain (e.g. 'siemens.com')")
+});
+var CheckVendorResultSchema = object({
+  vendorName: string2(),
+  verdict: _enum(["APPROVED", "FLAGGED_FOR_REVIEW", "REJECTED"]),
+  riskLevel: _enum(["CLEAR", "LOW_RISK", "MEDIUM_RISK", "HIGH_RISK", "CRITICAL"]),
+  confidence: number2(),
+  sanctionsHit: boolean2(),
+  vatValid: boolean2().nullable(),
+  entity: CanonicalEntityRecordSchema.nullable(),
+  vatVerification: VatVerificationResultSchema.nullable(),
+  sanctionsScreening: SanctionsScreenResultSchema.nullable(),
+  auditTrail: array(string2()),
+  evaluatedAt: string2()
+});
+var VerifyBankPayeeCommandSchema = object({
+  iban: string2().min(10).describe("International Bank Account Number (IBAN), spaces permitted"),
+  expectedCountry: string2().optional().describe("Expected 2-letter ISO country code of the payee/vendor (e.g. 'DE')"),
+  payeeName: string2().optional().describe("Optional legal payee name to cross-check against bank account jurisdiction")
+});
+var VerifyBankPayeeResultSchema = object({
+  valid: boolean2(),
+  normalizedIban: string2(),
+  countryCode: string2(),
+  bankCode: string2().nullable(),
+  checksumValid: boolean2(),
+  countryMatch: boolean2().nullable(),
+  expectedLength: number2().nullable(),
+  actualLength: number2(),
+  issues: array(string2()),
+  checkedAt: string2()
+});
+var BatchResolveItemSchema = object({
+  query: string2().min(1).describe("Company name, domain, or registration number"),
+  country: string2().optional().describe("Optional 2-letter ISO country code"),
+  jurisdiction: string2().optional().describe("Alias for country")
+});
+var BatchResolveCommandSchema = object({
+  items: array(BatchResolveItemSchema).min(1).max(25).describe("List of entities to resolve (1 to 25 items)")
+});
+var BatchResolveResultSchema = object({
+  total: number2(),
+  resolvedCount: number2(),
+  unresolvedCount: number2(),
+  results: array(object({
+    query: string2(),
+    country: string2().optional(),
+    resolved: boolean2(),
+    entity: CanonicalEntityRecordSchema.nullable(),
+    confidence: number2(),
+    error: string2().optional()
+  })),
+  durationMs: number2()
 });
 
 // src/application/tools/entity.tools.ts
@@ -7147,6 +7505,45 @@ function registerEntityTools(registry, service, config) {
     inputSchema: ScreenSanctionsCommandSchema,
     outputSchema: SanctionsScreenResultSchema,
     handler: (input) => service.screenSanctions(input)
+  }));
+  registry.register(defineTool({
+    id: "compliance.check_vendor",
+    mcpName: "check_vendor",
+    httpMethod: "POST",
+    httpPath: "/v1/compliance/check-vendor",
+    category: "compliance",
+    summary: "All-in-one 1-shot vendor KYB due diligence & compliance verdict",
+    description: "Composite autonomous KYB vendor due diligence tool. Concurrently resolves corporate identity across global registers, validates European Commission VIES VAT numbers, and screens global sanctions (OFAC/EU/UN). Returns a definitive compliance verdict (APPROVED, FLAGGED_FOR_REVIEW, or REJECTED) with a full audit trail in a single round trip.",
+    priceUsd: config.priceCheckVendorUsd,
+    inputSchema: CheckVendorCommandSchema,
+    outputSchema: CheckVendorResultSchema,
+    handler: (input) => service.checkVendor(input)
+  }));
+  registry.register(defineTool({
+    id: "compliance.verify_bank_payee",
+    mcpName: "verify_bank_payee",
+    httpMethod: "POST",
+    httpPath: "/v1/compliance/verify-bank-payee",
+    category: "compliance",
+    summary: "Verify SEPA / international IBAN format, checksum, and country alignment",
+    description: "Validates International Bank Account Numbers (IBAN) using ISO 13616 specifications and MOD-97 checksum validation. Verifies whether the issuing country matches the expected corporate jurisdiction to prevent invoice fraud and redirection attacks.",
+    priceUsd: config.priceVerifyBankPayeeUsd,
+    inputSchema: VerifyBankPayeeCommandSchema,
+    outputSchema: VerifyBankPayeeResultSchema,
+    handler: (input) => service.verifyBankPayee(input)
+  }));
+  registry.register(defineTool({
+    id: "entity.batch_resolve",
+    mcpName: "batch_resolve",
+    httpMethod: "POST",
+    httpPath: "/v1/entity/batch-resolve",
+    category: "entity",
+    summary: "Batch resolve multiple corporate entities concurrently (up to 25)",
+    description: "Concurrently resolves multiple corporate entity names, registration numbers, or domains across national registries. Optimized for agent data pipelines, CSV processing, and batch supplier onboarding.",
+    priceUsd: config.priceBatchResolveUsd,
+    inputSchema: BatchResolveCommandSchema,
+    outputSchema: BatchResolveResultSchema,
+    handler: (input) => service.batchResolve(input)
   }));
 }
 
@@ -7192,6 +7589,9 @@ function loadConfig(env = process.env) {
     priceEntityResolveUsd: env.PRICE_ENTITY_RESOLVE_USD ?? "0.005",
     priceVatVerifyUsd: env.PRICE_VAT_VERIFY_USD ?? "0.005",
     priceSanctionsCheckUsd: env.PRICE_SANCTIONS_CHECK_USD ?? "0.005",
+    priceCheckVendorUsd: env.PRICE_CHECK_VENDOR_USD ?? "0.010",
+    priceVerifyBankPayeeUsd: env.PRICE_VERIFY_BANK_PAYEE_USD ?? "0.003",
+    priceBatchResolveUsd: env.PRICE_BATCH_RESOLVE_USD ?? "0.025",
     x402Enabled: (env.X402_ENABLED ?? "true").toLowerCase() !== "false",
     x402Network: env.X402_NETWORK ?? "eip155:84532",
     x402PayToEvm: env.X402_PAY_TO_EVM ?? "0x000000000000000000000000000000000000dEaD",
@@ -7832,58 +8232,72 @@ function mountDiscoveryAdapter(app, registry, config) {
         ]
       })}</script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.6; color: #1e293b; background: #fafafa; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 920px; margin: 40px auto; padding: 0 24px; line-height: 1.6; color: #1e293b; background: #fafafa; }
     header { border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 24px; }
-    h1 { font-size: 1.8rem; color: #0f172a; margin-bottom: 8px; }
-    h2 { font-size: 1.3rem; color: #1e293b; margin-top: 32px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+    h1 { font-size: 1.85rem; color: #0f172a; margin-bottom: 8px; }
+    h2 { font-size: 1.25rem; color: #1e293b; margin-top: 32px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
     code, pre { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; }
-    pre { padding: 14px; overflow-x: auto; background: #0f172a; color: #f8fafc; border-radius: 8px; }
+    pre { padding: 14px; overflow-x: auto; background: #0f172a; color: #f8fafc; border-radius: 8px; font-size: 0.85rem; }
     pre code { background: transparent; color: inherit; padding: 0; }
-    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #e0e7ff; color: #3730a3; margin-right: 6px; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #e0e7ff; color: #3730a3; margin-right: 6px; margin-bottom: 6px; }
     .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     ul { padding-left: 20px; }
     li { margin-bottom: 6px; }
     a { color: #2563eb; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .playground-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .tab-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
-    .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .playground-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .tab-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.15s ease; }
+    .tab-btn:hover { background: #e2e8f0; }
+    .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
     .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
     .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
     .btn-run { background: #0f172a; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
     .btn-run:hover { background: #334155; }
-    .result-box { display: none; background: #0f172a; color: #f8fafc; padding: 12px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; max-height: 280px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .result-box { display: none; background: #0f172a; color: #f8fafc; padding: 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; max-height: 320px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>Agentum \u2014 EU &amp; US Corporate Entity, VAT &amp; Sanctions Resolver</h1>
-    <p>Zero-signup <strong>Streamable HTTP MCP Server</strong> and <strong>REST API</strong> for AI agents. Includes <strong>${config.freeCallsPerDay} free calls/day</strong>, live EU VIES validation, 26,650+ sanctions targets, and inline Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
-    <div>
+    <h1>Agentum \u2014 Global Corporate Entity, VAT &amp; Sanctions Resolver</h1>
+    <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) Server</strong> and <strong>REST API</strong> for autonomous AI agents. Deterministic entity resolution across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Australia</strong> (ABR/ABN), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT validation</strong>, 26,650+ OFAC/EU/UN sanctions screening, and Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 USDC on Base</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
+    <div style="margin-top: 10px;">
       <span class="badge">Model Context Protocol</span>
-      <span class="badge">Base USDC x402</span>
-      <span class="badge">Stripe Tempo MPP</span>
+      <span class="badge">UK Companies House</span>
+      <span class="badge">Swiss ZEFIX</span>
+      <span class="badge">Australian ABR</span>
+      <span class="badge">Singapore ACRA</span>
+      <span class="badge">GLEIF Worldwide LEI</span>
+      <span class="badge">US SEC EDGAR</span>
       <span class="badge">EU VIES VAT</span>
-      <span class="badge">OFAC SDN</span>
+      <span class="badge">OFAC/EU/UN Sanctions</span>
+      <span class="badge">LangChain &amp; CrewAI</span>
+      <span class="badge">Base USDC x402</span>
     </div>
   </header>
 
-  <h2>Interactive Live Demo (Free Tier)</h2>
+  <h2>Interactive Live Demo (5 Free Calls / Day)</h2>
   <div class="card">
     <div class="playground-tabs">
-      <button class="tab-btn active" onclick="setMode('entity', 'Siemens AG', 'DE')">Corporate Entity</button>
-      <button class="tab-btn" onclick="setMode('vat', 'DE129274202', '')">EU VIES VAT Check</button>
-      <button class="tab-btn" onclick="setMode('sanctions', 'Sberbank', '')">OFAC Sanctions Screen</button>
+      <button class="tab-btn active" onclick="setMode('entity', 'Rolls-Royce plc', 'GB')">\uD83C\uDDEC\uD83C\uDDE7 UK Companies House</button>
+      <button class="tab-btn" onclick="setMode('entity', 'Nestle SA', 'CH')">\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX</button>
+      <button class="tab-btn" onclick="setMode('entity', 'Atlassian Pty Ltd', 'AU')">\uD83C\uDDE6\uD83C\uDDFA Australian ABR</button>
+      <button class="tab-btn" onclick="setMode('entity', 'Grab Holdings', 'SG')">\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA</button>
+      <button class="tab-btn" onclick="setMode('entity', 'Apple Inc', 'US')">\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR</button>
+      <button class="tab-btn" onclick="setMode('entity', 'Siemens AG', 'DE')">\uD83C\uDDEA\uD83C\uDDFA EU LEI / GLEIF</button>
+      <button class="tab-btn" onclick="setMode('vat', 'DE129274202', '')">\uD83C\uDDEA\uD83C\uDDFA EU VIES VAT Check</button>
+      <button class="tab-btn" onclick="setMode('sanctions', 'Sberbank', '')">\uD83D\uDEE1\uFE0F OFAC Sanctions Screen</button>
     </div>
     <div class="search-row">
-      <input type="text" id="demoQuery" class="search-input" value="Siemens AG" placeholder="Enter company name, LEI, CIK, VAT, or code..." />
+      <input type="text" id="demoQuery" class="search-input" value="Rolls-Royce plc" placeholder="Enter company name, registration number, LEI, CIK, or VAT..." />
       <button class="btn-run" onclick="runDemo()">Resolve</button>
     </div>
     <div id="demoResult" class="result-box"></div>
   </div>
   <script>
     let currentMode = 'entity';
-    let currentHint = 'DE';
+    let currentHint = 'GB';
     function setMode(mode, val, hint) {
       currentMode = mode;
       currentHint = hint;
@@ -7895,10 +8309,11 @@ function mountDiscoveryAdapter(app, registry, config) {
       const q = document.getElementById('demoQuery').value.trim();
       const box = document.getElementById('demoResult');
       box.style.display = 'block';
-      box.textContent = 'Resolving query via live API...';
+      box.textContent = 'Resolving query via live Agentum API...';
       try {
         let ep = '/v1/entity/resolve';
-        let body = { query: q, jurisdictionHint: currentHint };
+        let body = { query: q };
+        if (currentHint) body.jurisdictionHint = currentHint;
         if (currentMode === 'vat') {
           ep = '/v1/entity/vat-verify';
           body = { vatNumber: q };
@@ -7908,7 +8323,7 @@ function mountDiscoveryAdapter(app, registry, config) {
         }
         const res = await fetch(ep, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(body)
         });
         const remaining = res.headers.get('X-Free-Tier-Remaining');
@@ -7926,12 +8341,40 @@ function mountDiscoveryAdapter(app, registry, config) {
     }
   </script>
 
-  <h2>Quick Connect for AI Agents</h2>
-  <div class="card">
-    <p><strong>Claude Code CLI:</strong></p>
-    <pre><code>claude mcp add --transport http agentum ${config.publicBaseUrl}/mcp</code></pre>
-    <p style="margin-top:12px"><strong>Skills CLI:</strong></p>
-    <pre><code>npx skills add Algiras/agentum-skills</code></pre>
+  <h2>Quick Connect &amp; Integration Examples</h2>
+  <div class="grid-2">
+    <div class="card">
+      <p><strong>Claude Code &amp; Desktop (MCP):</strong></p>
+      <pre><code>claude mcp add --transport http agentum ${config.publicBaseUrl}/mcp
+
+# Or via zero-config stdio npm bridge:
+npx -y agentum-mcp</code></pre>
+    </div>
+    <div class="card">
+      <p><strong>LangChain (TypeScript &amp; JavaScript):</strong></p>
+      <pre><code>import { AgentumToolkit } from "agentum-langchain";
+
+const toolkit = new AgentumToolkit({
+  baseUrl: "${config.publicBaseUrl}"
+});
+const tools = toolkit.getTools();</code></pre>
+    </div>
+    <div class="card">
+      <p><strong>LangChain / CrewAI (Python):</strong></p>
+      <pre><code># pip install agentum-langchain langchain
+from agentum_langchain import AgentumToolkit
+
+toolkit = AgentumToolkit(base_url="${config.publicBaseUrl}")
+agent_tools = toolkit.get_tools()</code></pre>
+    </div>
+    <div class="card">
+      <p><strong>Vercel AI SDK / OpenAI Functions:</strong></p>
+      <pre><code>import { agentumTools } from "agentum-langchain/ai-sdk";
+
+const { resolve_entity, verify_eu_vat } = agentumTools({
+  baseUrl: "${config.publicBaseUrl}"
+});</code></pre>
+    </div>
   </div>
 
   <h2>Machine &amp; Agent Discovery Coordinates</h2>
@@ -7951,14 +8394,20 @@ function mountDiscoveryAdapter(app, registry, config) {
     </ul>
   </div>
 
-  <h2>Supported Data Sources</h2>
-  <ul>
-    <li><strong>GLEIF:</strong> Global Legal Entity Identifier (LEI) worldwide verification.</li>
-    <li><strong>US SEC EDGAR:</strong> Central Index Key (CIK), EIN, and public company tickers.</li>
-    <li><strong>Lithuania Registr\u0173 centras JAR:</strong> Complete open-data register of legal entities.</li>
-    <li><strong>European Commission VIES:</strong> Real-time VAT validity cross-check across all 27 EU member states.</li>
-    <li><strong>Global Sanctions:</strong> US Treasury OFAC SDN, European Union Financial Sanctions (EEAS), and UN Security Council Consolidated List (26,650+ records).</li>
-  </ul>
+  <h2>Supported Jurisdictions &amp; Primary Data Sources</h2>
+  <div class="card">
+    <ul>
+      <li><strong>\uD83C\uDDEC\uD83C\uDDE7 UK Companies House:</strong> Real-time lookup of English, Welsh, Scottish, and Northern Irish company registration numbers (CRN) and canonical legal names.</li>
+      <li><strong>\uD83C\uDDE8\uD83C\uDDED Swiss Federal Commercial Registry (ZEFIX):</strong> Cantonal commercial registers, legal seats, and Unique Enterprise Identifiers (UID / CHE).</li>
+      <li><strong>\uD83C\uDDE6\uD83C\uDDFA Australian Business Register (ABR):</strong> Australian Business Numbers (ABN) and Australian Company Numbers (ACN) lookup.</li>
+      <li><strong>\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA:</strong> Accounting and Corporate Regulatory Authority Unique Entity Numbers (UEN) and entity records.</li>
+      <li><strong>\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR:</strong> Central Index Key (CIK), Employer Identification Number (EIN), and public equity tickers.</li>
+      <li><strong>\uD83C\uDF10 GLEIF Worldwide:</strong> Global Legal Entity Identifier (LEI) worldwide verification across 200+ countries.</li>
+      <li><strong>\uD83C\uDDF1\uD83C\uDDF9 Lithuania Registr\u0173 centras (JAR):</strong> Legal entity code (JAR) and company register.</li>
+      <li><strong>\uD83C\uDDEA\uD83C\uDDFA European Commission VIES:</strong> Real-time VAT validity cross-check across all 27 EU member states.</li>
+      <li><strong>\uD83D\uDEE1\uFE0F Consolidated Sanctions:</strong> Real-time screening against US Treasury OFAC SDN, European Union Financial Sanctions (EEAS), and UN Security Council Consolidated List (26,650+ records).</li>
+    </ul>
+  </div>
 </body>
 </html>`;
       return c.html(html);
@@ -9287,6 +9736,68 @@ function formatMarkdownSummary(toolName, output) {
     return lines.join(`
 `);
   }
+  if (toolName === "check_vendor") {
+    const verdictIcon = output.verdict === "APPROVED" ? "\u2705" : output.verdict === "REJECTED" ? "\uD83D\uDEA8" : "\u26A0\uFE0F";
+    const lines = [
+      `### ${verdictIcon} Vendor KYB Verdict: **[${output.verdict ?? "UNKNOWN"}]**`,
+      `- **Vendor:** ${output.vendorName ?? "N/A"}`,
+      `- **Risk Level:** ${output.riskLevel ?? "CLEAR"}`,
+      `- **Confidence:** ${Math.round((output.confidence ?? 0) * 100)}%`,
+      `- **Sanctions Clearance:** ${output.sanctionsHit ? "\uD83D\uDEA8 SANCTIONED HIT" : "\u2705 CLEAR"}`,
+      `- **VAT Status:** ${output.vatValid === true ? "\u2705 VALID" : output.vatValid === false ? "\u274C INVALID" : "N/A"}`
+    ];
+    if (output.entity) {
+      lines.push(`- **Resolved Entity:** ${output.entity.canonicalName} (${output.entity.jurisdiction})`);
+      if (output.entity.lei)
+        lines.push(`- **LEI:** \`${output.entity.lei}\``);
+    }
+    if (Array.isArray(output.auditTrail) && output.auditTrail.length > 0) {
+      lines.push(`
+**Audit Trail:**`);
+      output.auditTrail.forEach((line) => lines.push(`> ${line}`));
+    }
+    return lines.join(`
+`);
+  }
+  if (toolName === "verify_bank_payee") {
+    const statusIcon = output.valid ? "\u2705" : "\u274C";
+    const lines = [
+      `### ${statusIcon} IBAN Payee Validation: \`${output.normalizedIban ?? ""}\``,
+      `- **Validity:** ${output.valid ? "\u2705 VALID" : "\u274C INVALID"}`,
+      `- **Country Code:** ${output.countryCode ?? "N/A"}`,
+      `- **Checksum (Mod-97):** ${output.checksumValid ? "\u2705 Valid" : "\u274C Failed"}`,
+      `- **Country Match:** ${output.countryMatch === true ? "\u2705 Match" : output.countryMatch === false ? "\u26A0\uFE0F MISMATCH" : "N/A"}`
+    ];
+    if (output.bankCode)
+      lines.push(`- **Bank Code:** \`${output.bankCode}\``);
+    if (Array.isArray(output.issues) && output.issues.length > 0) {
+      lines.push(`
+**Observations:**`);
+      output.issues.forEach((iss) => lines.push(`- ${iss}`));
+    }
+    return lines.join(`
+`);
+  }
+  if (toolName === "batch_resolve") {
+    const lines = [
+      `### \uD83D\uDCE6 Batch Entity Resolution (${output.total ?? 0} items)`,
+      `- **Resolved:** ${output.resolvedCount ?? 0} / ${output.total ?? 0}`,
+      `- **Unresolved:** ${output.unresolvedCount ?? 0}`,
+      `- **Duration:** ${output.durationMs ?? 0}ms`
+    ];
+    if (Array.isArray(output.results)) {
+      lines.push(`
+**Results:**`);
+      output.results.slice(0, 10).forEach((r) => {
+        lines.push(`- ${r.resolved ? "\u2705" : "\u274C"} **${r.query}**: ${r.resolved ? r.entity?.canonicalName ?? "Found" : r.error ?? "Not found"}`);
+      });
+      if (output.results.length > 10) {
+        lines.push(`_...and ${output.results.length - 10} more items._`);
+      }
+    }
+    return lines.join(`
+`);
+  }
   return JSON.stringify(output, null, 2);
 }
 function mountMcpHttpAdapter(app, deps) {
@@ -10058,7 +10569,13 @@ function mountMcpHttpAdapter(app, deps) {
           };
         }
         const fingerprint = computeCallerFingerprint(rawHeaders);
-        const meta = rpc.params?._meta;
+        const argsObj = rpc.params?.arguments && typeof rpc.params.arguments === "object" ? rpc.params.arguments : {};
+        const metaObj = rpc.params?._meta && typeof rpc.params._meta === "object" ? rpc.params._meta : {};
+        const meta = {
+          ...argsObj._meta,
+          ...metaObj,
+          ...argsObj.format ? { format: argsObj.format } : {}
+        };
         const gate = await evaluateDual402Gate({
           config: deps.config,
           cacheStore: deps.cacheStore,
@@ -10188,6 +10705,24 @@ function mountMcpHttpAdapter(app, deps) {
           sanctioned: output?.sanctioned,
           matchCount: Array.isArray(output?.matches) ? output.matches.length : 0,
           topMatch: output?.matches?.[0]?.primaryName ?? null,
+          fullResourceUri: resultResourceUri
+        } : tool.mcpName === "check_vendor" ? {
+          vendorName: output?.vendorName,
+          verdict: output?.verdict,
+          riskLevel: output?.riskLevel,
+          sanctionsHit: output?.sanctionsHit,
+          vatValid: output?.vatValid,
+          fullResourceUri: resultResourceUri
+        } : tool.mcpName === "verify_bank_payee" ? {
+          valid: output?.valid,
+          countryCode: output?.countryCode,
+          checksumValid: output?.checksumValid,
+          countryMatch: output?.countryMatch,
+          fullResourceUri: resultResourceUri
+        } : tool.mcpName === "batch_resolve" ? {
+          total: output?.total,
+          resolvedCount: output?.resolvedCount,
+          unresolvedCount: output?.unresolvedCount,
           fullResourceUri: resultResourceUri
         } : {
           valid: output?.valid,

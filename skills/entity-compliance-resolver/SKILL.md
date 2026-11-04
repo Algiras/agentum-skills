@@ -58,6 +58,40 @@ Screens an entity or individual against **26,650+ live records** from the **US T
   }
   ```
 
+### 4. `check_vendor` (`POST /v1/compliance/check-vendor`) — `$0.010/call`
+**All-in-one 1-shot vendor KYB due diligence tool.** Concurrently resolves corporate identity across global registers, validates European Commission VIES VAT numbers, and screens global sanctions (OFAC/EU/UN). Returns a definitive compliance verdict (`APPROVED`, `FLAGGED_FOR_REVIEW`, or `REJECTED`) with a full audit trail in a single round trip.
+- **Input:**
+  ```json
+  {
+    "name": "Siemens AG",
+    "country": "DE",
+    "vatNumber": "DE129274202"
+  }
+  ```
+
+### 5. `verify_bank_payee` (`POST /v1/compliance/verify-bank-payee`) — `$0.003/call`
+Validates International Bank Account Numbers (IBAN) using ISO 13616 specifications and MOD-97 checksum validation. Verifies whether the issuing country matches the expected corporate jurisdiction to protect agents against invoice fraud and redirection attacks.
+- **Input:**
+  ```json
+  {
+    "iban": "DE89370400440532013000",
+    "expectedCountry": "DE"
+  }
+  ```
+
+### 6. `batch_resolve` (`POST /v1/entity/batch-resolve`) — `$0.025/call`
+Concurrently resolves multiple corporate entity names, registration numbers, or domains across national registries (up to 25 items). Optimized for agent data pipelines, CSV processing, and batch supplier onboarding.
+- **Input:**
+  ```json
+  {
+    "items": [
+      { "query": "Siemens AG", "country": "DE" },
+      { "query": "Rolls-Royce plc", "country": "GB" },
+      { "query": "Atlassian Pty Ltd", "country": "AU" }
+    ]
+  }
+  ```
+
 ## Access Quota & Inline HTTP 402 Micropayments
 
 1. **Zero-Signup Free Tier:** Every agent gets **10 free calls/day** automatically (tracked by `X-Agent-Id` or caller IP). No API key or registration is required.

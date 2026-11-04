@@ -14975,6 +14975,146 @@ function mountMcpHttpAdapter(app, deps) {
   });
 }
 
+// src/adapters/outbound/persistence/db-schema.ts
+var entitiesTable = {
+  tableName: "entities",
+  columns: [
+    "id",
+    "canonical_name",
+    "normalized_name",
+    "jurisdiction",
+    "region",
+    "primary_id_type",
+    "primary_id_value",
+    "lei",
+    "registration_number",
+    "registration_authority",
+    "vat_number",
+    "vat_valid",
+    "vat_checked_at",
+    "tax_id",
+    "cik",
+    "tickers",
+    "legal_form",
+    "status",
+    "incorporation_date",
+    "legal_address",
+    "headquarters_address",
+    "parent_lei",
+    "ultimate_parent_lei",
+    "domains",
+    "aliases",
+    "sanctions_flag",
+    "sanctions_matches",
+    "sources",
+    "raw_metadata",
+    "updated_at"
+  ],
+  createSql: `
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    CREATE TABLE IF NOT EXISTS entities (
+      id TEXT PRIMARY KEY,
+      canonical_name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL,
+      jurisdiction VARCHAR(16) NOT NULL,
+      region VARCHAR(8) NOT NULL,
+      primary_id_type VARCHAR(32) NOT NULL,
+      primary_id_value VARCHAR(64) NOT NULL,
+      lei VARCHAR(20),
+      registration_number VARCHAR(64),
+      registration_authority VARCHAR(32),
+      vat_number VARCHAR(32),
+      vat_valid BOOLEAN,
+      vat_checked_at TIMESTAMPTZ,
+      tax_id VARCHAR(32),
+      cik VARCHAR(16),
+      tickers JSONB NOT NULL DEFAULT '[]'::jsonb,
+      legal_form VARCHAR(64),
+      status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+      incorporation_date VARCHAR(32),
+      legal_address JSONB,
+      headquarters_address JSONB,
+      parent_lei VARCHAR(20),
+      ultimate_parent_lei VARCHAR(20),
+      domains JSONB NOT NULL DEFAULT '[]'::jsonb,
+      aliases TEXT NOT NULL DEFAULT '',
+      sanctions_flag BOOLEAN NOT NULL DEFAULT FALSE,
+      sanctions_matches JSONB NOT NULL DEFAULT '[]'::jsonb,
+      sources JSONB NOT NULL DEFAULT '[]'::jsonb,
+      raw_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (jurisdiction, primary_id_type, primary_id_value)
+    );
+    CREATE INDEX IF NOT EXISTS idx_entities_normalized_name_trgm
+      ON entities USING GIN (normalized_name gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS idx_entities_aliases_trgm
+      ON entities USING GIN (aliases gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS idx_entities_lei ON entities (lei);
+    CREATE INDEX IF NOT EXISTS idx_entities_vat ON entities (vat_number);
+    CREATE INDEX IF NOT EXISTS idx_entities_reg ON entities (registration_number);
+  `
+};
+var sanctionsEntriesTable = {
+  tableName: "sanctions_entries",
+  columns: [
+    "id",
+    "list_source",
+    "external_id",
+    "entity_type",
+    "primary_name",
+    "normalized_name",
+    "aliases",
+    "countries",
+    "programs",
+    "identifiers",
+    "remarks",
+    "updated_at"
+  ],
+  createSql: `
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    CREATE TABLE IF NOT EXISTS sanctions_entries (
+      id TEXT PRIMARY KEY,
+      list_source VARCHAR(32) NOT NULL,
+      external_id VARCHAR(64) NOT NULL,
+      entity_type VARCHAR(32) NOT NULL DEFAULT 'ENTITY',
+      primary_name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL,
+      aliases TEXT NOT NULL DEFAULT '',
+      countries JSONB NOT NULL DEFAULT '[]'::jsonb,
+      programs JSONB NOT NULL DEFAULT '[]'::jsonb,
+      identifiers JSONB NOT NULL DEFAULT '[]'::jsonb,
+      remarks TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (list_source, external_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_sanctions_normalized_name_trgm
+      ON sanctions_entries USING GIN (normalized_name gin_trgm_ops);
+  `
+};
+var syncRunsTable = {
+  tableName: "sync_runs",
+  columns: [
+    "id",
+    "dataset",
+    "status",
+    "rows_upserted",
+    "started_at",
+    "finished_at",
+    "error_message"
+  ],
+  createSql: `
+    CREATE TABLE IF NOT EXISTS sync_runs (
+      id TEXT PRIMARY KEY,
+      dataset VARCHAR(32) NOT NULL,
+      status VARCHAR(16) NOT NULL,
+      rows_upserted INTEGER NOT NULL DEFAULT 0,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      finished_at TIMESTAMPTZ,
+      error_message TEXT
+    );
+  `
+};
+
 // src/adapters/outbound/persistence/entity-repository.adapter.ts
 var SEED_ENTITIES = [
   {
@@ -15278,27 +15418,46 @@ class HybridPostgresEntityRepositoryAdapter {
   memory;
   sql = null;
   sqlHealthy = true;
+  initPromise = null;
   constructor(databaseUrl, initialEntities = SEED_ENTITIES) {
     this.databaseUrl = databaseUrl;
     this.memory = new InMemoryEntityRepositoryAdapter(initialEntities);
-    if (databaseUrl) {
-      try {
-        this.sql = new Bun.SQL(databaseUrl);
-      } catch {
-        this.sql = null;
-        this.sqlHealthy = false;
-      }
+  }
+  async ensureDb() {
+    if (!this.databaseUrl)
+      return null;
+    const databaseUrl = this.databaseUrl;
+    if (this.sql && this.sqlHealthy)
+      return this.sql;
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        try {
+          const db = new Bun.SQL(databaseUrl);
+          await db.unsafe(entitiesTable.createSql);
+          this.sql = db;
+          this.sqlHealthy = true;
+        } catch (err) {
+          console.error("[entities:db] ensureDb failed:", err);
+          this.sql = null;
+          this.sqlHealthy = false;
+        }
+      })();
     }
+    await this.initPromise;
+    if (!this.sql || !this.sqlHealthy)
+      this.initPromise = null;
+    return this.sqlHealthy ? this.sql : null;
   }
   async findByIdentifier(type, value, jurisdiction) {
-    if (this.sql && this.sqlHealthy) {
+    const db = await this.ensureDb();
+    if (db && this.sqlHealthy) {
       try {
         const cleanVal = value.trim();
         const query = classifyQuery(cleanVal, jurisdiction);
         const jurFilter = normalizeCountryCode(jurisdiction || query.inferredCountry || "") || null;
         const normalized = cleanVal.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
         const domain = cleanVal.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-        const rows = await this.sql`
+        const rows = await db`
           SELECT * FROM entities
           WHERE (${jurFilter}::text IS NULL OR jurisdiction = ${jurFilter})
             AND (regexp_replace(upper(primary_id_value), '[^A-Z0-9]', '', 'g') = ${normalized}
@@ -15320,10 +15479,11 @@ class HybridPostgresEntityRepositoryAdapter {
     return this.memory.findByIdentifier(type, value, jurisdiction);
   }
   async searchFuzzy(normalizedName, opts) {
-    if (this.sql && this.sqlHealthy) {
+    const db = await this.ensureDb();
+    if (db && this.sqlHealthy) {
       try {
         const limit = opts?.limit ?? 5;
-        const rows = await this.sql`
+        const rows = await db`
           SELECT *, similarity(normalized_name, ${normalizedName}) as sm
           FROM entities
           WHERE similarity(normalized_name, ${normalizedName}) >= 0.3
@@ -15341,7 +15501,8 @@ class HybridPostgresEntityRepositoryAdapter {
   }
   async upsertMany(entities) {
     const memCount = await this.memory.upsertMany(entities);
-    if (this.sql && this.sqlHealthy) {
+    const db = await this.ensureDb();
+    if (db && this.sqlHealthy) {
       try {
         const dedupedMap = new Map;
         for (const e of entities) {
@@ -15384,7 +15545,7 @@ class HybridPostgresEntityRepositoryAdapter {
             aliases: (e.aliases ?? []).join(" | "),
             sources: e.sources ?? []
           }));
-          await this.sql`
+          await db`
             INSERT INTO entities (
               id, canonical_name, normalized_name, jurisdiction, region,
               primary_id_type, primary_id_value, lei, registration_number,
@@ -15453,9 +15614,10 @@ class HybridPostgresEntityRepositoryAdapter {
     return memCount;
   }
   async count() {
-    if (this.sql && this.sqlHealthy) {
+    const db = await this.ensureDb();
+    if (db && this.sqlHealthy) {
       try {
-        const rows = await this.sql`SELECT count(*)::int as count FROM entities`;
+        const rows = await db`SELECT count(*)::int as count FROM entities`;
         if (rows && rows[0]) {
           return Number(rows[0].count);
         }
@@ -15496,68 +15658,6 @@ function mapRowToEntity(row, similarityScore) {
     confidence: similarityScore !== undefined ? Math.round(similarityScore * 1e4) / 1e4 : 0.99
   };
 }
-
-// src/adapters/outbound/persistence/db-schema.ts
-var sanctionsEntriesTable = {
-  tableName: "sanctions_entries",
-  columns: [
-    "id",
-    "list_source",
-    "external_id",
-    "entity_type",
-    "primary_name",
-    "normalized_name",
-    "aliases",
-    "countries",
-    "programs",
-    "identifiers",
-    "remarks",
-    "updated_at"
-  ],
-  createSql: `
-    CREATE EXTENSION IF NOT EXISTS pg_trgm;
-    CREATE TABLE IF NOT EXISTS sanctions_entries (
-      id TEXT PRIMARY KEY,
-      list_source VARCHAR(32) NOT NULL,
-      external_id VARCHAR(64) NOT NULL,
-      entity_type VARCHAR(32) NOT NULL DEFAULT 'ENTITY',
-      primary_name TEXT NOT NULL,
-      normalized_name TEXT NOT NULL,
-      aliases TEXT NOT NULL DEFAULT '',
-      countries JSONB NOT NULL DEFAULT '[]'::jsonb,
-      programs JSONB NOT NULL DEFAULT '[]'::jsonb,
-      identifiers JSONB NOT NULL DEFAULT '[]'::jsonb,
-      remarks TEXT,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (list_source, external_id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_sanctions_normalized_name_trgm
-      ON sanctions_entries USING GIN (normalized_name gin_trgm_ops);
-  `
-};
-var syncRunsTable = {
-  tableName: "sync_runs",
-  columns: [
-    "id",
-    "dataset",
-    "status",
-    "rows_upserted",
-    "started_at",
-    "finished_at",
-    "error_message"
-  ],
-  createSql: `
-    CREATE TABLE IF NOT EXISTS sync_runs (
-      id TEXT PRIMARY KEY,
-      dataset VARCHAR(32) NOT NULL,
-      status VARCHAR(16) NOT NULL,
-      rows_upserted INTEGER NOT NULL DEFAULT 0,
-      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      finished_at TIMESTAMPTZ,
-      error_message TEXT
-    );
-  `
-};
 
 // src/adapters/outbound/persistence/sanctions-repository.adapter.ts
 var SEED_SANCTIONS = [
@@ -16054,80 +16154,84 @@ var DEFAULT_BULK_FEED_URLS = {
   ltJarBulkJsonUrl: "https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo?limit(500)",
   gleifBulkJsonUrl: "https://api.gleif.org/api/v1/lei-records?page[size]=200&page[number]=1"
 };
-function parseCsvRows(csvText) {
-  if (!csvText)
-    return [];
-  const text = csvText.charCodeAt(0) === 65279 ? csvText.slice(1) : csvText;
-  const rows = [];
-  let currentRow = [];
-  let currentField = "";
-  let inQuotes = false;
-  let quoteClosed = false;
-  const len = text.length;
-  for (let i = 0;i < len; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < len && text[i + 1] === '"') {
-          currentField += '"';
-          i++;
-        } else {
-          inQuotes = false;
-          quoteClosed = true;
-        }
-      } else {
-        currentField += ch;
+
+class CsvRowDecoder {
+  onRow;
+  row = [];
+  field = "";
+  inQuotes = false;
+  quoteClosed = false;
+  quoteWhitespace = false;
+  skipLf = false;
+  started = false;
+  constructor(onRow) {
+    this.onRow = onRow;
+  }
+  push(text) {
+    for (const ch of text) {
+      if (!this.started) {
+        this.started = true;
+        if (ch === "\uFEFF")
+          continue;
       }
-    } else {
-      if (quoteClosed && ch !== "," && ch !== "\r" && ch !== `
-` && ch !== " " && ch !== "\t")
-        throw new Error("Invalid CSV after closing quote");
-      if (ch === '"') {
-        if (quoteClosed || currentField.trim())
-          throw new Error("Invalid quote in CSV field");
-        inQuotes = true;
-      } else if (ch === ",") {
-        quoteClosed = false;
-        currentRow.push(currentField.trim());
-        currentField = "";
-      } else if (ch === "\r") {
-        quoteClosed = false;
-        if (i + 1 < len && text[i + 1] === `
+      if (this.skipLf) {
+        this.skipLf = false;
+        if (ch === `
 `)
-          i++;
-        currentRow.push(currentField.trim());
-        currentField = "";
-        if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
-          rows.push(currentRow);
-        }
-        currentRow = [];
-      } else if (ch === `
+          continue;
+      }
+      if (this.inQuotes) {
+        if (ch === '"') {
+          this.inQuotes = false;
+          this.quoteClosed = true;
+        } else
+          this.field += ch;
+      } else if (this.quoteClosed && ch === '"' && !this.quoteWhitespace) {
+        this.field += '"';
+        this.inQuotes = true;
+        this.quoteClosed = false;
+      } else if (ch === '"') {
+        if (this.field.trim() || this.quoteClosed)
+          throw new Error("Invalid quote in CSV field");
+        this.inQuotes = true;
+      } else if (ch === ",") {
+        this.finishField();
+      } else if (ch === "\r" || ch === `
 `) {
-        quoteClosed = false;
-        currentRow.push(currentField.trim());
-        currentField = "";
-        if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
-          rows.push(currentRow);
-        }
-        currentRow = [];
+        this.finishField();
+        this.finishRow();
+        this.skipLf = ch === "\r";
       } else {
-        currentField += ch;
+        if (this.quoteClosed && ch !== " " && ch !== "\t")
+          throw new Error("Invalid CSV after closing quote");
+        if (this.quoteClosed)
+          this.quoteWhitespace = true;
+        this.field += ch;
       }
     }
   }
-  if (currentField.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentField.trim());
-    if (currentRow.length > 1 || currentRow.length === 1 && currentRow[0] !== "" && currentRow[0] !== "\x1A") {
-      rows.push(currentRow);
+  finish() {
+    if (this.inQuotes)
+      throw new Error("Unterminated quoted CSV field");
+    if (this.field.length || this.row.length || this.quoteClosed) {
+      this.finishField();
+      this.finishRow();
     }
   }
-  if (inQuotes)
-    throw new Error("Unterminated quoted CSV field");
-  return rows;
+  finishField() {
+    this.row.push(this.field.trim());
+    this.field = "";
+    this.quoteClosed = false;
+    this.quoteWhitespace = false;
+  }
+  finishRow() {
+    if (this.row.length > 1 || this.row.length === 1 && this.row[0] !== "" && this.row[0] !== "\x1A")
+      this.onRow(this.row);
+    this.row = [];
+  }
 }
-function parseOfacSdnCsv(csvText) {
+function parseOfacRows(rows) {
   const entries = [];
-  const rows = parseCsvRows(csvText);
   for (const cols of rows) {
     const entNum = cols[0]?.replace(/^-0-$/, "").trim();
     const sdnName = cols[1]?.replace(/^-0-$/, "").trim();
@@ -16165,9 +16269,8 @@ function parseOfacSdnCsv(csvText) {
   }
   return entries;
 }
-function parseOpenSanctionsSimpleCsv(csvText, listSource) {
+function parseOpenSanctionsRows(rows, listSource) {
   const entries = [];
-  const rows = parseCsvRows(csvText);
   if (rows.length <= 1)
     return entries;
   const header = rows[0].map((h) => h.toLowerCase());
@@ -16305,20 +16408,44 @@ function parseLithuaniaJarBulkJson(payload) {
   }
   return entities;
 }
-function validateFeedCsv(csv, source) {
-  const rows = parseCsvRows(csv);
-  if (source === "OFAC_SDN") {
-    if (!rows.length || rows.some((row) => row.length !== 12 || !/^\d+$/.test(row[0]) || !row[1] || row[1] === "-0-"))
-      throw new Error("Invalid OFAC CSV records");
-    return;
+
+class SanctionsCsvCollector {
+  source;
+  entries = [];
+  header = null;
+  rowCount = 0;
+  csv = new CsvRowDecoder((row) => this.accept(row));
+  constructor(source) {
+    this.source = source;
   }
-  const header = rows[0]?.map((value) => value.toLowerCase()) ?? [];
-  const required = ["id", "schema", "name", "aliases", "countries", "identifiers", "sanctions"];
-  if (new Set(header).size !== header.length || required.some((name) => !header.includes(name)))
-    throw new Error("Invalid sanctions CSV headers");
-  const id = header.indexOf("id"), name = header.indexOf("name");
-  if (rows.length < 2 || rows.slice(1).some((row) => row.length !== header.length || !row[id] || !row[name]))
-    throw new Error("Invalid sanctions CSV records");
+  push(text) {
+    this.csv.push(text);
+  }
+  finish() {
+    this.csv.finish();
+    if (!this.rowCount || this.source !== "OFAC_SDN" && !this.entries.length)
+      throw new Error("Invalid sanctions CSV records");
+    return this.entries;
+  }
+  accept(row) {
+    this.rowCount++;
+    if (this.source === "OFAC_SDN") {
+      if (row.length !== 12 || !/^\d+$/.test(row[0]) || !row[1] || row[1] === "-0-")
+        throw new Error("Invalid OFAC CSV records");
+      this.entries.push(...parseOfacRows([row]));
+      return;
+    }
+    if (!this.header) {
+      this.header = row.map((value) => value.toLowerCase());
+      const required = ["id", "schema", "name", "aliases", "countries", "identifiers", "sanctions"];
+      if (new Set(this.header).size !== this.header.length || required.some((name) => !this.header.includes(name)))
+        throw new Error("Invalid sanctions CSV headers");
+      return;
+    }
+    if (row.length !== this.header.length || !row[this.header.indexOf("id")] || !row[this.header.indexOf("name")])
+      throw new Error("Invalid sanctions CSV records");
+    this.entries.push(...parseOpenSanctionsRows([this.header, row], this.source));
+  }
 }
 
 class DatasetIngestWorkerAdapter {
@@ -16348,32 +16475,43 @@ class DatasetIngestWorkerAdapter {
     for (let attempt = 0;attempt < 2; attempt++) {
       const controller = new AbortController;
       let timer;
+      let reader;
       try {
         return await Promise.race([
           (async () => {
             const response = await this.fetchImpl(url, { ...init, signal: controller.signal });
             if (!response.ok)
               throw new Error(`HTTP ${response.status}`);
-            const reader = response.body?.getReader();
+            reader = response.body?.getReader();
             if (!reader)
               throw new Error("Feed response has no body");
             const limit = this.deps.maxFeedBytes ?? 100 * 1024 * 1024;
             const chunks = [];
+            const csv = format === "json" ? null : new SanctionsCsvCollector(format);
+            const decoder = new TextDecoder("utf-8", { fatal: true });
             let bytes = 0;
             while (true) {
               const { done, value } = await reader.read();
               if (done)
                 break;
+              if (!value)
+                throw new Error("Feed response returned an empty chunk");
               bytes += value.byteLength;
               if (bytes > limit) {
                 controller.abort();
                 reader.cancel().catch(() => {});
                 throw new Error("Feed response exceeds size limit");
               }
-              chunks.push(value);
+              if (csv)
+                csv.push(decoder.decode(value, { stream: true }));
+              else
+                chunks.push(value);
             }
-            const decoded = new TextDecoder().decode(Buffer.concat(chunks));
-            return format === "text" ? decoded : JSON.parse(decoded);
+            if (csv) {
+              csv.push(decoder.decode());
+              return csv.finish();
+            }
+            return JSON.parse(decoder.decode(Buffer.concat(chunks)));
           })(),
           new Promise((_, reject) => {
             timer = setTimeout(() => {
@@ -16383,6 +16521,9 @@ class DatasetIngestWorkerAdapter {
           })
         ]);
       } catch (error) {
+        controller.abort();
+        if (reader)
+          reader.cancel().catch(() => {});
         lastError = error;
         if (attempt === 0)
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -16446,9 +16587,7 @@ class DatasetIngestWorkerAdapter {
         let attempt;
         try {
           attempt = await this.beginFeedAttempt("OFAC_SDN");
-          const csv = await this.fetchBody(this.feedUrls.ofacSdnCsvUrl, "text");
-          validateFeedCsv(csv, "OFAC_SDN");
-          const parsed = parseOfacSdnCsv(csv);
+          const parsed = await this.fetchBody(this.feedUrls.ofacSdnCsvUrl, "OFAC_SDN");
           await this.publishSnapshot("OFAC_SDN", parsed, new Date().toISOString(), attempt);
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
@@ -16469,9 +16608,7 @@ class DatasetIngestWorkerAdapter {
         let attempt;
         try {
           attempt = await this.beginFeedAttempt(listSource);
-          const csv = await this.fetchBody(url, "text");
-          validateFeedCsv(csv, listSource);
-          const parsed = parseOpenSanctionsSimpleCsv(csv, listSource);
+          const parsed = await this.fetchBody(url, listSource);
           await this.publishSnapshot(listSource, parsed, new Date().toISOString(), attempt);
           sourceDetails[src] = { status: "ok", recordsLoaded: parsed.length };
         } catch (err) {
@@ -18833,6 +18970,14 @@ function createApp(overrides = {}, customDeps) {
   };
 }
 
+// src/adapters/inbound/worker/schedule.ts
+function scheduleRefresh(refresh, intervalMs) {
+  refresh();
+  const timer = setInterval(refresh, intervalMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
 // src/index.ts
 var { app, config: config3, ingestWorker } = createApp();
 if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
@@ -18845,10 +18990,10 @@ if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
       }
     }).catch((err) => console.error("[agentum:worker] sync error:", err));
   };
-  refresh();
   if (config3.nodeEnv === "production") {
-    setInterval(refresh, 24 * 60 * 60 * 1000).unref();
-  }
+    scheduleRefresh(refresh, 24 * 60 * 60 * 1000);
+  } else
+    refresh();
 }
 console.log(`[agentum] starting serviceRole=${config3.serviceRole} resolverMode=${config3.resolverMode} port=${config3.port}`);
 var src_default = {

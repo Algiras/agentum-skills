@@ -42,6 +42,10 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
   };
 
   try {
+    const signal = typeof AbortSignal !== "undefined" && AbortSignal.timeout
+      ? AbortSignal.timeout(10000)
+      : undefined;
+
     // 1. Get ETH balance
     const ethPayload = {
       jsonrpc: "2.0",
@@ -54,11 +58,16 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(ethPayload),
+      signal,
     });
 
-    if (ethRes.ok) {
-      const data = await ethRes.json();
-      if (data.result && typeof data.result === "string") {
+    if (!ethRes.ok) {
+      results.error = `HTTP ${ethRes.status}: ${ethRes.statusText || "RPC request failed"}`;
+    } else {
+      const data = await ethRes.json().catch(() => ({}));
+      if (data.error) {
+        results.error = data.error.message || "ETH balance RPC error";
+      } else if (data.result && typeof data.result === "string") {
         const wei = BigInt(data.result);
         const ethVal = Number(wei) / 1e18;
         results.eth = ethVal.toFixed(4);
@@ -66,7 +75,7 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
     }
 
     // 2. Get USDC balance (ERC-20 with 6 decimals)
-    if (usdcContract) {
+    if (usdcContract && !results.error) {
       const usdcPayload = {
         jsonrpc: "2.0",
         id: 2,
@@ -84,11 +93,16 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usdcPayload),
+        signal,
       });
 
-      if (usdcRes.ok) {
-        const data = await usdcRes.json();
-        if (data.result && typeof data.result === "string" && data.result !== "0x") {
+      if (!usdcRes.ok) {
+        results.error = `HTTP ${usdcRes.status}: ${usdcRes.statusText || "USDC RPC request failed"}`;
+      } else {
+        const data = await usdcRes.json().catch(() => ({}));
+        if (data.error) {
+          results.error = data.error.message || "USDC balance RPC error";
+        } else if (data.result && typeof data.result === "string" && data.result !== "0x") {
           const atomic = BigInt(data.result);
           const usdcVal = Number(atomic) / 1e6;
           results.usdc = usdcVal.toFixed(2);

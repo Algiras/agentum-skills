@@ -15,7 +15,7 @@ const { loadConfig, saveConfig, getEffectiveAgentId, resolveNetwork, NETWORKS } 
 const { generateWallet, importWallet, checkBalances } = require("../lib/wallet.js");
 const { parse402Challenge, buildSignedX402Payload } = require("../lib/x402-signer.js");
 
-const PKG_VERSION = "0.2.0";
+const PKG_VERSION = "0.2.1";
 const DEFAULT_ENDPOINT = "https://agentum.asimplek.cloud/mcp";
 
 const args = process.argv.slice(2);
@@ -86,6 +86,9 @@ async function handleStatus() {
   if (config.address) {
     console.log(`\nFetching on-chain balances...`);
     const balances = await checkBalances(config.address, net);
+    if (balances.error) {
+      console.error(`Warning: ${balances.error}`);
+    }
     console.log(`Base ETH (Gas):  ${balances.eth} ETH`);
     console.log(`Base USDC:       ${balances.usdc} USDC`);
     if (net.isTestnet && net.faucets) {
@@ -268,18 +271,28 @@ function startBridge() {
         sessionId = newSessionId;
       }
 
-      // Check for 402 Payment Required
-      if (res.status === 402) {
-        const rawBody = await res.json().catch(() => ({}));
-        const rawHeaders = {};
-        res.headers.forEach((v, k) => {
-          rawHeaders[k] = v;
-        });
+      if (res.status === 204 || (res.status === 200 && res.headers.get("content-length") === "0")) {
+        return;
+      }
 
-        const challenge = parse402Challenge(rawHeaders, rawBody);
+      const rawHeaders = {};
+      res.headers.forEach((v, k) => {
+        rawHeaders[k] = v;
+      });
+
+      let data = await res.json().catch(() => ({}));
+      const paymentRequiredHeader = rawHeaders["payment-required"] || rawHeaders["x-payment-required"];
+      const isPaymentChallenge =
+        res.status === 402 ||
+        Boolean(paymentRequiredHeader) ||
+        Boolean(data?.result?._meta?.paymentRequired);
+
+      // Handle payment challenge autonomously
+      if (isPaymentChallenge) {
+        const challenge = parse402Challenge(rawHeaders, data);
 
         if (challenge && config.privateKey) {
-          log(`402 received. Signing autonomous x402 micropayment on ${challenge.network}...`);
+          log(`Payment challenge received on ${challenge.network}. Signing autonomous x402 micropayment...`);
           try {
             const signedB64 = buildSignedX402Payload(challenge, config.privateKey, config.network);
             headers["X-PAYMENT"] = signedB64;
@@ -288,15 +301,45 @@ function startBridge() {
             const retryController = new AbortController();
             const retryTimer = setTimeout(() => retryController.abort(), timeoutMs);
 
-            res = await fetch(endpoint, {
+            const retryRes = await fetch(endpoint, {
               method: "POST",
               headers,
               body: JSON.stringify(request),
               signal: retryController.signal,
             });
             clearTimeout(retryTimer);
+
+            const retryData = await retryRes.json().catch(() => ({}));
+            const retryPaymentHeader = retryRes.headers.get("payment-required");
+
+            if (retryRes.status === 200 && !retryPaymentHeader && !retryData?.result?._meta?.paymentRequired) {
+              process.stdout.write(JSON.stringify(retryData) + "\n");
+              return;
+            }
+
+            // Retry was not successful (e.g. insufficient on-chain USDC)
+            log(`Payment retry failed with status ${retryRes.status}`);
           } catch (signErr) {
             log(`Auto-payment signing failed: ${signErr.message}`);
+          }
+
+          // Return structured JSON-RPC error response if retry failed
+          if (!isNotification) {
+            const failedResponse = {
+              jsonrpc: "2.0",
+              id: request.id,
+              result: {
+                content: [
+                  {
+                    type: "text",
+                    text: `Payment authorization failed or wallet has insufficient funds on ${config.networkConfig.name}.\n\nActive Wallet: ${config.address}\nRequired: 0.05 USDC + small gas\n\nCheck balance: npx agentum-mcp wallet balance`,
+                  },
+                ],
+                isError: true,
+              },
+            };
+            process.stdout.write(JSON.stringify(failedResponse) + "\n");
+            return;
           }
         } else if (!config.privateKey && !isNotification) {
           // Friendly guidance for LLMs and developers
@@ -318,11 +361,6 @@ function startBridge() {
         }
       }
 
-      if (res.status === 204 || (res.status === 200 && res.headers.get("content-length") === "0")) {
-        return;
-      }
-
-      const data = await res.json();
       process.stdout.write(JSON.stringify(data) + "\n");
     } catch (err) {
       log(`Forwarding failed: ${err.message}`);

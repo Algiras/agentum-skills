@@ -34,8 +34,14 @@ function parse402Challenge(headers, body) {
   }
 
   if (!payload && body && typeof body === "object") {
-    if (body.error && body.error.data) {
+    if (body.result && body.result._meta && body.result._meta.paymentRequired) {
+      payload = body.result._meta.paymentRequired.x402 || body.result._meta.paymentRequired;
+    } else if (body.error && body.error.data) {
       payload = body.error.data.x402 || body.error.data.challenge?.x402 || null;
+    } else if (body.x402) {
+      payload = body.x402;
+    } else if (body.paymentRequired) {
+      payload = body.paymentRequired.x402 || body.paymentRequired;
     }
   }
 

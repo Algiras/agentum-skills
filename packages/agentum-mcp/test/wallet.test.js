@@ -39,3 +39,20 @@ test("checkBalances calls JSON-RPC eth_getBalance and eth_call for USDC", async 
   assert.equal(balances.eth, "1.0000");
   assert.equal(balances.usdc, "5.00");
 });
+
+test("checkBalances captures HTTP non-200 or RPC errors in error field", async () => {
+  const failingFetch = async () => ({
+    ok: false,
+    status: 429,
+    statusText: "Too Many Requests",
+    json: async () => ({ error: { message: "Rate limit exceeded" } }),
+  });
+
+  const netConfig = {
+    rpcUrl: "https://mainnet.base.org",
+    usdcAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  };
+  const balances = await checkBalances("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", netConfig, failingFetch);
+  assert.ok(balances.error);
+  assert.ok(balances.error.includes("429") || balances.error.includes("Rate limit"));
+});

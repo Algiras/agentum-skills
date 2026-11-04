@@ -8,7 +8,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
-const { privateKeyToAddress } = require("./crypto.js");
+const { privateKeyToAddress, normalizePrivateKey } = require("./crypto.js");
 
 const DEFAULT_CONFIG_DIR = path.join(os.homedir(), ".agentum");
 const DEFAULT_CONFIG_PATH = path.join(DEFAULT_CONFIG_DIR, "config.json");
@@ -67,6 +67,10 @@ function loadConfig(customPath) {
     }
   }
 
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+    stored = {};
+  }
+
   const agentId = stored.agentId || generateDefaultAgentId();
   const rawKey = process.env.AGENTUM_PRIVATE_KEY || stored.privateKey || null;
   const networkInput = process.env.AGENTUM_NETWORK || stored.network || "eip155:8453";
@@ -102,6 +106,11 @@ function saveConfig(updates, customPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 });
   }
+  try {
+    fs.chmodSync(dirPath, 0o700);
+  } catch {
+    // Best effort on non-POSIX
+  }
 
   let current = {};
   if (fs.existsSync(filePath)) {
@@ -112,18 +121,18 @@ function saveConfig(updates, customPath) {
     }
   }
 
+  if (!current || typeof current !== "object" || Array.isArray(current)) {
+    current = {};
+  }
+
   if (!current.agentId) {
     current.agentId = generateDefaultAgentId();
   }
 
   if (updates.privateKey !== undefined) {
     if (updates.privateKey) {
-      const normalizedKey = updates.privateKey.startsWith("0x")
-        ? updates.privateKey
-        : "0x" + updates.privateKey;
-      // Validate
-      privateKeyToAddress(normalizedKey);
-      current.privateKey = normalizedKey;
+      const normalized = normalizePrivateKey(updates.privateKey);
+      current.privateKey = "0x" + normalized;
     } else {
       delete current.privateKey;
     }

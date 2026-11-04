@@ -100,10 +100,14 @@ function toChecksumAddress(address) {
 }
 
 function normalizePrivateKey(key) {
+  if (typeof key !== "string") {
+    throw new Error("Invalid private key: must be a string");
+  }
   let hex = key.trim();
-  if (hex.startsWith("0x")) {
+  if (hex.startsWith("0x") || hex.startsWith("0X")) {
     hex = hex.slice(2);
   }
+  hex = hex.trim();
   if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error("Invalid private key: must be a 32-byte hexadecimal string");
   }

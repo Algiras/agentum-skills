@@ -31,3 +31,28 @@ test("getEffectiveAgentId uses address if wallet exists or falls back to persist
   const agentId = getEffectiveAgentId(cfg);
   assert.equal(agentId.toLowerCase(), "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");
 });
+
+test("loadConfig handles corrupt null JSON safely without throwing", () => {
+  const corruptPath = path.join(testDir, "corrupt.json");
+  fs.writeFileSync(corruptPath, "null\n");
+  const cfg = loadConfig(corruptPath);
+  assert.ok(cfg.agentId.startsWith("agent_"));
+  assert.equal(cfg.privateKey, null);
+});
+
+test("saveConfig handles privateKey with leading/trailing whitespace", () => {
+  const wsPath = path.join(testDir, "ws.json");
+  saveConfig({ privateKey: "  0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80  " }, wsPath);
+  const reloaded = loadConfig(wsPath);
+  assert.equal(reloaded.privateKey, "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+  assert.equal(reloaded.address.toLowerCase(), "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");
+});
+
+test("saveConfig ensures directory has 0700 permissions even if pre-created", () => {
+  const preDir = path.join(os.tmpdir(), "agentum-precreated-" + Date.now());
+  fs.mkdirSync(preDir, { mode: 0o777 });
+  const cfgPath = path.join(preDir, "config.json");
+  saveConfig({ network: "eip155:8453" }, cfgPath);
+  const dirStat = fs.statSync(preDir);
+  assert.equal(dirStat.mode & 0o777, 0o700);
+});

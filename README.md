@@ -1,6 +1,6 @@
-# Agentum — EU & US Corporate Entity, VAT & Sanctions Resolver for AI Agents
+# Agentum — Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> **Zero-Signup Streamable HTTP MCP Server & REST API** for deterministic corporate entity resolution (**GLEIF LEI**, **US SEC EDGAR CIK/EIN**, **Lithuania Registrų centras JAR**), live **EU Commission VIES VAT** validation, and **OFAC SDN + EU Financial Sanctions + UN Security Council** screening (`26,650+` live records).
+> **Zero-Signup Streamable HTTP MCP Server & REST API** for deterministic corporate entity resolution across global national registries (**UK Companies House**, **Swiss ZEFIX**, **Australian ABR**, **Singapore ACRA**, **US SEC EDGAR**, **European Registries**, and **Worldwide GLEIF LEI**), live **EU Commission VIES VAT** validation, and **OFAC SDN + EU Financial Sanctions + UN Security Council** screening (`26,650+` live records).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Streamable%20HTTP-blueviolet)](https://agentum.asimplek.cloud/mcp)

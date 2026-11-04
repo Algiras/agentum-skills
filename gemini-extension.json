@@ -1,7 +1,7 @@
 {
   "name": "agentum-entity-resolver",
-  "version": "0.1.0",
-  "description": "Deterministic EU & US Corporate Entity (GLEIF LEI, US SEC EDGAR CIK, Lithuania JAR), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+  "version": "0.2.0",
+  "description": "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {
     "agentum": {

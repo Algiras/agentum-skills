@@ -1,6 +1,6 @@
-# Agentum — EU & US Entity & Compliance Resolver for AI Agents
+# Agentum — Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> Deterministic EU & US company registration resolution (GLEIF LEI, Lithuania Registrų centras JAR, US SEC EDGAR CIK/EIN), live EU Commission VIES VAT validation, and OFAC/EU sanctions screening.
+> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening.
 
 ## Access & Pricing
 - **Free Tier:** 5 free calls/day per agent (`X-Agent-Id` or IP) — zero signup or API keys required.

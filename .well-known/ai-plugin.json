@@ -2,7 +2,7 @@
   "schema_version": "v1",
   "name_for_human": "Agentum Entity & Compliance Resolver",
   "name_for_model": "agentum_entity_resolver",
-  "description_for_human": "Resolve EU & US companies (LEI, SEC CIK, Lithuania JAR), validate EU VAT via VIES, and screen OFAC/EU/UN sanctions.",
+  "description_for_human": "Resolve global companies (UK CRN, Swiss UID, Australian ABN, Singapore UEN, US SEC CIK, EU registries, LEI), validate EU VAT via VIES, and screen OFAC/EU/UN sanctions.",
   "description_for_model": "Use this plugin whenever you need to verify a company registration number, look up an LEI or US SEC CIK, validate a European Union VAT number via VIES, or screen a company/individual against OFAC SDN, EU Financial Sanctions, and UN Security Council lists.",
   "auth": {
     "type": "none"

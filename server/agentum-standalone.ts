@@ -8193,9 +8193,9 @@ function mountDiscoveryAdapter(app, registry, config) {
             "@type": "WebAPI",
             name: "Agentum Entity & Compliance Resolver API",
             description: "Deterministic global corporate entity resolution, live EU VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents.",
-            documentation: `${config.publicBaseUrl}/openapi.json`,
+            documentation: config.publicBaseUrl + "/openapi.json",
             url: config.publicBaseUrl,
-            termsOfService: `${config.publicBaseUrl}/terms`,
+            termsOfService: config.publicBaseUrl + "/terms",
             provider: {
               "@type": "Organization",
               name: "Agentum Network",
@@ -8218,12 +8218,14 @@ function mountDiscoveryAdapter(app, registry, config) {
               "Swiss Federal Commercial Registry (ZEFIX / UID) lookup",
               "Australian Business Register (ABR / ABN / ACN) lookup",
               "Singapore ACRA (UEN) corporate entity directory",
-              "GLEIF Legal Entity Identifier (LEI) resolution",
-              "US SEC EDGAR CIK and EIN resolution",
+              "GLEIF Legal Entity Identifier (LEI) resolution across 200+ countries",
+              "US SEC EDGAR CIK, EIN and public ticker corporate resolution",
               "Lithuania Registr\u0173 centras JAR registry lookup",
-              "Deterministic legal form auto-alignment across global jurisdictions",
-              "Live European Commission VIES VAT number validation",
-              "OFAC SDN, EU Financial Sanctions, and UN Security Council screening",
+              "Live European Commission VIES VAT number validation across 27 EU member states",
+              "OFAC SDN, EU Financial Sanctions, and UN Security Council screening (26,650+ records)",
+              "1-shot composite KYB vendor due diligence & compliance verdict",
+              "SEPA & international IBAN validation, MOD-97 checksum & payee fraud guard",
+              "Concurrent batch entity resolution for up to 25 companies",
               "Model Context Protocol (MCP) Streamable HTTP with Server-Sent Events",
               "Coinbase x402 v2 USDC on Base settlement",
               "Stripe & Tempo Machine Payments Protocol (MPP)"
@@ -8231,183 +8233,1620 @@ function mountDiscoveryAdapter(app, registry, config) {
           }
         ]
       })}</script>
+
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 920px; margin: 40px auto; padding: 0 24px; line-height: 1.6; color: #1e293b; background: #fafafa; }
-    header { border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 24px; }
-    h1 { font-size: 1.85rem; color: #0f172a; margin-bottom: 8px; }
-    h2 { font-size: 1.25rem; color: #1e293b; margin-top: 32px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
-    code, pre { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: ui-monospace, Menlo, Monaco, Consolas, monospace; }
-    pre { padding: 14px; overflow-x: auto; background: #0f172a; color: #f8fafc; border-radius: 8px; font-size: 0.85rem; }
-    pre code { background: transparent; color: inherit; padding: 0; }
-    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: #e0e7ff; color: #3730a3; margin-right: 6px; margin-bottom: 6px; }
-    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    ul { padding-left: 20px; }
-    li { margin-bottom: 6px; }
-    a { color: #2563eb; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .playground-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-    .tab-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.15s ease; }
-    .tab-btn:hover { background: #e2e8f0; }
-    .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
-    .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
-    .search-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
-    .btn-run { background: #0f172a; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-    .btn-run:hover { background: #334155; }
-    .result-box { display: none; background: #0f172a; color: #f8fafc; padding: 14px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; max-height: 320px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+    :root {
+      --bg: #0b0f19;
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --border: #e2e8f0;
+      --border-dark: #1e293b;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --accent: #0ea5e9;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
+      background: var(--bg-page);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+
+    /* Top Navigation */
+    .nav-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: #0f172a;
+      text-decoration: none;
+    }
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+    }
+    .nav-links {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+    .nav-link {
+      color: #475569;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .nav-link:hover { color: var(--primary); }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* Hero Section */
+    .hero {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 32px;
+      margin-bottom: 32px;
+      box-shadow: 0 4px 12px -2px rgba(15,23,42,0.04);
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: 2.2rem;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      color: #0f172a;
+      margin-bottom: 14px;
+      font-weight: 800;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: #475569;
+      line-height: 1.6;
+      max-width: 960px;
+      margin-bottom: 20px;
+    }
+    .pill-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 11px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      transition: all 0.15s;
+    }
+    .badge:hover {
+      background: #e2e8f0;
+      border-color: #cbd5e1;
+    }
+    .badge.badge-blue { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .badge.badge-purple { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+    .badge.badge-green { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+
+    /* Section Headings */
+    .section-head {
+      margin: 40px 0 18px;
+    }
+    .section-head h2 {
+      font-size: 1.35rem;
+      color: #0f172a;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-head p {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    /* Cards */
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      margin-bottom: 20px;
+    }
+
+    /* Interactive Playground */
+    .playground-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .tab-btn {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #334155;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .tab-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(37,99,235,0.25);
+    }
+
+    .tool-info-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 0.82rem;
+    }
+    .tool-info-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .method-tag {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      font-weight: 700;
+      font-size: 0.72rem;
+      padding: 3px 6px;
+      border-radius: 4px;
+    }
+    .endpoint-tag {
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      color: #0f172a;
+      font-weight: 600;
+    }
+    .price-pill {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 600;
+      font-size: 0.74rem;
+    }
+
+    /* Dynamic Form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+    .form-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .form-input, .form-textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      color: #0f172a;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-textarea {
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      font-size: 0.82rem;
+      min-height: 90px;
+      resize: vertical;
+    }
+    .form-input:focus, .form-textarea:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .form-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .btn-execute {
+      background: #0f172a;
+      color: #ffffff;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+    .btn-execute:hover {
+      background: #1e293b;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .btn-execute:disabled {
+      background: #64748b;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Terminal & Result Container */
+    .terminal-window {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 14px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+    }
+    .terminal-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+    }
+    .window-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ctrl-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .ctrl-red { background: #ef4444; }
+    .ctrl-yellow { background: #f59e0b; }
+    .ctrl-green { background: #10b981; }
+
+    .terminal-title {
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-copy-sm {
+      background: rgba(255,255,255,0.08);
+      color: #f8fafc;
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.74rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .btn-copy-sm:hover {
+      background: rgba(255,255,255,0.18);
+    }
+    .btn-copy-sm.copied {
+      background: #059669;
+      border-color: #10b981;
+    }
+
+    .verdict-banner {
+      display: none;
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .verdict-approved {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .verdict-review {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    .verdict-rejected {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .status-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.72rem;
+    }
+    .status-200 { background: #065f46; color: #a7f3d0; }
+    .status-err { background: #7f1d1d; color: #fecaca; }
+
+    .json-output {
+      padding: 16px;
+      font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: #f8fafc;
+      overflow-x: auto;
+      max-height: 380px;
+      white-space: pre;
+    }
+
+    /* JSON Syntax Highlighting */
+    .hl-key { color: #38bdf8; font-weight: 600; }
+    .hl-string { color: #4ade80; }
+    .hl-number { color: #fb923c; }
+    .hl-bool { color: #c084fc; font-weight: 600; }
+    .hl-null { color: #94a3b8; font-style: italic; }
+
+    /* Recipes Section */
+    .recipes-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .recipes-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 8px 0;
+      gap: 4px;
+    }
+    .recipe-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: none;
+      padding: 8px 16px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-size: 0.84rem;
+      font-weight: 500;
+      color: #64748b;
+      transition: all 0.15s;
+    }
+    .recipe-tab:hover {
+      color: #0f172a;
+      background: rgba(0,0,0,0.02);
+    }
+    .recipe-tab.active {
+      background: #ffffff;
+      color: var(--primary);
+      border-color: var(--border);
+      font-weight: 600;
+      box-shadow: 0 -1px 3px rgba(0,0,0,0.03);
+    }
+    .recipe-content {
+      display: none;
+      position: relative;
+    }
+    .recipe-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f172a;
+      padding: 8px 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .recipe-lang {
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .code-block {
+      background: #090d16;
+      color: #f8fafc;
+      padding: 16px 20px;
+      font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.83rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* Core Tools Grid */
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .tool-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+    .tool-card:hover {
+      border-color: #cbd5e1;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px -2px rgba(15,23,42,0.08);
+    }
+    .tool-top {
+      margin-bottom: 12px;
+    }
+    .tool-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .tool-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .tool-route {
+      font-family: ui-monospace, Menlo, Monaco, monospace;
+      font-size: 0.76rem;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+    .tool-desc {
+      font-size: 0.86rem;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .tool-features {
+      list-style: none;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .tool-features li {
+      margin-bottom: 5px;
+      padding-left: 16px;
+      position: relative;
+    }
+    .tool-features li::before {
+      content: "\u2713";
+      color: #10b981;
+      font-weight: 700;
+      position: absolute;
+      left: 0;
+    }
+    .tool-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1px solid #f1f5f9;
+      margin-top: 12px;
+      font-size: 0.78rem;
+    }
+
+    /* Grid 2 */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .container { padding: 18px 14px 60px; }
+      .hero { padding: 24px 18px; }
+      .hero h1 { font-size: 1.65rem; }
+      .nav-links { display: none; }
+    }
+
+    /* Discovery Table / List */
+    .discovery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .discovery-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.84rem;
+    }
+    .discovery-item a {
+      color: #0f172a;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .discovery-item a:hover {
+      color: var(--primary);
+    }
+    .discovery-badge {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.72rem;
+      background: #e2e8f0;
+      color: #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 32px 0 20px;
+      color: #94a3b8;
+      font-size: 0.82rem;
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+    }
+    footer a { color: #64748b; text-decoration: none; }
+    footer a:hover { color: var(--primary); }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #ffffff;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Agentum \u2014 Global Corporate Entity, VAT &amp; Sanctions Resolver</h1>
-    <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) Server</strong> and <strong>REST API</strong> for autonomous AI agents. Deterministic entity resolution across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Australia</strong> (ABR/ABN), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT validation</strong>, 26,650+ OFAC/EU/UN sanctions screening, and Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 USDC on Base</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
-    <div style="margin-top: 10px;">
-      <span class="badge">Model Context Protocol</span>
-      <span class="badge">UK Companies House</span>
-      <span class="badge">Swiss ZEFIX</span>
-      <span class="badge">Australian ABR</span>
-      <span class="badge">Singapore ACRA</span>
-      <span class="badge">GLEIF Worldwide LEI</span>
-      <span class="badge">US SEC EDGAR</span>
-      <span class="badge">EU VIES VAT</span>
-      <span class="badge">OFAC/EU/UN Sanctions</span>
-      <span class="badge">LangChain &amp; CrewAI</span>
-      <span class="badge">Base USDC x402</span>
-    </div>
-  </header>
+  <div class="container">
+    <!-- Top Navigation Bar -->
+    <header class="nav-bar">
+      <a href="${config.publicBaseUrl}/" class="brand">
+        <svg class="brand-logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="nav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#6366f1"/>
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="112" fill="#0f172a"/>
+          <polygon points="256,72 416,164 416,348 256,440 96,348 96,164" fill="none" stroke="url(#nav-grad)" stroke-width="26" stroke-linejoin="round"/>
+          <polygon points="256,140 356,198 356,314 256,372 156,314 156,198" fill="url(#nav-grad)" fill-opacity="0.2" stroke="#38bdf8" stroke-width="14" stroke-linejoin="round"/>
+          <path d="M216 260 L246 290 L304 226" fill="none" stroke="#38bdf8" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>AGENTUM</span>
+        <span style="font-size: 0.72rem; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-weight:600;">v0.2.0</span>
+      </a>
+      <div class="nav-links">
+        <a href="#playground" class="nav-link">Interactive Playground</a>
+        <a href="#recipes" class="nav-link">Quickstart Recipes</a>
+        <a href="#tools" class="nav-link">6 Core Tools</a>
+        <a href="${config.publicBaseUrl}/mcp" class="nav-link">MCP Endpoint</a>
+        <a href="${config.publicBaseUrl}/openapi.json" class="nav-link">OpenAPI Spec</a>
+        <a href="https://github.com/Algiras/agentum-skills" target="_blank" rel="noopener" class="nav-link">GitHub</a>
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          <span>5 Free Calls / Day</span>
+        </div>
+      </div>
+    </header>
 
-  <h2>Interactive Live Demo (5 Free Calls / Day)</h2>
-  <div class="card">
-    <div class="playground-tabs">
-      <button class="tab-btn active" onclick="setMode('entity', 'Rolls-Royce plc', 'GB')">\uD83C\uDDEC\uD83C\uDDE7 UK Companies House</button>
-      <button class="tab-btn" onclick="setMode('entity', 'Nestle SA', 'CH')">\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX</button>
-      <button class="tab-btn" onclick="setMode('entity', 'Atlassian Pty Ltd', 'AU')">\uD83C\uDDE6\uD83C\uDDFA Australian ABR</button>
-      <button class="tab-btn" onclick="setMode('entity', 'Grab Holdings', 'SG')">\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA</button>
-      <button class="tab-btn" onclick="setMode('entity', 'Apple Inc', 'US')">\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR</button>
-      <button class="tab-btn" onclick="setMode('entity', 'Siemens AG', 'DE')">\uD83C\uDDEA\uD83C\uDDFA EU LEI / GLEIF</button>
-      <button class="tab-btn" onclick="setMode('vat', 'DE129274202', '')">\uD83C\uDDEA\uD83C\uDDFA EU VIES VAT Check</button>
-      <button class="tab-btn" onclick="setMode('sanctions', 'Sberbank', '')">\uD83D\uDEE1\uFE0F OFAC Sanctions Screen</button>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-eyebrow">
+        <span>\uD83E\uDD16</span>
+        <span>The Autonomous KYB &amp; Entity Resolution Platform for AI Agents</span>
+      </div>
+      <h1>Deterministic Corporate Entity, VAT &amp; Sanctions Resolver</h1>
+      <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) server</strong> and <strong>REST API</strong>. Query authoritative corporate registries across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Australia</strong> (ABR), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT</strong> validation, 26,650+ OFAC/EU/UN sanctions screening, and inline Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 Base USDC</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
+      
+      <div class="pill-cloud">
+        <span class="badge badge-blue">\u26A1 Model Context Protocol (Streamable HTTP)</span>
+        <span class="badge">\uD83C\uDDEC\uD83C\uDDE7 UK Companies House</span>
+        <span class="badge">\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX</span>
+        <span class="badge">\uD83C\uDDE6\uD83C\uDDFA Australian ABR</span>
+        <span class="badge">\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA</span>
+        <span class="badge">\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR</span>
+        <span class="badge">\uD83C\uDF10 GLEIF LEI Worldwide</span>
+        <span class="badge">\uD83C\uDDF1\uD83C\uDDF9 Lithuania JAR</span>
+        <span class="badge badge-purple">\uD83C\uDDEA\uD83C\uDDFA EU VIES VAT</span>
+        <span class="badge">\uD83D\uDEE1\uFE0F OFAC / EU / UN Sanctions</span>
+        <span class="badge badge-green">\u26A1 1-Shot KYB Check</span>
+        <span class="badge badge-green">\uD83C\uDFE6 IBAN Fraud Guard</span>
+        <span class="badge">\uD83D\uDCE6 Batch Resolver</span>
+        <span class="badge">Coinbase x402 v2 (Base USDC)</span>
+        <span class="badge">Stripe &amp; Tempo MPP</span>
+      </div>
+    </section>
+
+    <!-- SECTION 1: Interactive Live Demo Playground -->
+    <div class="section-head" id="playground">
+      <h2>\u26A1 Interactive Live Demo Playground</h2>
+      <p>Test all 6 tools &amp; global national registries live in your browser. Powered by 5 free daily calls per agent.</p>
     </div>
-    <div class="search-row">
-      <input type="text" id="demoQuery" class="search-input" value="Rolls-Royce plc" placeholder="Enter company name, registration number, LEI, CIK, or VAT..." />
-      <button class="btn-run" onclick="runDemo()">Resolve</button>
+    <div class="card">
+      <div class="playground-tabs" id="presetTabs">
+        <!-- Tab buttons rendered by JavaScript -->
+      </div>
+
+      <!-- Active Tool Info Ribbon -->
+      <div class="tool-info-bar" id="toolInfoBar">
+        <div class="tool-info-left">
+          <span class="method-tag" id="toolMethod">POST</span>
+          <span class="endpoint-tag" id="toolEndpoint">/v1/entity/resolve</span>
+          <span class="badge badge-blue" id="toolMcpName">resolve_entity</span>
+          <span class="price-pill" id="toolPrice">$0.002 USD</span>
+        </div>
+        <div style="font-size:0.78rem; color:#64748b;" id="toolSummary">Official UK Companies House lookup</div>
+      </div>
+
+      <!-- Dynamic Form -->
+      <div class="form-grid" id="formFields">
+        <!-- Rendered dynamically by setPreset() -->
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-execute" id="btnRun" onclick="runPlayground()">Run Execution \u2794</button>
+        <span style="font-size:0.78rem; color:#64748b;">Instant response from production Agentum cluster.</span>
+      </div>
+
+      <!-- High Contrast Terminal Response Box -->
+      <div class="terminal-window" id="playgroundTerminal" style="display:none;">
+        <div class="terminal-bar">
+          <div class="window-controls">
+            <span class="ctrl-dot ctrl-red"></span>
+            <span class="ctrl-dot ctrl-yellow"></span>
+            <span class="ctrl-dot ctrl-green"></span>
+          </div>
+          <div class="terminal-title" id="responseStatus">Ready</div>
+          <button class="btn-copy-sm" onclick="copyResponseJson(this)">Copy JSON</button>
+        </div>
+        <div id="verdictBanner" class="verdict-banner"></div>
+        <pre class="json-output" id="jsonOutput"></pre>
+      </div>
     </div>
-    <div id="demoResult" class="result-box"></div>
-  </div>
-  <script>
-    let currentMode = 'entity';
-    let currentHint = 'GB';
-    function setMode(mode, val, hint) {
-      currentMode = mode;
-      currentHint = hint;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      event.target.classList.add('active');
-      document.getElementById('demoQuery').value = val;
+
+    <!-- SECTION 2: Multi-Framework Quickstart Recipes -->
+    <div class="section-head" id="recipes">
+      <h2>\uD83D\uDE80 Multi-Framework Quickstart Recipes</h2>
+      <p>Connect Agentum to Claude Desktop, Cursor, LangChain, Vercel AI SDK, Python CrewAI, or raw cURL with 1-click copy.</p>
+    </div>
+    <div class="recipes-card">
+      <div class="recipes-tabs">
+        <button class="recipe-tab active" data-recipe="claude" onclick="switchRecipe('claude')">Claude &amp; Cursor (MCP)</button>
+        <button class="recipe-tab" data-recipe="langchain-ts" onclick="switchRecipe('langchain-ts')">LangChain TS</button>
+        <button class="recipe-tab" data-recipe="vercel-ai" onclick="switchRecipe('vercel-ai')">Vercel AI SDK</button>
+        <button class="recipe-tab" data-recipe="python" onclick="switchRecipe('python')">Python (CrewAI / LangChain)</button>
+        <button class="recipe-tab" data-recipe="curl" onclick="switchRecipe('curl')">cURL REST (Dual-402)</button>
+      </div>
+
+      <!-- Recipe 1: Claude & Cursor MCP -->
+      <div class="recipe-content" id="recipe-claude" style="display:block;">
+        <div class="recipe-header">
+          <span class="recipe-lang">Terminal CLI / .mcp.json</span>
+          <button class="btn-copy-sm" onclick="copyCode(this, 'code-claude')">Copy Snippet</button>
+        </div>
+        <pre class="code-block" id="code-claude"><code># 1. Claude Code / Claude Desktop Streamable HTTP MCP (One-command setup):
+claude mcp add --transport http agentum ${config.publicBaseUrl}/mcp
+
+# 2. Or add to ~/.cursor/mcp.json or claude_desktop_config.json:
+{
+  "mcpServers": {
+    "agentum": {
+      "url": "${config.publicBaseUrl}/mcp"
     }
-    async function runDemo() {
-      const q = document.getElementById('demoQuery').value.trim();
-      const box = document.getElementById('demoResult');
-      box.style.display = 'block';
-      box.textContent = 'Resolving query via live Agentum API...';
-      try {
-        let ep = '/v1/entity/resolve';
-        let body = { query: q };
-        if (currentHint) body.jurisdictionHint = currentHint;
-        if (currentMode === 'vat') {
-          ep = '/v1/entity/vat-verify';
-          body = { vatNumber: q };
-        } else if (currentMode === 'sanctions') {
-          ep = '/v1/entity/sanctions-screen';
-          body = { name: q };
+  }
+}
+
+# 3. Or launch via zero-config stdio npm bridge:
+npx -y agentum-mcp</code></pre>
+      </div>
+
+      <!-- Recipe 2: LangChain TS -->
+      <div class="recipe-content" id="recipe-langchain-ts">
+        <div class="recipe-header">
+          <span class="recipe-lang">TypeScript / JavaScript</span>
+          <button class="btn-copy-sm" onclick="copyCode(this, 'code-langchain-ts')">Copy Snippet</button>
+        </div>
+        <pre class="code-block" id="code-langchain-ts"><code>// npm install agentum-langchain @langchain/openai @langchain/langgraph
+import { ChatOpenAI } from "@langchain/openai";
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { AgentumToolkit } from "agentum-langchain";
+
+// 1. Initialize Agentum Toolkit (5 free calls/day out-of-the-box)
+const toolkit = new AgentumToolkit({
+  baseUrl: "${config.publicBaseUrl}",
+  // Optional: EVM private key for automatic $0.002-$0.005 Base USDC micropayments
+  // privateKey: process.env.BASE_PRIVATE_KEY,
+});
+
+// 2. Bind all 6 compliance tools to your LangChain agent
+const agent = createReactAgent({
+  llm: new ChatOpenAI({ model: "gpt-4o", temperature: 0 }),
+  tools: toolkit.getTools(),
+});
+
+// 3. Run autonomous multi-jurisdiction KYB investigation
+const result = await agent.invoke({
+  messages: [
+    {
+      role: "user",
+      content: "Run 1-shot KYB on Siemens AG (DE) and verify bank IBAN DE89370400440532013000.",
+    },
+  ],
+});
+console.log(result.messages[result.messages.length - 1].content);</code></pre>
+      </div>
+
+      <!-- Recipe 3: Vercel AI SDK -->
+      <div class="recipe-content" id="recipe-vercel-ai">
+        <div class="recipe-header">
+          <span class="recipe-lang">TypeScript / Vercel AI SDK</span>
+          <button class="btn-copy-sm" onclick="copyCode(this, 'code-vercel-ai')">Copy Snippet</button>
+        </div>
+        <pre class="code-block" id="code-vercel-ai"><code>// npm install ai @ai-sdk/openai agentum-langchain
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { createAgentumAiTools } from "agentum-langchain";
+
+// Generate response with Agentum tools automatically wired
+const { text } = await generateText({
+  model: openai("gpt-4o"),
+  tools: createAgentumAiTools({
+    baseUrl: "${config.publicBaseUrl}",
+  }),
+  prompt: "Verify Grab Holdings in Singapore via ACRA, check EU VAT DE129274202, and screen SEVERSTAL for sanctions.",
+});
+
+console.log(text);</code></pre>
+      </div>
+
+      <!-- Recipe 4: Python CrewAI -->
+      <div class="recipe-content" id="recipe-python">
+        <div class="recipe-header">
+          <span class="recipe-lang">Python (LangChain / CrewAI)</span>
+          <button class="btn-copy-sm" onclick="copyCode(this, 'code-python')">Copy Snippet</button>
+        </div>
+        <pre class="code-block" id="code-python"><code># pip install agentum-langchain langchain crewai
+from agentum_langchain import AgentumToolkit
+from crewai import Agent, Task, Crew
+
+# 1. Initialize tools (5 free calls/day per agent)
+toolkit = AgentumToolkit(base_url="${config.publicBaseUrl}")
+tools = toolkit.get_tools()
+
+# 2. Define autonomous compliance agent
+compliance_officer = Agent(
+    role="Senior Corporate KYB Analyst",
+    goal="Deterministically resolve entities, verify EU VAT, and screen sanctions",
+    tools=tools,
+    verbose=True,
+)
+
+# 3. Execute KYB due diligence task
+task = Task(
+    description="Verify Nestle SA in Switzerland (ZEFIX) and check for OFAC sanctions.",
+    expected_output="Comprehensive corporate verification and sanctions screening report.",
+    agent=compliance_officer,
+)
+
+crew = Crew(agents=[compliance_officer], tasks=[task])
+crew.kickoff()</code></pre>
+      </div>
+
+      <!-- Recipe 5: cURL REST -->
+      <div class="recipe-content" id="recipe-curl">
+        <div class="recipe-header">
+          <span class="recipe-lang">cURL / Dual-402 Headers</span>
+          <button class="btn-copy-sm" onclick="copyCode(this, 'code-curl')">Copy Snippet</button>
+        </div>
+        <pre class="code-block" id="code-curl"><code># 1. Free Tier (5 free calls/day per agent fingerprint)
+curl -X POST "${config.publicBaseUrl}/v1/compliance/check-vendor" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Agent-Id: autonomous-agent-01" \\
+  -d '{"name": "Siemens AG", "country": "DE", "vatNumber": "DE129274202"}'
+
+# 2. HTTP 402 with Coinbase x402 v2 payment header (Base USDC)
+curl -X POST "${config.publicBaseUrl}/v1/entity/resolve" \\
+  -H "Content-Type: application/json" \\
+  -H "PAYMENT-SIGNATURE: 0x&lt;eip3009_base_usdc_signature&gt;" \\
+  -d '{"query": "Rolls-Royce plc", "jurisdictionHint": "GB"}'
+
+# 3. HTTP 402 with Stripe &amp; Tempo MPP payment header
+curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Payment proof=&lt;tempo_micropayment_receipt&gt;" \\
+  -d '{"iban": "DE89 3704 0044 0532 0130 00", "expectedCountry": "DE"}'</code></pre>
+      </div>
+    </div>
+
+    <!-- SECTION 3: The 6 Core Agent Tools -->
+    <div class="section-head" id="tools">
+      <h2>\uD83D\uDEE0\uFE0F The 6 Core Autonomous KYB &amp; Compliance Tools</h2>
+      <p>Purpose-built for autonomous AI agents, enterprise pipelines, and automated supplier workflows.</p>
+    </div>
+    <div class="tools-grid">
+      <!-- Tool 1: resolve_entity -->
+      <div class="tool-card">
+        <div class="tool-top">
+          <div class="tool-header-row">
+            <span class="tool-title">\uD83C\uDF10 Entity Resolver</span>
+            <span class="badge badge-blue">resolve_entity</span>
+          </div>
+          <span class="tool-route">POST /v1/entity/resolve</span>
+          <p class="tool-desc">Deterministic resolution across 6 national registries + worldwide GLEIF LEI. Resolves canonical names, registration codes, status, and legal forms.</p>
+          <ul class="tool-features">
+            <li>UK Companies House (CRN) &amp; Swiss ZEFIX (UID)</li>
+            <li>Australian ABR (ABN/ACN) &amp; Singapore ACRA (UEN)</li>
+            <li>US SEC EDGAR (CIK/EIN) &amp; GLEIF LEI (200+ countries)</li>
+          </ul>
+        </div>
+        <div class="tool-footer">
+          <span style="font-weight:600; color:#0f172a;">$0.002 USD / call</span>
+          <span style="color:#64748b;">Free tier eligible</span>
+        </div>
+      </div>
+
+      <!-- Tool 2: verify_eu_vat -->
+      <div class="tool-card">
+        <div class="tool-top">
+          <div class="tool-header-row">
+            <span class="tool-title">\uD83C\uDDEA\uD83C\uDDFA EU VIES VAT Validator</span>
+            <span class="badge badge-purple">verify_eu_vat</span>
+          </div>
+          <span class="tool-route">POST /v1/entity/vat-verify</span>
+          <p class="tool-desc">Direct live validation against European Commission VIES across all 27 member states. Verifies company legal name, seat address, and cross-links canonical entity profile.</p>
+          <ul class="tool-features">
+            <li>Official EU Commission real-time XML/REST gateway</li>
+            <li>Detects deregistered or fraudulent EU VAT numbers</li>
+            <li>Links VAT identity to GLEIF and national registers</li>
+          </ul>
+        </div>
+        <div class="tool-footer">
+          <span style="font-weight:600; color:#0f172a;">$0.002 USD / call</span>
+          <span style="color:#64748b;">Free tier eligible</span>
+        </div>
+      </div>
+
+      <!-- Tool 3: screen_sanctions -->
+      <div class="tool-card">
+        <div class="tool-top">
+          <div class="tool-header-row">
+            <span class="tool-title">\uD83D\uDEE1\uFE0F Sanctions Screener</span>
+            <span class="badge">screen_sanctions</span>
+          </div>
+          <span class="tool-route">POST /v1/entity/sanctions-screen</span>
+          <p class="tool-desc">Consolidated screening against 26,650+ records from US Treasury OFAC SDN, EU Financial Sanctions, and UN Security Council. Sub-millisecond trigram fuzzy matching.</p>
+          <ul class="tool-features">
+            <li>Zero false-positive trigram similarity engine</li>
+            <li>Tracks OFAC SDN, EU EEAS, and UN Consolidated lists</li>
+            <li>Configurable match threshold and risk level assessment</li>
+          </ul>
+        </div>
+        <div class="tool-footer">
+          <span style="font-weight:600; color:#0f172a;">$0.002 USD / call</span>
+          <span style="color:#64748b;">Free tier eligible</span>
+        </div>
+      </div>
+
+      <!-- Tool 4: check_vendor -->
+      <div class="tool-card">
+        <div class="tool-top">
+          <div class="tool-header-row">
+            <span class="tool-title">\u26A1 1-Shot KYB Due Diligence</span>
+            <span class="badge badge-green">check_vendor</span>
+          </div>
+          <span class="tool-route">POST /v1/compliance/check-vendor</span>
+          <p class="tool-desc">Composite 1-shot KYB due diligence tool. Concurrently resolves identity, verifies EU VAT, screens sanctions, and returns an autonomous compliance verdict with full audit trail.</p>
+          <ul class="tool-features">
+            <li>Returns APPROVED, FLAGGED_FOR_REVIEW, or REJECTED</li>
+            <li>Risk level rating: CLEAR, LOW, MEDIUM, HIGH, CRITICAL</li>
+            <li>Includes audit trail timeline for compliance logs</li>
+          </ul>
+        </div>
+        <div class="tool-footer">
+          <span style="font-weight:600; color:#0f172a;">$0.005 USD / call</span>
+          <span style="color:#64748b;">Free tier eligible</span>
+        </div>
+      </div>
+
+      <!-- Tool 5: verify_bank_payee -->
+      <div class="tool-card">
+        <div class="tool-top">
+          <div class="tool-header-row">
+            <span class="tool-title">\uD83C\uDFE6 Bank Payee &amp; IBAN Guard</span>
+            <span class="badge badge-green">verify_bank_payee</span>
+          </div>
+          <span class="tool-route">POST /v1/compliance/verify-bank-payee</span>
+          <p class="tool-desc">SEPA &amp; international IBAN verification using ISO 13616 specifications, country length rules, and MOD-97 checksum validation. Detects corporate jurisdiction mismatches.</p>
+          <ul class="tool-features">
+            <li>MOD-97 checksum calculation &amp; normalization</li>
+            <li>Guards against supplier invoice redirection fraud</li>
+            <li>Extracts bank code and validates issuing jurisdiction</li>
+          </ul>
+        </div>
+        <div class="tool-footer">
+          <span style="font-weight:600; color:#0f172a;">$0.002 USD / call</span>
+          <span style="color:#64748b;">Free tier eligible</span>
+        </div>
+      </div>
+
+      <!-- Tool 6: batch_resolve -->
+      <div class="tool-card">
+        <div class="tool-top">
+          <div class="tool-header-row">
+            <span class="tool-title">\uD83D\uDCE6 Batch Entity Resolver</span>
+            <span class="badge">batch_resolve</span>
+          </div>
+          <span class="tool-route">POST /v1/entity/batch-resolve</span>
+          <p class="tool-desc">Concurrently resolves up to 25 corporate entities across national registries in a single round trip. Ideal for data pipelines, CSV supplier lists, and batch onboarding.</p>
+          <ul class="tool-features">
+            <li>Resolves up to 25 entities concurrently in one HTTP call</li>
+            <li>Reports resolved vs unresolved counts with confidence</li>
+            <li>Saves roundtrips and optimizes agent tool execution</li>
+          </ul>
+        </div>
+        <div class="tool-footer">
+          <span style="font-weight:600; color:#0f172a;">$0.010 USD / call</span>
+          <span style="color:#64748b;">Free tier eligible</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: Supported Jurisdictions & Data Upstreams -->
+    <div class="section-head">
+      <h2>\uD83C\uDF0D Supported Jurisdictions &amp; Primary Upstreams</h2>
+      <p>Direct integration with authoritative national company registries and global compliance authorities.</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <ul style="list-style:none; font-size:0.88rem; color:#334155;">
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDDEC\uD83C\uDDE7 UK Companies House:</strong> Real-time lookup of English, Welsh, Scottish, and Northern Irish company registration numbers (CRN) and official legal names.</li>
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX Registry:</strong> Cantonal commercial registers, legal seats, and Unique Enterprise Identifiers (UID / CHE).</li>
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDDE6\uD83C\uDDFA Australian Business Register (ABR):</strong> Australian Business Numbers (ABN) and Australian Company Numbers (ACN).</li>
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA:</strong> Accounting &amp; Corporate Regulatory Authority Unique Entity Numbers (UEN) and business records.</li>
+          <li><strong>\uD83C\uDDF1\uD83C\uDDF9 Lithuania Registr\u0173 centras (JAR):</strong> Legal entity code (JAR) and company register.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <ul style="list-style:none; font-size:0.88rem; color:#334155;">
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR:</strong> Central Index Key (CIK), Employer Identification Number (EIN), and publicly traded tickers.</li>
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDF10 GLEIF Worldwide:</strong> Global Legal Entity Identifier (LEI) worldwide verification across 200+ countries and territories.</li>
+          <li style="margin-bottom:12px;"><strong>\uD83C\uDDEA\uD83C\uDDFA European Commission VIES:</strong> Real-time VAT validity cross-check across all 27 EU member states.</li>
+          <li><strong>\uD83D\uDEE1\uFE0F Consolidated Sanctions:</strong> US Treasury OFAC SDN, European Union Financial Sanctions (EEAS), and UN Security Council Consolidated List (26,650+ records).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SECTION 5: Autonomous Dual-402 Micropayment Protocol -->
+    <div class="section-head">
+      <h2>\uD83D\uDCB3 Autonomous Dual-402 Micropayment Protocol</h2>
+      <p>Seamless settlement for autonomous AI agents without credit cards, subscriptions, or manual API billing.</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="font-size:1.05rem; color:#0f172a; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+          <span>\u26A1</span> <span>Coinbase x402 v2 (Base USDC)</span>
+        </h3>
+        <p style="font-size:0.86rem; color:#475569; margin-bottom:12px;">Agentum implements the official Coinbase x402 specification. When daily free tier quota is exhausted, endpoints return HTTP 402 with a standard <code>PAYMENT-REQUIRED</code> header detailing payment terms.</p>
+        <div style="font-size:0.8rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; font-family:ui-monospace,Menlo,monospace; color:#334155;">
+          Rail: eip155:8453 (Base Mainnet)<br/>
+          Asset: USDC ($0.002 - $0.005 / call)<br/>
+          Header: PAYMENT-SIGNATURE: 0x&lt;eip3009&gt;
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:1.05rem; color:#0f172a; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
+          <span>\uD83C\uDF10</span> <span>Stripe &amp; Tempo MPP</span>
+        </h3>
+        <p style="font-size:0.86rem; color:#475569; margin-bottom:12px;">Supports the Machine Payments Protocol (MPP) co-developed by Stripe and Tempo. Allows AI agents to settle calls via HTTP <code>WWW-Authenticate: Payment</code> and <code>Authorization: Payment</code> headers.</p>
+        <div style="font-size:0.8rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; font-family:ui-monospace,Menlo,monospace; color:#334155;">
+          Rail: Tempo Stablecoins &amp; Stripe<br/>
+          Method: Shared Payment Tokens / Streaming<br/>
+          Header: Authorization: Payment proof=&lt;token&gt;
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 6: Machine & Agent Discovery Coordinates -->
+    <div class="section-head">
+      <h2>\uD83D\uDCE1 Machine &amp; Agent Discovery Coordinates</h2>
+      <p>Standardized discovery manifests for autonomous agent crawlers, LLMs, and registry aggregators.</p>
+    </div>
+    <div class="card">
+      <div class="discovery-grid">
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/mcp">Streamable HTTP MCP</a>
+            <div style="font-size:0.75rem; color:#64748b;">Primary MCP Server URL</div>
+          </div>
+          <span class="discovery-badge">/mcp</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/.well-known/mcp.json">MCP Manifest</a>
+            <div style="font-size:0.75rem; color:#64748b;">RFC Discovery JSON</div>
+          </div>
+          <span class="discovery-badge">/.well-known/mcp.json</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/openapi.json">OpenAPI 3.1 Spec</a>
+            <div style="font-size:0.75rem; color:#64748b;">Full REST Schemas &amp; x-402</div>
+          </div>
+          <span class="discovery-badge">/openapi.json</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/llms.txt">LLMs.txt Reference</a>
+            <div style="font-size:0.75rem; color:#64748b;">Agent Compact Summary</div>
+          </div>
+          <span class="discovery-badge">/llms.txt</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/llms-full.txt">LLMs-Full Reference</a>
+            <div style="font-size:0.75rem; color:#64748b;">Complete Schemas &amp; Prompts</div>
+          </div>
+          <span class="discovery-badge">/llms-full.txt</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/.well-known/ai-plugin.json">OpenAI Plugin Manifest</a>
+            <div style="font-size:0.75rem; color:#64748b;">ChatGPT Actions Spec</div>
+          </div>
+          <span class="discovery-badge">/ai-plugin.json</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/.well-known/agent.json">Google A2A Card</a>
+            <div style="font-size:0.75rem; color:#64748b;">Agent2Agent Protocol</div>
+          </div>
+          <span class="discovery-badge">/agent.json</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 Bazaar</a>
+            <div style="font-size:0.75rem; color:#64748b;">Base USDC Micropayments</div>
+          </div>
+          <span class="discovery-badge">/x402.json</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>
+            <div style="font-size:0.75rem; color:#64748b;">Machine Payments Spec</div>
+          </div>
+          <span class="discovery-badge">/mpp.json</span>
+        </div>
+        <div class="discovery-item">
+          <div>
+            <a href="https://github.com/Algiras/agentum-skills" target="_blank" rel="noopener">GitHub Skills Repo</a>
+            <div style="font-size:0.75rem; color:#64748b;">Open Source &amp; Packages</div>
+          </div>
+          <span class="discovery-badge">GitHub</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>MIT License &copy; 2026 Agentum Network &bull; <a href="${config.publicBaseUrl}/pricing">Pricing</a> &bull; <a href="${config.publicBaseUrl}/terms">Terms</a> &bull; <a href="${config.publicBaseUrl}/privacy">Privacy</a> &bull; <a href="https://github.com/Algiras/agentum-skills" target="_blank" rel="noopener">Algiras/agentum-skills</a></p>
+    </footer>
+  </div>
+
+  <script>
+    var currentPresetId = 'uk';
+    var lastResponseData = null;
+
+    var PRESETS = {
+      'uk': {
+        id: 'uk',
+        name: '\uD83C\uDDEC\uD83C\uDDE7 UK Companies House',
+        tool: 'resolve_entity',
+        method: 'POST',
+        endpoint: '/v1/entity/resolve',
+        price: '$0.002 USD',
+        summary: 'Official UK Companies House lookup by legal name or 8-char CRN',
+        fields: [
+          { id: 'query', label: 'Company Name or CRN', value: 'Rolls-Royce plc', placeholder: 'e.g. Rolls-Royce plc or 00132876' },
+          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'GB', placeholder: 'GB' }
+        ],
+        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'GB' }; }
+      },
+      'ch': {
+        id: 'ch',
+        name: '\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX',
+        tool: 'resolve_entity',
+        method: 'POST',
+        endpoint: '/v1/entity/resolve',
+        price: '$0.002 USD',
+        summary: 'Swiss Federal Commercial Registry (ZEFIX) lookup by CHE-xxx UID or company name',
+        fields: [
+          { id: 'query', label: 'Company Name or UID', value: 'Nestle SA', placeholder: 'e.g. Nestle SA or CHE-105.909.036' },
+          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'CH', placeholder: 'CH' }
+        ],
+        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'CH' }; }
+      },
+      'au': {
+        id: 'au',
+        name: '\uD83C\uDDE6\uD83C\uDDFA Australian ABR',
+        tool: 'resolve_entity',
+        method: 'POST',
+        endpoint: '/v1/entity/resolve',
+        price: '$0.002 USD',
+        summary: 'Australian Business Register (ABR) lookup by 11-digit ABN, 9-digit ACN, or legal name',
+        fields: [
+          { id: 'query', label: 'Company Name, ABN, or ACN', value: 'Atlassian Pty Ltd', placeholder: 'e.g. Atlassian Pty Ltd or 53102443916' },
+          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'AU', placeholder: 'AU' }
+        ],
+        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'AU' }; }
+      },
+      'sg': {
+        id: 'sg',
+        name: '\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA',
+        tool: 'resolve_entity',
+        method: 'POST',
+        endpoint: '/v1/entity/resolve',
+        price: '$0.002 USD',
+        summary: 'Singapore Accounting & Corporate Regulatory Authority (ACRA) directory by UEN or company name',
+        fields: [
+          { id: 'query', label: 'Company Name or UEN', value: 'Grab Holdings', placeholder: 'e.g. Grab Holdings or 201800123A' },
+          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'SG', placeholder: 'SG' }
+        ],
+        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'SG' }; }
+      },
+      'us': {
+        id: 'us',
+        name: '\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR',
+        tool: 'resolve_entity',
+        method: 'POST',
+        endpoint: '/v1/entity/resolve',
+        price: '$0.002 USD',
+        summary: 'US SEC EDGAR corporate database by CIK, EIN, stock ticker, or legal name',
+        fields: [
+          { id: 'query', label: 'Company Name, CIK, or Ticker', value: 'Apple Inc', placeholder: 'e.g. Apple Inc, 0000320193, or AAPL' },
+          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'US', placeholder: 'US' }
+        ],
+        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'US' }; }
+      },
+      'eu_lei': {
+        id: 'eu_lei',
+        name: '\uD83C\uDDEA\uD83C\uDDFA EU LEI / GLEIF',
+        tool: 'resolve_entity',
+        method: 'POST',
+        endpoint: '/v1/entity/resolve',
+        price: '$0.002 USD',
+        summary: 'GLEIF worldwide Legal Entity Identifier resolution across 200+ countries',
+        fields: [
+          { id: 'query', label: 'Company Name or 20-char LEI', value: 'Siemens AG', placeholder: 'e.g. Siemens AG or W38RGI023J3WT1HWRP32' },
+          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'DE', placeholder: 'DE' }
+        ],
+        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'DE' }; }
+      },
+      'vat': {
+        id: 'vat',
+        name: '\uD83C\uDDEA\uD83C\uDDFA EU VIES VAT Check',
+        tool: 'verify_eu_vat',
+        method: 'POST',
+        endpoint: '/v1/entity/vat-verify',
+        price: '$0.002 USD',
+        summary: 'Real-time European Commission VIES VAT status validation across all 27 EU member states',
+        fields: [
+          { id: 'vatNumber', label: 'Full EU VAT Number (with country code prefix)', value: 'DE129274202', placeholder: 'e.g. DE129274202 or IE6388047V' }
+        ],
+        makeBody: function(f) { return { vatNumber: f.vatNumber }; }
+      },
+      'sanctions': {
+        id: 'sanctions',
+        name: '\uD83D\uDEE1\uFE0F OFAC Sanctions Screen',
+        tool: 'screen_sanctions',
+        method: 'POST',
+        endpoint: '/v1/entity/sanctions-screen',
+        price: '$0.002 USD',
+        summary: 'Screen individuals & companies against 26,650+ records from OFAC SDN, EU Financial Sanctions, and UN Security Council',
+        fields: [
+          { id: 'name', label: 'Entity or Individual Name', value: 'Sberbank', placeholder: 'e.g. Sberbank, Gazprom, or Wagner Group' },
+          { id: 'threshold', label: 'Trigram Similarity Threshold (0.0 to 1.0)', value: '0.75', placeholder: '0.75' }
+        ],
+        makeBody: function(f) { return { name: f.name, threshold: parseFloat(f.threshold) || 0.75 }; }
+      },
+      'kyb': {
+        id: 'kyb',
+        name: '\u26A1 1-Shot KYB Due Diligence',
+        tool: 'check_vendor',
+        method: 'POST',
+        endpoint: '/v1/compliance/check-vendor',
+        price: '$0.005 USD',
+        summary: 'Composite 1-shot KYB: concurrent entity resolution, live VIES VAT check, and OFAC/EU sanctions screening with verdict',
+        fields: [
+          { id: 'name', label: 'Vendor Legal Name', value: 'Siemens AG', placeholder: 'e.g. Siemens AG' },
+          { id: 'country', label: 'Country Code (ISO 2-letter)', value: 'DE', placeholder: 'e.g. DE, GB, US, CH, AU, SG' },
+          { id: 'vatNumber', label: 'EU VAT Number (Optional)', value: 'DE129274202', placeholder: 'e.g. DE129274202' }
+        ],
+        makeBody: function(f) {
+          var b = { name: f.name };
+          if (f.country) b.country = f.country;
+          if (f.vatNumber) b.vatNumber = f.vatNumber;
+          return b;
         }
-        const res = await fetch(ep, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(body)
+      },
+      'iban': {
+        id: 'iban',
+        name: '\uD83C\uDFE6 Bank Payee & IBAN Fraud Guard',
+        tool: 'verify_bank_payee',
+        method: 'POST',
+        endpoint: '/v1/compliance/verify-bank-payee',
+        price: '$0.002 USD',
+        summary: 'SEPA & international IBAN format, country length, MOD-97 checksum, and country mismatch verification',
+        fields: [
+          { id: 'iban', label: 'International Bank Account Number (IBAN)', value: 'DE89 3704 0044 0532 0130 00', placeholder: 'e.g. DE89 3704 0044 0532 0130 00' },
+          { id: 'expectedCountry', label: 'Expected Payee Country', value: 'DE', placeholder: 'DE' },
+          { id: 'payeeName', label: 'Payee Legal Name (Optional)', value: 'Siemens AG', placeholder: 'Siemens AG' }
+        ],
+        makeBody: function(f) {
+          var b = { iban: f.iban };
+          if (f.expectedCountry) b.expectedCountry = f.expectedCountry;
+          if (f.payeeName) b.payeeName = f.payeeName;
+          return b;
+        }
+      },
+      'batch': {
+        id: 'batch',
+        name: '\uD83D\uDCE6 Batch Entity Resolver',
+        tool: 'batch_resolve',
+        method: 'POST',
+        endpoint: '/v1/entity/batch-resolve',
+        price: '$0.010 USD',
+        summary: 'Concurrently resolve up to 25 corporate entities across national registries in a single round trip',
+        fields: [
+          {
+            id: 'itemsJson',
+            label: 'Entities to Resolve (JSON Array, 1-25 items)',
+            value: JSON.stringify([
+              { "query": "Rolls-Royce plc", "country": "GB" },
+              { "query": "Nestle SA", "country": "CH" },
+              { "query": "Grab Holdings", "country": "SG" }
+            ], null, 2),
+            isTextarea: true,
+            placeholder: '[{"query": "...", "country": "..."}]'
+          }
+        ],
+        makeBody: function(f) {
+          try {
+            var parsed = JSON.parse(f.itemsJson);
+            return { items: Array.isArray(parsed) ? parsed : [parsed] };
+          } catch (e) {
+            return { items: [{ query: f.itemsJson }] };
+          }
+        }
+      }
+    };
+
+    function initPlayground() {
+      var tabsContainer = document.getElementById('presetTabs');
+      tabsContainer.innerHTML = '';
+      Object.keys(PRESETS).forEach(function(key) {
+        var p = PRESETS[key];
+        var btn = document.createElement('button');
+        btn.className = 'tab-btn' + (key === currentPresetId ? ' active' : '');
+        btn.textContent = p.name;
+        btn.onclick = function() { setPreset(key); };
+        tabsContainer.appendChild(btn);
+      });
+      setPreset(currentPresetId);
+    }
+
+    function setPreset(id) {
+      currentPresetId = id;
+      var p = PRESETS[id];
+      if (!p) return;
+
+      // Update active tab styling
+      document.querySelectorAll('#presetTabs .tab-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.textContent.trim() === p.name.trim());
+      });
+
+      // Update info ribbon
+      document.getElementById('toolMethod').textContent = p.method;
+      document.getElementById('toolEndpoint').textContent = p.endpoint;
+      document.getElementById('toolMcpName').textContent = p.tool;
+      document.getElementById('toolPrice').textContent = p.price;
+      document.getElementById('toolSummary').textContent = p.summary;
+
+      // Render form fields
+      var fieldsContainer = document.getElementById('formFields');
+      fieldsContainer.innerHTML = '';
+      p.fields.forEach(function(f) {
+        var group = document.createElement('div');
+        group.className = 'form-group' + (f.isTextarea ? ' full-width' : '');
+        var label = document.createElement('label');
+        label.className = 'form-label';
+        label.textContent = f.label;
+        group.appendChild(label);
+
+        if (f.isTextarea) {
+          var textarea = document.createElement('textarea');
+          textarea.className = 'form-textarea';
+          textarea.id = 'field_' + f.id;
+          textarea.value = f.value;
+          textarea.placeholder = f.placeholder;
+          group.appendChild(textarea);
+        } else {
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-input';
+          input.id = 'field_' + f.id;
+          input.value = f.value;
+          input.placeholder = f.placeholder;
+          input.onkeydown = function(e) {
+            if (e.key === 'Enter') runPlayground();
+          };
+          group.appendChild(input);
+        }
+        fieldsContainer.appendChild(group);
+      });
+    }
+
+    function syntaxHighlight(json) {
+      if (typeof json !== 'string') {
+        json = JSON.stringify(json, null, 2);
+      }
+      json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return json.replace(/(".*?"(:)?|true|false|null|-?[0-9]+([.][0-9]+)?)/g, function (match) {
+        var cls = 'hl-number';
+        if (match.startsWith('"')) {
+          cls = match.endsWith(':') ? 'hl-key' : 'hl-string';
+        } else if (match === 'true' || match === 'false') {
+          cls = 'hl-bool';
+        } else if (match === 'null') {
+          cls = 'hl-null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+      });
+    }
+
+    async function runPlayground() {
+      var preset = PRESETS[currentPresetId];
+      if (!preset) return;
+      var btn = document.getElementById('btnRun');
+      var terminal = document.getElementById('playgroundTerminal');
+      var jsonBox = document.getElementById('jsonOutput');
+      var statusEl = document.getElementById('responseStatus');
+      var verdictEl = document.getElementById('verdictBanner');
+
+      var formValues = {};
+      preset.fields.forEach(function(f) {
+        var el = document.getElementById('field_' + f.id);
+        formValues[f.id] = el ? el.value.trim() : '';
+      });
+      var reqBody = preset.makeBody(formValues);
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Executing...';
+      terminal.style.display = 'block';
+      statusEl.textContent = 'Calling ' + preset.method + ' ' + preset.endpoint + '...';
+      verdictEl.style.display = 'none';
+      jsonBox.innerHTML = '<span style="color:#64748b;">// Awaiting live response from ' + preset.endpoint + '...</span>';
+
+      var startTime = performance.now();
+      try {
+        var res = await fetch(preset.endpoint, {
+          method: preset.method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Agent-Id': 'agentum-web-playground'
+          },
+          body: JSON.stringify(reqBody)
         });
-        const remaining = res.headers.get('X-Free-Tier-Remaining');
-        const rail = res.headers.get('X-Payment-Rail');
-        const data = await res.json();
-        box.textContent = JSON.stringify({
-          status: res.status,
-          paymentRail: rail,
-          freeTierRemainingToday: remaining,
-          response: data
-        }, null, 2);
+        var duration = Math.round(performance.now() - startTime);
+        var remaining = res.headers.get('X-Free-Tier-Remaining') || '5';
+        var rail = res.headers.get('X-Payment-Rail') || 'FREE';
+        var statusText = res.status + ' ' + (res.status === 200 ? 'OK' : res.status === 402 ? 'Payment Required' : 'Status');
+
+        var data;
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = { rawText: await res.text() };
+        }
+
+        lastResponseData = data;
+        statusEl.innerHTML = '<span class="status-badge status-' + (res.status === 200 ? '200' : 'err') + '">' + statusText + '</span> \u2022 <span>\u23F1 ' + duration + 'ms</span> \u2022 <span>Rail: <strong style="color:#38bdf8">' + rail + '</strong></span> \u2022 <span>Free Calls: <strong style="color:#4ade80">' + remaining + ' remaining today</strong></span>';
+
+        if (data.verdict) {
+          verdictEl.style.display = 'block';
+          var verdictClass = data.verdict === 'APPROVED' ? 'verdict-approved' : data.verdict === 'REJECTED' ? 'verdict-rejected' : 'verdict-review';
+          var verdictIcon = data.verdict === 'APPROVED' ? '\u2705' : data.verdict === 'REJECTED' ? '\u26D4' : '\u26A0\uFE0F';
+          verdictEl.className = 'verdict-banner ' + verdictClass;
+          verdictEl.innerHTML = '<strong>' + verdictIcon + ' KYB Verdict: ' + data.verdict + '</strong> &nbsp;|&nbsp; Risk Level: <strong>' + (data.riskLevel || 'N/A') + '</strong> &nbsp;|&nbsp; Sanctions: <strong>' + (data.sanctionsHit ? 'HIT DETECTED' : 'CLEAR') + '</strong> &nbsp;|&nbsp; VAT: <strong>' + (data.vatValid === true ? 'VALID' : data.vatValid === false ? 'INVALID' : 'N/A') + '</strong>';
+        } else if (data.valid !== undefined && preset.id === 'iban') {
+          verdictEl.style.display = 'block';
+          var ibanClass = data.valid && data.checksumValid ? 'verdict-approved' : 'verdict-rejected';
+          verdictEl.className = 'verdict-banner ' + ibanClass;
+          verdictEl.innerHTML = '<strong>' + (data.valid ? '\u2705 IBAN Valid' : '\u274C IBAN Invalid') + '</strong> &nbsp;|&nbsp; Country: <strong>' + data.countryCode + '</strong> &nbsp;|&nbsp; Checksum: <strong>' + (data.checksumValid ? 'VALID' : 'INVALID') + '</strong> &nbsp;|&nbsp; Country Match: <strong>' + (data.countryMatch === true ? 'MATCH' : data.countryMatch === false ? 'MISMATCH' : 'N/A') + '</strong>';
+        } else if (data.sanctioned !== undefined) {
+          verdictEl.style.display = 'block';
+          var sancClass = data.sanctioned ? 'verdict-rejected' : 'verdict-approved';
+          verdictEl.className = 'verdict-banner ' + sancClass;
+          verdictEl.innerHTML = '<strong>' + (data.sanctioned ? '\uD83D\uDEA8 SANCTIONS HIT' : '\u2705 SANCTIONS CLEAR') + '</strong> &nbsp;|&nbsp; Risk Level: <strong>' + data.riskLevel + '</strong> &nbsp;|&nbsp; Matched Lists: <strong>' + (data.matchedLists && data.matchedLists.length ? data.matchedLists.join(', ') : 'None') + '</strong>';
+        } else if (data.valid !== undefined && preset.id === 'vat') {
+          verdictEl.style.display = 'block';
+          var vatClass = data.valid ? 'verdict-approved' : 'verdict-rejected';
+          verdictEl.className = 'verdict-banner ' + vatClass;
+          verdictEl.innerHTML = '<strong>' + (data.valid ? '\u2705 EU VIES VAT VALID' : '\u274C VAT INVALID') + '</strong> &nbsp;|&nbsp; Country: <strong>' + data.countryCode + '</strong> &nbsp;|&nbsp; Number: <strong>' + data.vatNumber + '</strong>';
+        }
+
+        jsonBox.innerHTML = syntaxHighlight(data);
       } catch (err) {
-        box.textContent = 'Error: ' + err.message;
+        statusEl.innerHTML = '<span class="status-badge status-err">ERROR</span> \u2022 ' + err.message;
+        jsonBox.innerHTML = '<span style="color:#f87171;">Error executing request: ' + err.message + '</span>';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Run Execution \u2794';
       }
     }
+
+    function copyResponseJson(btn) {
+      if (!lastResponseData) return;
+      var text = JSON.stringify(lastResponseData, null, 2);
+      navigator.clipboard.writeText(text).then(function() {
+        var original = btn.innerHTML;
+        btn.innerHTML = '\u2713 Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.innerHTML = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    function copyCode(btn, elementId) {
+      var el = document.getElementById(elementId);
+      if (!el) return;
+      var text = el.innerText || el.textContent;
+      navigator.clipboard.writeText(text).then(function() {
+        var original = btn.innerHTML;
+        btn.innerHTML = '\u2713 Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.innerHTML = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(function() {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.innerHTML = '\u2713 Copied!';
+        setTimeout(function() { btn.innerHTML = 'Copy Snippet'; }, 2000);
+      });
+    }
+
+    function switchRecipe(recipeId) {
+      document.querySelectorAll('.recipe-tab').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.recipe-content').forEach(function(c) { c.style.display = 'none'; });
+      var activeTab = document.querySelector('.recipe-tab[data-recipe="' + recipeId + '"]');
+      if (activeTab) activeTab.classList.add('active');
+      var target = document.getElementById('recipe-' + recipeId);
+      if (target) target.style.display = 'block';
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', initPlayground);
   </script>
-
-  <h2>Quick Connect &amp; Integration Examples</h2>
-  <div class="grid-2">
-    <div class="card">
-      <p><strong>Claude Code &amp; Desktop (MCP):</strong></p>
-      <pre><code>claude mcp add --transport http agentum ${config.publicBaseUrl}/mcp
-
-# Or via zero-config stdio npm bridge:
-npx -y agentum-mcp</code></pre>
-    </div>
-    <div class="card">
-      <p><strong>LangChain (TypeScript &amp; JavaScript):</strong></p>
-      <pre><code>import { AgentumToolkit } from "agentum-langchain";
-
-const toolkit = new AgentumToolkit({
-  baseUrl: "${config.publicBaseUrl}"
-});
-const tools = toolkit.getTools();</code></pre>
-    </div>
-    <div class="card">
-      <p><strong>LangChain / CrewAI (Python):</strong></p>
-      <pre><code># pip install agentum-langchain langchain
-from agentum_langchain import AgentumToolkit
-
-toolkit = AgentumToolkit(base_url="${config.publicBaseUrl}")
-agent_tools = toolkit.get_tools()</code></pre>
-    </div>
-    <div class="card">
-      <p><strong>Vercel AI SDK / OpenAI Functions:</strong></p>
-      <pre><code>import { agentumTools } from "agentum-langchain/ai-sdk";
-
-const { resolve_entity, verify_eu_vat } = agentumTools({
-  baseUrl: "${config.publicBaseUrl}"
-});</code></pre>
-    </div>
-  </div>
-
-  <h2>Machine &amp; Agent Discovery Coordinates</h2>
-  <div class="card">
-    <ul>
-      <li><a href="${config.publicBaseUrl}/mcp"><strong>Streamable HTTP MCP Server:</strong> <code>${config.publicBaseUrl}/mcp</code></a></li>
-      <li><a href="${config.publicBaseUrl}/.well-known/mcp.json"><strong>MCP Discovery Manifest:</strong> <code>/.well-known/mcp.json</code></a></li>
-      <li><a href="${config.publicBaseUrl}/.well-known/mcp/server-card"><strong>MCP Server Card:</strong> <code>/.well-known/mcp/server-card</code></a></li>
-      <li><a href="${config.publicBaseUrl}/openapi.json"><strong>OpenAPI 3.1 Spec:</strong> <code>/openapi.json</code></a></li>
-      <li><a href="${config.publicBaseUrl}/.well-known/ai-plugin.json"><strong>OpenAI Actions &amp; Plugins:</strong> <code>/.well-known/ai-plugin.json</code></a></li>
-      <li><a href="${config.publicBaseUrl}/.well-known/agent.json"><strong>A2A Agent Card:</strong> <code>/.well-known/agent.json</code></a></li>
-      <li><a href="${config.publicBaseUrl}/.well-known/x402.json"><strong>Coinbase x402 Bazaar (Base USDC):</strong> <code>/.well-known/x402.json</code></a></li>
-      <li><a href="${config.publicBaseUrl}/.well-known/mpp.json"><strong>Stripe / Tempo MPP Manifest:</strong> <code>/.well-known/mpp.json</code></a></li>
-      <li><a href="${config.publicBaseUrl}/llms.txt"><strong>LLMs.txt Discovery:</strong> <code>/llms.txt</code></a> &amp; <a href="${config.publicBaseUrl}/llms-full.txt"><code>/llms-full.txt</code></a></li>
-      <li><a href="${config.publicBaseUrl}/sitemap.xml"><strong>XML Sitemap:</strong> <code>/sitemap.xml</code></a></li>
-      <li><a href="https://github.com/Algiras/agentum-skills"><strong>GitHub Skills &amp; Manifests:</strong> <code>Algiras/agentum-skills</code></a></li>
-    </ul>
-  </div>
-
-  <h2>Supported Jurisdictions &amp; Primary Data Sources</h2>
-  <div class="card">
-    <ul>
-      <li><strong>\uD83C\uDDEC\uD83C\uDDE7 UK Companies House:</strong> Real-time lookup of English, Welsh, Scottish, and Northern Irish company registration numbers (CRN) and canonical legal names.</li>
-      <li><strong>\uD83C\uDDE8\uD83C\uDDED Swiss Federal Commercial Registry (ZEFIX):</strong> Cantonal commercial registers, legal seats, and Unique Enterprise Identifiers (UID / CHE).</li>
-      <li><strong>\uD83C\uDDE6\uD83C\uDDFA Australian Business Register (ABR):</strong> Australian Business Numbers (ABN) and Australian Company Numbers (ACN) lookup.</li>
-      <li><strong>\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA:</strong> Accounting and Corporate Regulatory Authority Unique Entity Numbers (UEN) and entity records.</li>
-      <li><strong>\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR:</strong> Central Index Key (CIK), Employer Identification Number (EIN), and public equity tickers.</li>
-      <li><strong>\uD83C\uDF10 GLEIF Worldwide:</strong> Global Legal Entity Identifier (LEI) worldwide verification across 200+ countries.</li>
-      <li><strong>\uD83C\uDDF1\uD83C\uDDF9 Lithuania Registr\u0173 centras (JAR):</strong> Legal entity code (JAR) and company register.</li>
-      <li><strong>\uD83C\uDDEA\uD83C\uDDFA European Commission VIES:</strong> Real-time VAT validity cross-check across all 27 EU member states.</li>
-      <li><strong>\uD83D\uDEE1\uFE0F Consolidated Sanctions:</strong> Real-time screening against US Treasury OFAC SDN, European Union Financial Sanctions (EEAS), and UN Security Council Consolidated List (26,650+ records).</li>
-    </ul>
-  </div>
 </body>
 </html>`;
       return c.html(html);

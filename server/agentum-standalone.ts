@@ -3843,7 +3843,7 @@ class EntityApplicationService {
           vatOwnershipConfirmed = true;
           auditTrail.push(`      \u2713 VAT Ownership Confirmed: Entity record contains registered VAT '${inputVat}'`);
         } else if (vatRes.linkedEntity) {
-          const isSameEntity = vatRes.linkedEntity.id === entity.id || vatRes.linkedEntity.jurisdiction === entity.jurisdiction && vatRes.linkedEntity.primaryIdValue === entity.primaryIdValue;
+          const isSameEntity = Boolean(entity.id) && vatRes.linkedEntity.id === entity.id || vatRes.linkedEntity.jurisdiction === entity.jurisdiction && vatRes.linkedEntity.primaryIdType === entity.primaryIdType && vatRes.linkedEntity.primaryIdValue === entity.primaryIdValue;
           if (isSameEntity) {
             vatOwnershipConfirmed = true;
             auditTrail.push(`      \u2713 VAT Ownership Confirmed: Linked entity matches resolved entity (${entity.canonicalName})`);
@@ -3919,6 +3919,10 @@ class EntityApplicationService {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "HIGH_RISK";
       auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number was rejected or unconfirmed by VIES`);
+    } else if (vatValid === true && !vatOwnershipConfirmed) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: VAT registration is valid, but ownership by this vendor is unconfirmed.`);
     } else if (!entityRes.resolved || entityRes.confidence < 0.7) {
       verdict = "FLAGGED_FOR_REVIEW";
       riskLevel = "MEDIUM_RISK";
@@ -13355,6 +13359,10 @@ async function evaluateDual402Gate(opts) {
       mppChallengeId: mppCh.payload.id ?? ""
     };
   };
+  const hasPayment = normalizedHeaders["payment-signature"] || normalizedHeaders["x-payment"] || opts.metaPayment?.x402 || opts.metaPayment?.mpp || normalizedHeaders.authorization?.trim().toLowerCase().startsWith("payment ");
+  if (hasPayment && opts.config.nodeEnv === "production" && opts.config.paymentMode === "live" && (!opts.config.redisUrl || !opts.config.featureReplayProtection)) {
+    return { allowed: false, challenge: buildChallenge(), error: "Live production payments require shared replay protection" };
+  }
   const x402Cred = normalizedHeaders["payment-signature"] ?? normalizedHeaders["x-payment"] ?? opts.metaPayment?.x402;
   if (x402Cred) {
     let identity = x402Cred.trim();
@@ -13988,6 +13996,7 @@ function mountMcpHttpAdapter(app, deps) {
     });
   });
   app.post("/mcp", async (c) => {
+    const remoteAddress = typeof c.env === "object" && c.env !== null && "remoteAddress" in c.env && typeof c.env.remoteAddress === "string" ? c.env.remoteAddress : undefined;
     const incomingSessionId = c.req.header("mcp-session-id") ?? crypto5.randomUUID();
     c.header("Mcp-Session-Id", incomingSessionId);
     let rawPayload;
@@ -14344,7 +14353,7 @@ function mountMcpHttpAdapter(app, deps) {
           const query = decodeURIComponent(cleanPath);
           const resolveTool = deps.registry.getByMcpName("resolve_entity");
           if (resolveTool) {
-            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
+            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: remoteAddress });
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
@@ -14419,7 +14428,7 @@ function mountMcpHttpAdapter(app, deps) {
           const vatNumber = decodeURIComponent(uri.slice("agentum://vat/".length));
           const vatTool = deps.registry.getByMcpName("verify_eu_vat");
           if (vatTool) {
-            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
+            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: remoteAddress });
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
@@ -14482,7 +14491,7 @@ function mountMcpHttpAdapter(app, deps) {
           const name = decodeURIComponent(uri.slice("agentum://sanctions/".length));
           const sanctionsTool = deps.registry.getByMcpName("screen_sanctions");
           if (sanctionsTool) {
-            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
+            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: remoteAddress });
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
@@ -14745,7 +14754,7 @@ function mountMcpHttpAdapter(app, deps) {
             }
           };
         }
-        const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
+        const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: remoteAddress });
         const argsObj = rpc.params?.arguments && typeof rpc.params.arguments === "object" ? rpc.params.arguments : {};
         const metaObj = rpc.params?._meta && typeof rpc.params._meta === "object" ? rpc.params._meta : {};
         const meta = {
@@ -15726,7 +15735,8 @@ class HybridPostgresSanctionsRepositoryAdapter {
           await db.unsafe(sanctionsEntriesTable.createSql);
           await db.unsafe(syncRunsTable.createSql);
           this.sql = db;
-        } catch {
+        } catch (err) {
+          console.error("[sanctions:db] ensureDb failed:", err);
           this.sql = null;
         }
       })();
@@ -16443,6 +16453,10 @@ class MppPaymentAdapter {
             rail: "MPP",
             error: `Stripe PaymentIntent amount ${piData.amount} cents is less than required ${minCents} cents`
           };
+        }
+        const expectedResource = new URL(ctx.resource, this.config.publicBaseUrl).pathname;
+        if (piData.metadata?.agentum_resource !== expectedResource) {
+          return { verified: false, rail: "MPP", error: "Stripe PaymentIntent is not bound to this Agentum resource" };
         }
         const receipt = {
           status: "succeeded",

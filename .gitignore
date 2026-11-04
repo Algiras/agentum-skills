@@ -1,5 +1,37 @@
-
-dist/
-*.zip
-.DS_Store
+# Dependencies
 node_modules/
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Build & package artifacts
+dist/
+build/
+*.zip
+*.tar.gz
+*.tsbuildinfo
+.DS_Store
+*.log
+tmp/
+temp/
+
+# AI & IDE metadata
+.superpowers/
+.superpowers
+.claude/
+.claude
+.gemini/
+.gemini
+.cursor/
+.cursor
+.idea/
+.vscode/
+
+# Worktrees
+.worktrees/
+worktrees/

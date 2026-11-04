@@ -42,9 +42,10 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
   };
 
   try {
-    const signal = typeof AbortSignal !== "undefined" && AbortSignal.timeout
-      ? AbortSignal.timeout(10000)
-      : undefined;
+    const getSignal = () =>
+      typeof AbortSignal !== "undefined" && AbortSignal.timeout
+        ? AbortSignal.timeout(10000)
+        : undefined;
 
     // 1. Get ETH balance
     const ethPayload = {
@@ -58,7 +59,7 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(ethPayload),
-      signal,
+      signal: getSignal(),
     });
 
     if (!ethRes.ok) {
@@ -93,7 +94,7 @@ async function checkBalances(address, networkConfig, fetchImpl = fetch) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(usdcPayload),
-        signal,
+        signal: getSignal(),
       });
 
       if (!usdcRes.ok) {

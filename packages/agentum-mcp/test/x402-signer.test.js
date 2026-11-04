@@ -52,7 +52,7 @@ test("parse402Challenge parses challenge from MCP result._meta.paymentRequired b
   assert.equal(parsed.payTo, "0x000000000000000000000000000000000000dEaD");
 });
 
-test("buildSignedX402Payload constructs cryptographically valid signed x402 header", () => {
+test("buildSignedX402Payload constructs cryptographically valid signed x402 header", async () => {
   const challenge = {
     x402Version: 2,
     scheme: "exact",
@@ -60,12 +60,31 @@ test("buildSignedX402Payload constructs cryptographically valid signed x402 head
     amount: "5000",
     asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     payTo: "0x000000000000000000000000000000000000dEaD",
+    maxTimeoutSeconds: 300,
   };
   const privKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-  const b64 = buildSignedX402Payload(challenge, privKey, "eip155:8453");
+  const b64 = await buildSignedX402Payload(challenge, privKey, "eip155:8453");
   const decoded = JSON.parse(Buffer.from(b64, "base64").toString("utf-8"));
   assert.equal(decoded.x402Version, 2);
   assert.equal(decoded.payer.toLowerCase(), "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");
   assert.ok(decoded.signature.startsWith("0x"));
   assert.equal(decoded.signature.length, 132);
+  assert.ok(decoded.payload.authorization);
+  assert.equal(decoded.payload.authorization.from.toLowerCase(), "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266");
+});
+
+test("buildSignedX402Payload throws when challenge amount exceeds safety cap", async () => {
+  const challenge = {
+    x402Version: 2,
+    scheme: "exact",
+    network: "eip155:8453",
+    amount: "1000000", // 1.00 USDC > 0.05 USDC cap
+    asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    payTo: "0x000000000000000000000000000000000000dEaD",
+  };
+  const privKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+  await assert.rejects(
+    async () => await buildSignedX402Payload(challenge, privKey, "eip155:8453"),
+    /exceeds safety cap/
+  );
 });

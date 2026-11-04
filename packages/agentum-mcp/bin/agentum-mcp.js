@@ -294,7 +294,7 @@ function startBridge() {
         if (challenge && config.privateKey) {
           log(`Payment challenge received on ${challenge.network}. Signing autonomous x402 micropayment...`);
           try {
-            const signedB64 = buildSignedX402Payload(challenge, config.privateKey, config.network);
+            const signedB64 = await buildSignedX402Payload(challenge, config.privateKey, config.network);
             headers["X-PAYMENT"] = signedB64;
             headers["PAYMENT-SIGNATURE"] = signedB64;
 

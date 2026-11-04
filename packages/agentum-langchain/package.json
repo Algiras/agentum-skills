@@ -1,0 +1,57 @@
+{
+  "name": "agentum-langchain",
+  "version": "0.1.0",
+  "description": "Official LangChain & AI Frameworks toolkit for Agentum: Deterministic Global Corporate Entity Resolution, EU VIES VAT, and OFAC/EU/UN Sanctions screening with autonomous x402 micropayments.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "keywords": [
+    "langchain",
+    "langchain-tools",
+    "agentum",
+    "entity-resolution",
+    "kyb",
+    "compliance",
+    "sanctions",
+    "ofac",
+    "vies-vat",
+    "lei",
+    "x402",
+    "ai-agents"
+  ],
+  "author": "Algimantas Krasauskas / Agentum Network <compliance@asimplek.cloud>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Algiras/agentum-skills.git"
+  },
+  "homepage": "https://agentum.asimplek.cloud",
+  "peerDependencies": {
+    "@langchain/core": ">=0.3.0 <2.0.0",
+    "zod": ">=3.24.0 <5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@x402/core": "~2.28.0",
+    "@x402/evm": "~2.28.0",
+    "@x402/fetch": "~2.28.0",
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "@langchain/core": "^1.2.20",
+    "typescript": "^5.7.3",
+    "zod": "^3.24.2"
+  }
+}

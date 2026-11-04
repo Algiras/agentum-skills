@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.algiras/agentum-entity-resolver",
-  "description": "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+  "name": "io.github.Algiras/agentum-entity-resolver",
+  "description": "Corporate entity resolution, VAT verification and sanctions screening via Agentum.",
   "status": "active",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/Algiras/agentum-skills",
     "source": "github"
   },
   "remotes": [
     {
-      "transport_type": "streamable-http",
-      "url": "https://agentum.asimplek.cloud/mcp"
+      "url": "https://agentum.asimplek.cloud/mcp",
+      "type": "streamable-http"
     }
   ]
 }

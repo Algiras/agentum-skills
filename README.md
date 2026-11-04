@@ -76,9 +76,12 @@ Every caller receives **5 free calls per day** automatically (tracked by `X-Agen
 
 | Tool (MCP) | HTTP Endpoint | Free Tier | Price | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `resolve_entity` | `POST /v1/entity/resolve` | 5 calls/day | `$0.005` | Resolve EU/US company by LEI, EU VAT, US CIK/EIN, LT JAR code, domain, or fuzzy legal name |
+| `resolve_entity` | `POST /v1/entity/resolve` | 5 calls/day | `$0.005` | Resolve company worldwide by LEI, VAT, CIK/EIN, UK CRN, CH UID, AU ABN/ACN, SG UEN, domain, or fuzzy legal name |
 | `verify_eu_vat` | `POST /v1/entity/vat-verify` | 5 calls/day | `$0.002` | Live European Commission VIES VAT validation + entity cross-reference |
 | `screen_sanctions` | `POST /v1/entity/sanctions-screen` | 5 calls/day | `$0.002` | Screen against 26,650+ OFAC SDN, EU Financial Sanctions & UN SC targets (homoglyph & trigram resistant) |
+| `check_vendor` | `POST /v1/compliance/check-vendor` | 5 calls/day | `$0.010` | 1-shot KYB due diligence returning APPROVED, FLAGGED_FOR_REVIEW, or REJECTED with multi-factor audit trail |
+| `verify_bank_payee` | `POST /v1/compliance/verify-bank-payee` | 5 calls/day | `$0.003` | ISO-13616 Mod-97 IBAN checksum validation and country alignment check |
+| `batch_resolve` | `POST /v1/entity/batch-resolve` | 5 calls/day | `$0.025` | Concurrently resolve multiple companies across national registries in one call |
 
 ---
 

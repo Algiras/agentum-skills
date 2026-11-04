@@ -39,6 +39,10 @@ jobs:
             }
           '
 
+      - name: Install MCP dependencies
+        run: |
+          cd packages/agentum-mcp && npm install
+
       - name: Test agentum-mcp CLI binary
         run: |
           node packages/agentum-mcp/bin/agentum-mcp.js --version

@@ -13315,7 +13315,11 @@ var globalTelemetry = new RailwayTelemetryTracker;
 
 // src/adapters/inbound/http/dual-402.middleware.ts
 import crypto3 from "crypto";
-function computeCallerFingerprint(headers) {
+function computeCallerFingerprint(headers, connection) {
+  if (connection?.production) {
+    const identity = connection.address || "anonymous-no-transport-address";
+    return crypto3.createHash("sha256").update(identity).digest("hex");
+  }
   const normalized = {};
   for (const [key, value] of Object.entries(headers)) {
     if (value !== undefined) {
@@ -13445,7 +13449,10 @@ function createDual402Middleware(opts) {
         }
       }
     }
-    const fingerprint = computeCallerFingerprint(headers);
+    const fingerprint = computeCallerFingerprint(headers, {
+      production: opts.config.nodeEnv === "production",
+      address: c.env?.remoteAddress
+    });
     const resource = c.req.url;
     const gate = await evaluateDual402Gate({
       config: opts.config,
@@ -14337,7 +14344,7 @@ function mountMcpHttpAdapter(app, deps) {
           const query = decodeURIComponent(cleanPath);
           const resolveTool = deps.registry.getByMcpName("resolve_entity");
           if (resolveTool) {
-            const fingerprint = computeCallerFingerprint(rawHeaders);
+            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
@@ -14412,7 +14419,7 @@ function mountMcpHttpAdapter(app, deps) {
           const vatNumber = decodeURIComponent(uri.slice("agentum://vat/".length));
           const vatTool = deps.registry.getByMcpName("verify_eu_vat");
           if (vatTool) {
-            const fingerprint = computeCallerFingerprint(rawHeaders);
+            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
@@ -14475,7 +14482,7 @@ function mountMcpHttpAdapter(app, deps) {
           const name = decodeURIComponent(uri.slice("agentum://sanctions/".length));
           const sanctionsTool = deps.registry.getByMcpName("screen_sanctions");
           if (sanctionsTool) {
-            const fingerprint = computeCallerFingerprint(rawHeaders);
+            const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
             const gate = await evaluateDual402Gate({
               config: deps.config,
               cacheStore: deps.cacheStore,
@@ -14738,7 +14745,7 @@ function mountMcpHttpAdapter(app, deps) {
             }
           };
         }
-        const fingerprint = computeCallerFingerprint(rawHeaders);
+        const fingerprint = computeCallerFingerprint(rawHeaders, { production: deps.config.nodeEnv === "production", address: c.env?.remoteAddress });
         const argsObj = rpc.params?.arguments && typeof rpc.params.arguments === "object" ? rpc.params.arguments : {};
         const metaObj = rpc.params?._meta && typeof rpc.params._meta === "object" ? rpc.params._meta : {};
         const meta = {
@@ -15729,6 +15736,8 @@ class HybridPostgresSanctionsRepositoryAdapter {
   }
   async recordFeedSync(status) {
     await this.fallback.recordFeedSync(status);
+    if (!this.databaseUrl)
+      return;
     const db = await this.ensureDb();
     if (!db)
       throw new Error("Cannot persist sanctions feed status: PostgreSQL unavailable");
@@ -15853,6 +15862,8 @@ class HybridPostgresSanctionsRepositoryAdapter {
   }
   async upsertMany(entries) {
     await this.fallback.upsertMany(entries);
+    if (!this.databaseUrl)
+      return entries.length;
     const db = await this.ensureDb();
     if (!db)
       throw new Error("Cannot persist sanctions data: PostgreSQL unavailable");
@@ -18640,7 +18651,9 @@ console.log(`[agentum] starting serviceRole=${config3.serviceRole} resolverMode=
 var src_default = {
   port: config3.port,
   hostname: "0.0.0.0",
-  fetch: app.fetch
+  fetch(request, server) {
+    return app.fetch(request, { remoteAddress: server.requestIP(request)?.address });
+  }
 };
 export {
   src_default as default

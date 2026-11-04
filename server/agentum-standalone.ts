@@ -18666,7 +18666,8 @@ var src_default = {
   port: config3.port,
   hostname: "0.0.0.0",
   fetch(request, server) {
-    return app.fetch(request, { remoteAddress: server.requestIP(request)?.address });
+    const remoteAddress = server && typeof server.requestIP === "function" ? server.requestIP(request)?.address : undefined;
+    return app.fetch(request, { remoteAddress });
   }
 };
 export {

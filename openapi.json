@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Agentum EU & US Entity Resolver API",
-    "version": "0.1.0",
-    "description": "Deterministic EU & US corporate entity resolution, EU VIES VAT validation, and OFAC/EU sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
+    "title": "Agentum Global Entity Resolver API",
+    "version": "0.2.0",
+    "description": "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
   },
   "servers": [
     {
@@ -14,8 +14,8 @@
     "/v1/entity/resolve": {
       "post": {
         "operationId": "resolve_entity",
-        "summary": "Resolve legal entity by identifier or name",
-        "description": "Resolves companies and organizations across global registers (GLEIF, EU VAT, SEC EDGAR, State Registrars) with optional sanctions screening and live VAT verification.",
+        "summary": "Deterministic Global Corporate Entity & Registry Resolver",
+        "description": "Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK, EU-27, Switzerland, Australia, Singapore, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.",
         "tags": [
           "entity"
         ],
@@ -48,10 +48,14 @@
                   "query": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Company name, LEI, EU VAT, LT JAR code, US CIK/EIN, or domain"
+                    "description": "Company name, domain, or registration number (LEI, CIK, EIN, UK Company No, Swiss UID, ABN/ACN, UEN, JAR, VAT)"
                   },
                   "jurisdiction": {
-                    "description": "Optional ISO country or region filter (e.g. 'EU', 'US', 'LT', 'DE')",
+                    "description": "Optional 2-letter ISO country code (e.g. GB, CH, AU, SG, US, LT, DE) or auto-detected",
+                    "type": "string"
+                  },
+                  "country": {
+                    "description": "Alias for jurisdiction",
                     "type": "string"
                   },
                   "verifyVat": {
@@ -97,6 +101,11 @@
                         "LT_JAR",
                         "US_CIK",
                         "US_EIN",
+                        "UK_CRN",
+                        "CH_UID",
+                        "AU_ABN",
+                        "AU_ACN",
+                        "SG_UEN",
                         "DOMAIN",
                         "NAME"
                       ]

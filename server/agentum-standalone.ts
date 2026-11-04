@@ -13587,6 +13587,7 @@ if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
 console.log(`[agentum] starting serviceRole=${config3.serviceRole} resolverMode=${config3.resolverMode} port=${config3.port}`);
 var src_default = {
   port: config3.port,
+  hostname: "0.0.0.0",
   fetch: app.fetch
 };
 export {

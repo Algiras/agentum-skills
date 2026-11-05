@@ -65,6 +65,7 @@ jobs:
       - name: Check public release status
         continue-on-error: true
         run: |
+          npm view agentum-mcp version --registry=https://registry.npmjs.org
           npm view agentum-langchain version --registry=https://registry.npmjs.org
           npm view agentum-langchain@0.3.0 version --registry=https://registry.npmjs.org || true
           curl --connect-timeout 10 --max-time 20 --fail --silent --show-error https://agentum.asimplek.cloud/health

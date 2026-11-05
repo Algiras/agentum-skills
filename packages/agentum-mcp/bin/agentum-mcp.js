@@ -15,7 +15,7 @@ const { loadConfig, saveConfig, getEffectiveAgentId, resolveNetwork, NETWORKS } 
 const { generateWallet, importWallet, checkBalances } = require("../lib/wallet.js");
 const { parse402Challenge, buildSignedX402Payload } = require("../lib/x402-signer.js");
 
-const PKG_VERSION = "0.2.1";
+const PKG_VERSION = require("../package.json").version;
 const DEFAULT_ENDPOINT = "https://agentum.asimplek.cloud/mcp";
 
 const args = process.argv.slice(2);

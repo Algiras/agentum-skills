@@ -30,7 +30,10 @@ jobs:
               ".claude-plugin/marketplace.json",
               ".cursor-plugin/plugin.json",
               "gemini-extension.json",
-              "packages/agentum-mcp/package.json"
+              "packages/agentum-mcp/package.json",
+              "packages/agentum-langchain/package.json",
+              "packages/agentum-agentkit/package.json",
+              "packages/agentum-x402-guard/package.json"
             ];
             for (const f of files) {
               const content = require("fs").readFileSync(f, "utf8");
@@ -59,6 +62,28 @@ jobs:
           npm run build
           npm pack --dry-run
 
+      - name: No private registry URLs in new package lockfiles
+        run: |
+          if grep -l "npm.dev.wixpress.com" packages/agentum-agentkit/*lock* packages/agentum-x402-guard/*lock* 2>/dev/null; then
+            echo "::error::Private registry URL found in a lockfile"; exit 1
+          fi
+
+      - name: Install, build and test AgentKit action provider
+        working-directory: packages/agentum-agentkit
+        run: |
+          npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
+          npm run build
+          bun test
+          npm pack --dry-run
+
+      - name: Install, build and test x402 guard
+        working-directory: packages/agentum-x402-guard
+        run: |
+          npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
+          npm run build
+          bun test
+          npm pack --dry-run
+
       - name: Check standalone bundle syntax
         run: bun build server/agentum-standalone.ts --target=bun --outfile=/tmp/agentum-standalone-check.js
 
@@ -68,4 +93,6 @@ jobs:
           npm view agentum-mcp version --registry=https://registry.npmjs.org
           npm view agentum-langchain version --registry=https://registry.npmjs.org
           npm view agentum-langchain@0.3.0 version --registry=https://registry.npmjs.org || true
+          npm view agentum-agentkit version --registry=https://registry.npmjs.org || true
+          npm view agentum-x402-guard version --registry=https://registry.npmjs.org || true
           curl --connect-timeout 10 --max-time 20 --fail --silent --show-error https://agentum.asimplek.cloud/health

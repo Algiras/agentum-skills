@@ -1,0 +1,40 @@
+{
+  "name": "agentum-x402-guard",
+  "version": "0.1.0",
+  "description": "Pre-payment OFAC address guard for x402 clients: screens the payTo address via Agentum before your agent signs a payment and aborts on an exact sanctions match.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "keywords": [
+    "x402",
+    "guard",
+    "ofac",
+    "sanctions",
+    "address-screening",
+    "wallet-agent",
+    "agentum",
+    "compliance",
+    "usdc",
+    "ai-agents"
+  ],
+  "author": "Algimantas Krasauskas / Agentum Network <compliance@asimplek.cloud>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Algiras/agentum-skills.git",
+    "directory": "packages/agentum-x402-guard"
+  },
+  "homepage": "https://agentum.asimplek.cloud",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}

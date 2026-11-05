@@ -13,10 +13,17 @@ on:
         options:
           - agentum-mcp
           - agentum-langchain
+          - agentum-x402-guard
+          - agentum-agentkit
       tag:
         description: "NPM dist-tag (e.g. latest, beta)"
         required: false
         default: "latest"
+      dry_run:
+        description: "agentum-x402-guard / agentum-agentkit only: build and test but do not publish"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -106,5 +113,52 @@ jobs:
         if: steps.npm-check.outputs.publish == 'true'
         working-directory: packages/agentum-langchain
         run: npm publish --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-integration-packages:
+    # Manual only. Defaults to a dry run; set dry_run=false to publish for real.
+    if: github.event_name == 'workflow_dispatch' && (inputs.package == 'agentum-x402-guard' || inputs.package == 'agentum-agentkit')
+    runs-on: ubuntu-latest
+    env:
+      PKG: ${{ inputs.package }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      DIST_TAG: ${{ inputs.tag || 'latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+      - name: Refuse a version that is already on npm
+        run: |
+          NAME=$(node -p "require('./packages/$PKG/package.json').name")
+          VERSION=$(node -p "require('./packages/$PKG/package.json').version")
+          echo "Package: $NAME@$VERSION (tag: $DIST_TAG, dry run: $DRY_RUN)"
+          if npm view "$NAME@$VERSION" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "::error::$NAME@$VERSION is already published. Bump the version in package.json first."
+            exit 1
+          fi
+      - name: Install AgentKit (the guard's end-to-end tests use its x402 client)
+        if: inputs.package == 'agentum-x402-guard'
+        working-directory: packages/agentum-agentkit
+        run: npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
+      - name: Install, build and test
+        working-directory: packages/${{ inputs.package }}
+        run: |
+          npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
+          npm run build
+          bun test
+          npm pack --dry-run
+      - name: Publish
+        working-directory: packages/${{ inputs.package }}
+        run: |
+          if [ "$DRY_RUN" = "false" ]; then
+            npm publish --access public --tag "$DIST_TAG"
+          else
+            echo "Dry run: not publishing."
+            npm publish --access public --tag "$DIST_TAG" --dry-run
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

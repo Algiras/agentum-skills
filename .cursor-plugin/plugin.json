@@ -1,6 +1,6 @@
 {
   "name": "agentum-entity-resolver",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Deterministic Global Corporate Entity (UK, Switzerland, Australia, Singapore, US, EU, LEI), EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with x402 v2 and Stripe/Tempo MPP micropayments.",
   "skills": ["./skills/entity-compliance-resolver/SKILL.md"],
   "mcpServers": {

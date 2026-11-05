@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Agentum Global Entity Resolver API",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
   },
   "servers": [

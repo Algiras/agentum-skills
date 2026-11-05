@@ -2096,33 +2096,6 @@ function normalizeCountryCode(code) {
   return COUNTRY_ALIASES[upper] || upper;
 }
 
-// src/domain/entity-identifier.ts
-function matchesEntityIdentifier(entity, query) {
-  const clean = (value) => value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  const equal = (value) => Boolean(value && clean(value) === clean(query.cleanedValue));
-  const primary = entity.primaryIdType === query.type && equal(entity.primaryIdValue);
-  switch (query.type) {
-    case "LEI":
-      return primary || equal(entity.lei);
-    case "EU_VAT":
-      return primary || equal(entity.vatNumber);
-    case "US_EIN":
-      return primary || equal(entity.taxId);
-    case "US_CIK": {
-      const cik = entity.cik ?? (entity.primaryIdType === "US_CIK" ? entity.primaryIdValue : null);
-      return Boolean(cik && cik.replace(/^0+/, "") === query.cleanedValue.replace(/^0+/, ""));
-    }
-    case "DOMAIN": {
-      const domain = (value) => value.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-      return entity.domains.some((value) => domain(value) === domain(query.cleanedValue));
-    }
-    case "NAME":
-      return false;
-    default:
-      return primary || equal(entity.registrationNumber) || query.type === "NATIONAL_ID" && equal(entity.taxId);
-  }
-}
-
 // src/domain/identifiers/checksums.ts
 function luhn(digits) {
   const clean = digits.replace(/\D/g, "");
@@ -2295,6 +2268,7 @@ function fiYtunnusChecksum(cleanRaw) {
 var cleanDigits = (raw) => raw.replace(/\D/g, "");
 var cleanAlphaNum = (raw) => raw.toUpperCase().replace(/[\s-]/g, "");
 var NATIONAL_ID_SCHEMES = [
+  { scheme: "LV_REGCODE", country: "LV", kind: "COMPANY", pattern: /^\d{11}$/, normalize: cleanDigits },
   {
     scheme: "FR_SIREN",
     country: "FR",
@@ -2528,18 +2502,22 @@ function validateNationalId(raw, country) {
     return null;
   const iso2 = normalizeCountryCode(country);
   const candidates = NATIONAL_ID_SCHEMES.filter((s) => s.country === iso2);
+  let invalid = null;
   for (const validator of candidates) {
     const cleaned = validator.normalize(raw);
     if (validator.pattern.test(cleaned)) {
       const valid = validator.checksum ? validator.checksum(cleaned) : true;
-      return {
+      const result = {
         scheme: validator.scheme,
         valid,
         cleaned
       };
+      if (valid)
+        return result;
+      invalid ??= result;
     }
   }
-  return null;
+  return invalid;
 }
 function detectSchemes(raw, countryHint) {
   if (!raw)
@@ -2561,6 +2539,89 @@ function detectSchemes(raw, countryHint) {
     }
   }
   return matches;
+}
+
+// src/domain/entity-identifier.ts
+function registrationKey(record) {
+  if (!record.registrationNumber)
+    return null;
+  const country = normalizeCountryCode(record.jurisdiction);
+  const matches = NATIONAL_ID_SCHEMES.filter((s) => {
+    if (s.country !== country || s.kind === "TAX")
+      return false;
+    const id = s.normalize(record.registrationNumber);
+    return s.pattern.test(id) && (!s.checksum || s.checksum(id));
+  });
+  if (matches.length !== 1)
+    return null;
+  const scheme = matches[0];
+  return `${country}:${scheme.scheme}:${scheme.normalize(record.registrationNumber)}`;
+}
+function coalesceRegistryRecords(records) {
+  const result = [];
+  const primaryKeys = new Set;
+  for (const record of records) {
+    const primaryKey = `${record.jurisdiction}:${record.primaryIdType}:${record.primaryIdValue}`;
+    if (primaryKeys.has(primaryKey))
+      continue;
+    primaryKeys.add(primaryKey);
+    const key = registrationKey(record);
+    const index = key ? result.findIndex((other) => {
+      const corroborating = record.primaryIdType === "NATIONAL_REG" && other.sources.some((s) => s.source === "GLEIF") || other.primaryIdType === "NATIONAL_REG" && record.sources.some((s) => s.source === "GLEIF");
+      return corroborating && registrationKey(other) === key && other.normalizedName === record.normalizedName && !(other.lei && record.lei && other.lei !== record.lei);
+    }) : -1;
+    if (index < 0) {
+      result.push(record);
+      continue;
+    }
+    const other = result[index];
+    const national = record.primaryIdType === "NATIONAL_REG" ? record : other;
+    const gleif = national === record ? other : record;
+    result[index] = {
+      ...national,
+      lei: national.lei ?? gleif.lei,
+      parentLei: national.parentLei ?? gleif.parentLei,
+      ultimateParentLei: national.ultimateParentLei ?? gleif.ultimateParentLei,
+      headquartersAddress: national.headquartersAddress ?? gleif.headquartersAddress,
+      aliases: [...new Set([...national.aliases, ...gleif.aliases])],
+      tickers: [...new Set([...national.tickers, ...gleif.tickers])],
+      domains: [...new Set([...national.domains, ...gleif.domains])],
+      sources: [...national.sources, ...gleif.sources].filter((source, i, all) => all.findIndex((s) => s.source === source.source && s.sourceId === source.sourceId) === i)
+    };
+  }
+  return result;
+}
+function matchesEntityIdentifier(entity, query) {
+  const clean = (value) => value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const equal = (value) => Boolean(value && clean(value) === clean(query.cleanedValue));
+  const primary = entity.primaryIdType === query.type && equal(entity.primaryIdValue);
+  switch (query.type) {
+    case "LEI":
+      return primary || equal(entity.lei);
+    case "EU_VAT":
+      return primary || equal(entity.vatNumber);
+    case "US_EIN":
+      return primary || equal(entity.taxId);
+    case "US_CIK": {
+      const cik = entity.cik ?? (entity.primaryIdType === "US_CIK" ? entity.primaryIdValue : null);
+      return Boolean(cik && cik.replace(/^0+/, "") === query.cleanedValue.replace(/^0+/, ""));
+    }
+    case "DOMAIN": {
+      const domain = (value) => value.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      return entity.domains.some((value) => domain(value) === domain(query.cleanedValue));
+    }
+    case "NAME":
+      return false;
+    case "NATIONAL_ID": {
+      if (query.scheme === "PL_NIP")
+        return equal(entity.taxId);
+      if (query.scheme === "PL_KRS")
+        return equal(entity.registrationNumber) && (entity.registrationAuthority === "PL_KRS" || entity.sources.some((s) => s.source === "PL_KRS"));
+      return primary || equal(entity.registrationNumber) || equal(entity.taxId);
+    }
+    default:
+      return primary || equal(entity.registrationNumber);
+  }
 }
 
 // src/domain/normalize.ts
@@ -2736,6 +2797,24 @@ function classifyQuery(raw, jurisdictionHint) {
   const trimmed = raw.trim();
   const cleanDigits = trimmed.replace(/[\s-]/g, "");
   const cleanAlphanum = trimmed.toUpperCase().replace(/[\s-]/g, "");
+  const polishPrefix = /^(KRS|NIP|REGON)\s*:\s*([\d\s-]+)$/i.exec(trimmed);
+  if (polishPrefix || jurisdictionHint?.toUpperCase() === "PL" && /^[\d\s-]+$/.test(trimmed)) {
+    const match = polishPrefix ? { scheme: `PL_${polishPrefix[1].toUpperCase()}`, cleaned: polishPrefix[2].replace(/\D/g, ""), valid: true } : validateNationalId(trimmed, "PL");
+    const explicitScheme = polishPrefix?.[1].toUpperCase();
+    const validExplicit = !polishPrefix || (explicitScheme === "NIP" ? validateNationalId(match?.cleaned ?? "", "PL")?.scheme === "PL_NIP" : explicitScheme === "REGON" ? /^(\d{9}|\d{14})$/.test(match?.cleaned ?? "") : /^\d{10}$/.test(match?.cleaned ?? ""));
+    if (match?.valid && validExplicit)
+      return {
+        raw,
+        type: "NATIONAL_ID",
+        scheme: match.scheme,
+        cleanedValue: match.cleaned,
+        normalizedName: match.cleaned,
+        detectedLegalForm: null,
+        inferredCountry: "PL"
+      };
+    if (polishPrefix)
+      return { raw, type: "NAME", cleanedValue: trimmed, normalizedName: trimmed.toUpperCase(), detectedLegalForm: null, inferredCountry: "PL" };
+  }
   const domain = extractDomain(trimmed);
   if (domain) {
     const domainLabel = domain.split(".")[0];
@@ -2917,7 +2996,7 @@ function classifyQuery(raw, jurisdictionHint) {
       };
     }
   }
-  if (jurisdictionHint) {
+  if (jurisdictionHint && (jurisdictionHint.toUpperCase() !== "PL" || /^[\d\s-]+$/.test(trimmed))) {
     const nationalMatch = validateNationalId(trimmed, jurisdictionHint);
     if (nationalMatch && nationalMatch.valid) {
       return {
@@ -3281,7 +3360,8 @@ var OVERLAY_PROFILES = {
       {
         id: "uk_companies_house",
         kind: "LIVE_API",
-        access: "FREE",
+        access: "FREE_REGISTRATION",
+        envKey: "COMPANIES_HOUSE_API_KEY",
         cacheTtlSeconds: 86400,
         resaleAllowed: true,
         costPerCallUsd: 0
@@ -3313,7 +3393,8 @@ var OVERLAY_PROFILES = {
       {
         id: "au_abr",
         kind: "LIVE_API",
-        access: "FREE",
+        access: "FREE_REGISTRATION",
+        envKey: "ABR_GUID",
         cacheTtlSeconds: 86400,
         resaleAllowed: true,
         costPerCallUsd: 0
@@ -3391,14 +3472,39 @@ var OVERLAY_PROFILES = {
     legalForms: ["Sp. z o.o.", "S.A.", "Sp. k."],
     sources: [
       {
-        id: "pl_mf_whitelist",
+        id: "pl_krs",
         kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0,
+        operations: ["ENTITY_ID_LOOKUP"]
+      },
+      {
+        id: "pl_mf_whitelist",
+        operations: ["BANK_ACCOUNT_OWNERSHIP"],
+        kind: "TAX_AUTHORITY",
         access: "FREE",
         cacheTtlSeconds: 86400,
         resaleAllowed: true,
         costPerCallUsd: 0
       }
     ]
+  },
+  LV: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["LV_REGCODE"],
+    legalForms: ["SIA", "AS"],
+    sources: [{
+      id: "lv_ur",
+      kind: "LIVE_API",
+      access: "FREE",
+      cacheTtlSeconds: 86400,
+      resaleAllowed: true,
+      costPerCallUsd: 0,
+      operations: ["ENTITY_ID_LOOKUP", "ENTITY_NAME_SEARCH"]
+    }]
   },
   CZ: {
     coverage: "L2_VERIFIED",
@@ -3521,6 +3627,7 @@ var OVERLAY_PROFILES = {
     sources: [
       {
         id: "ca_corp",
+        implemented: false,
         kind: "LIVE_API",
         access: "FREE",
         cacheTtlSeconds: 86400 * 7,
@@ -3575,11 +3682,11 @@ for (const [iso2, name, region] of ISO_ENTRIES) {
     sources: overlay.sources ?? []
   });
 }
-function getCountryProfile(code) {
+function getCountryProfile(code, env = process.env) {
   const iso2 = normalizeCountryCode(code);
   const found = COUNTRY_MAP.get(iso2);
   if (found) {
-    return found;
+    return withAvailableSources(found, env);
   }
   return {
     iso2: iso2 || "XX",
@@ -3592,8 +3699,30 @@ function getCountryProfile(code) {
     sources: []
   };
 }
-function listCoverage() {
-  return Array.from(COUNTRY_MAP.values());
+function withAvailableSources(profile, env) {
+  const sources = profile.sources.filter((source) => source.kind !== "BULK" && source.implemented !== false && (!source.envKey || Boolean(env[source.envKey]?.trim())));
+  return {
+    ...profile,
+    sources,
+    coverage: profile.coverage === "L2_VERIFIED" && profile.sources.length > 0 && sources.length === 0 ? profile.idSchemes.length > 0 ? "L1_VALIDATED" : "L0_SCREENED" : profile.coverage
+  };
+}
+function listCoverage(env = process.env) {
+  return Array.from(COUNTRY_MAP.values(), (profile) => withAvailableSources(profile, env));
+}
+
+// src/ports/outbound/upstream-provider.port.ts
+class UpstreamProviderError extends Error {
+  reason;
+  httpStatus;
+  retryAfterSeconds;
+  constructor(reason, httpStatus, retryAfterSeconds) {
+    super(reason);
+    this.reason = reason;
+    this.httpStatus = httpStatus;
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.name = "UpstreamProviderError";
+  }
 }
 
 // src/application/source-router.ts
@@ -3601,6 +3730,7 @@ class SourceRouter {
   free;
   paid;
   timeoutMs;
+  inFlight = new Map;
   constructor(deps) {
     this.free = deps.free;
     this.paid = deps.paid;
@@ -3612,10 +3742,23 @@ class SourceRouter {
     const freePromises = supportedFree.map(async (provider) => {
       const start = Date.now();
       try {
-        const records = await provider.search(query, {
-          jurisdiction: opts.jurisdiction,
-          timeoutMs: this.timeoutMs
-        });
+        const key = JSON.stringify([provider.sourceName, query, opts.jurisdiction]);
+        let pending = this.inFlight.get(key);
+        if (!pending) {
+          pending = provider.search(query, {
+            jurisdiction: opts.jurisdiction,
+            timeoutMs: this.timeoutMs
+          });
+          if (this.inFlight.size < 128) {
+            this.inFlight.set(key, pending);
+            const finish = () => {
+              if (this.inFlight.get(key) === pending)
+                this.inFlight.delete(key);
+            };
+            pending.then(finish, finish);
+          }
+        }
+        const records = (await pending).map((record) => structuredClone(record));
         const elapsed = Date.now() - start;
         const status = records.length > 0 ? "HIT" : "MISS";
         sourcesTried.push({
@@ -3625,13 +3768,18 @@ class SourceRouter {
           ms: elapsed
         });
         return records;
-      } catch {
+      } catch (error) {
         const elapsed = Date.now() - start;
         sourcesTried.push({
           source: provider.sourceName,
           tier: "FREE",
           status: "ERROR",
-          ms: elapsed
+          ms: elapsed,
+          ...error instanceof UpstreamProviderError ? {
+            reason: error.reason,
+            httpStatus: error.httpStatus,
+            retryAfterSeconds: error.retryAfterSeconds
+          } : { reason: "UNAVAILABLE" }
         });
         return [];
       }
@@ -3708,7 +3856,7 @@ class EntityApplicationService {
     const effectiveJurisdiction = requestedJurisdiction || (classified.type !== "NAME" ? classified.inferredCountry : undefined) || undefined;
     const cleanPart = encodeURIComponent(classified.cleanedValue.toLowerCase());
     const jurPart = encodeURIComponent((effectiveJurisdiction ?? "all").toLowerCase());
-    const identityCacheKey = `agentum:identity:v1:${classified.type}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}`;
+    const identityCacheKey = `agentum:identity:v2:${classified.type}:${classified.scheme ?? "legacy"}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}`;
     let candidates = [];
     let best = null;
     let modeUsed = this.deps.config.resolverMode;
@@ -3726,7 +3874,7 @@ class EntityApplicationService {
     } else {
       if (this.deps.config.resolverMode !== "live") {
         if (classified.type !== "NAME") {
-          const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction);
+          const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction, classified.scheme);
           if (exact) {
             candidates.push({ ...exact, confidence: 0.99 });
           }
@@ -3748,19 +3896,10 @@ class EntityApplicationService {
         const upstreamRecords = routerRes.records;
         if (upstreamRecords.length > 0) {
           await this.deps.entityRepo.upsertMany(upstreamRecords);
-          const combined = [...candidates, ...upstreamRecords];
-          const seen = new Set;
-          const deduplicated = [];
-          for (const item of combined) {
-            const key = `${item.jurisdiction}:${item.primaryIdType}:${item.primaryIdValue}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              deduplicated.push(item);
-            }
-          }
-          candidates = deduplicated;
+          candidates = [...candidates, ...upstreamRecords];
         }
       }
+      candidates = coalesceRegistryRecords(candidates);
       for (const c of candidates) {
         if (effectiveJurisdiction && normalizeCountryCode(c.jurisdiction) !== normalizeCountryCode(effectiveJurisdiction)) {
           c.confidence = 0;
@@ -3833,6 +3972,26 @@ class EntityApplicationService {
         registrationNumber: best?.registrationNumber ?? best?.lei ?? undefined
       });
     }
+    let beneficialOwnership;
+    if (cmd.includeBeneficialOwners && best) {
+      const adapter = (this.deps.beneficialOwnershipAdapters ?? []).find((a) => a.supportsEntity(best));
+      if (!adapter) {
+        beneficialOwnership = { status: "UNSUPPORTED", source: null, ownerCount: 0 };
+      } else {
+        try {
+          const owners = await adapter.listBeneficialOwners(best, 2200);
+          best = { ...best, beneficialOwners: owners };
+          beneficialOwnership = { status: "OK", source: adapter.sourceName, ownerCount: owners.length };
+        } catch (err) {
+          beneficialOwnership = {
+            status: "UNAVAILABLE",
+            source: adapter.sourceName,
+            ownerCount: 0,
+            error: err instanceof Error ? err.message : String(err)
+          };
+        }
+      }
+    }
     const targetCountry = effectiveJurisdiction || classified.inferredCountry || "XX";
     const profile = getCountryProfile(targetCountry);
     const isResolved = best !== null && best.confidence >= 0.6;
@@ -3851,6 +4010,7 @@ class EntityApplicationService {
         sourcesTried: routerAttempts,
         paidSourceUsed: paidUsed
       },
+      ...beneficialOwnership ? { beneficialOwnership } : {},
       latencyMs: Math.max(1, Date.now() - startedAt)
     };
     return result;
@@ -10015,6 +10175,20 @@ var OfficerRecordSchema = object({
   nationality: string2().optional(),
   occupation: string2().optional()
 });
+var BeneficialOwnerRecordSchema = object({
+  name: string2(),
+  kind: _enum(["INDIVIDUAL", "CORPORATE", "LEGAL_PERSON", "PROTECTED", "UNKNOWN"]),
+  naturesOfControl: array(string2()),
+  notifiedOn: string2().optional(),
+  ceasedOn: string2().optional(),
+  nationality: string2().optional(),
+  countryOfResidence: string2().optional(),
+  birthYearMonth: string2().optional(),
+  registrationNumber: string2().optional(),
+  countryRegistered: string2().optional(),
+  legalForm: string2().optional(),
+  source: string2()
+});
 var CanonicalEntityRecordSchema = object({
   id: string2().optional(),
   canonicalName: string2(),
@@ -10042,7 +10216,8 @@ var CanonicalEntityRecordSchema = object({
   aliases: array(string2()),
   sources: array(EntityDataSourceRefSchema),
   confidence: number2().min(0).max(1),
-  officers: array(OfficerRecordSchema).optional()
+  officers: array(OfficerRecordSchema).optional(),
+  beneficialOwners: array(BeneficialOwnerRecordSchema).optional()
 });
 var VatVerificationResultSchema = object({
   valid: boolean2(),
@@ -10056,7 +10231,7 @@ var VatVerificationResultSchema = object({
   error: string2().optional()
 });
 var SanctionsEntrySchema = object({
-  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC"]),
+  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC", "UK_FCDO"]),
   externalId: string2(),
   primaryName: string2(),
   aliases: array(string2()),
@@ -10067,7 +10242,7 @@ var SanctionsEntrySchema = object({
   remarks: string2().optional()
 });
 var SanctionsMatchSchema = object({
-  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC"]),
+  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC", "UK_FCDO"]),
   externalId: string2(),
   primaryName: string2(),
   entityType: string2(),
@@ -10095,8 +10270,9 @@ var ResolveEntityCommandSchema = object({
   country: string2().optional().describe("Alias for jurisdiction"),
   verifyVat: boolean2().optional().describe("Verify EU VAT number against live VIES if available"),
   includeParent: boolean2().optional().describe("Include parent and ultimate parent LEI relationships"),
-  checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN & EU Financial Sanctions (default true)"),
+  checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN, EU FSF, UN SC and UK FCDO sanctions lists (default true)"),
   includeOfficers: boolean2().optional().describe("Include corporate directors, executives, and officers when available"),
+  includeBeneficialOwners: boolean2().optional().describe("Include current beneficial owners (e.g. UK Persons with Significant Control) when available"),
   allowPaidSources: boolean2().optional().describe("Allow fallback to commercial paid aggregators when official registries are paywalled or unavailable")
 });
 var ResolveEntityResultSchema = object({
@@ -10113,6 +10289,12 @@ var ResolveEntityResultSchema = object({
     level: string2(),
     sourcesTried: array(any()),
     paidSourceUsed: boolean2()
+  }).optional(),
+  beneficialOwnership: object({
+    status: _enum(["OK", "UNAVAILABLE", "UNSUPPORTED"]),
+    source: string2().nullable(),
+    ownerCount: number2(),
+    error: string2().optional()
   }).optional(),
   latencyMs: number2()
 });
@@ -10200,7 +10382,7 @@ function registerEntityTools(registry, service, config) {
     httpPath: "/v1/entity/resolve",
     category: "entity",
     summary: "Deterministic Global Corporate Entity & Registry Resolver",
-    description: "Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK, EU-27, Switzerland, Australia, Singapore, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.",
+    description: "Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK, EU-27, Switzerland, Singapore, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.",
     priceUsd: config.priceEntityResolveUsd,
     inputSchema: ResolveEntityCommandSchema,
     outputSchema: ResolveEntityResultSchema,
@@ -10806,7 +10988,7 @@ function mountDiscoveryAdapter(app, registry, config) {
     const discoveryPayload = {
       service: "agentum",
       name: "Agentum \u2014 Deterministic Global Corporate Entity, VAT & Sanctions Resolver",
-      version: "0.2.0",
+      version: "0.2.1",
       publicBaseUrl: config.publicBaseUrl,
       skillsRepository: "https://github.com/Algiras/agentum-skills",
       discovery: {
@@ -10837,7 +11019,7 @@ function mountDiscoveryAdapter(app, registry, config) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agentum \u2014 Deterministic Global Corporate Entity, VAT &amp; Sanctions Resolver for AI Agents</title>
-  <meta name="description" content="Deterministic Global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, EU Registries, GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Streamable HTTP MCP &amp; REST with x402 v2 and Stripe/Tempo MPP micropayments." />
+  <meta name="description" content="Deterministic Global corporate entity resolution (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, EU Registries, GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Streamable HTTP MCP &amp; REST with x402 v2 and Stripe/Tempo MPP micropayments." />
   <link rel="canonical" href="${config.publicBaseUrl}/" />
   <link rel="icon" type="image/svg+xml" href="${config.publicBaseUrl}/logo.svg" />
   <link rel="mcp-server" href="${config.publicBaseUrl}/mcp" />
@@ -10850,7 +11032,7 @@ function mountDiscoveryAdapter(app, registry, config) {
   <meta property="og:site_name" content="Agentum" />
   <meta property="og:url" content="${config.publicBaseUrl}/" />
   <meta property="og:title" content="Agentum \u2014 Deterministic Global Corporate Entity Resolver for AI Agents" />
-  <meta property="og:description" content="Zero-signup Streamable HTTP MCP server for deterministic corporate KYB, national registries (UK, CH, AU, SG, US, EU), VIES VAT, and OFAC sanctions resolution with inline micropayments." />
+  <meta property="og:description" content="Zero-signup Streamable HTTP MCP server for deterministic corporate KYB, national registries (UK, CH, SG, US, EU), VIES VAT, and OFAC sanctions resolution with inline micropayments." />
   <meta property="og:image" content="${config.publicBaseUrl}/logo.png" />
   
   <!-- Twitter Card Metadata -->
@@ -10890,7 +11072,6 @@ function mountDiscoveryAdapter(app, registry, config) {
             featureList: [
               "UK Companies House official corporate registry lookup",
               "Swiss Federal Commercial Registry (ZEFIX / UID) lookup",
-              "Australian Business Register (ABR / ABN / ACN) lookup",
               "Singapore ACRA (UEN) corporate entity directory",
               "GLEIF Legal Entity Identifier (LEI) resolution across 200+ countries",
               "US SEC EDGAR CIK, EIN and public ticker corporate resolution",
@@ -11599,7 +11780,7 @@ function mountDiscoveryAdapter(app, registry, config) {
           <path d="M216 260 L246 290 L304 226" fill="none" stroke="#38bdf8" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span>AGENTUM</span>
-        <span style="font-size: 0.72rem; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-weight:600;">v0.2.0</span>
+        <span style="font-size: 0.72rem; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; font-weight:600;">v0.2.1</span>
       </a>
       <div class="nav-links">
         <a href="#playground" class="nav-link">Interactive Playground</a>
@@ -11622,13 +11803,12 @@ function mountDiscoveryAdapter(app, registry, config) {
         <span>The Autonomous KYB &amp; Entity Resolution Platform for AI Agents</span>
       </div>
       <h1>Deterministic Corporate Entity, VAT &amp; Sanctions Resolver</h1>
-      <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) server</strong> and <strong>REST API</strong>. Query authoritative corporate registries across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Australia</strong> (ABR), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT</strong> validation, 26,650+ OFAC/EU/UN sanctions screening, and inline Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 Base USDC</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
+      <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) server</strong> and <strong>REST API</strong>. Query authoritative corporate registries across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT</strong> validation, 26,650+ OFAC/EU/UN sanctions screening, and inline Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 Base USDC</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
       
       <div class="pill-cloud">
         <span class="badge badge-blue">\u26A1 Model Context Protocol (Streamable HTTP)</span>
         <span class="badge">\uD83C\uDDEC\uD83C\uDDE7 UK Companies House</span>
         <span class="badge">\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX</span>
-        <span class="badge">\uD83C\uDDE6\uD83C\uDDFA Australian ABR</span>
         <span class="badge">\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA</span>
         <span class="badge">\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR</span>
         <span class="badge">\uD83C\uDF10 GLEIF LEI Worldwide</span>
@@ -11858,10 +12038,10 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
             <span class="badge badge-blue">resolve_entity</span>
           </div>
           <span class="tool-route">POST /v1/entity/resolve</span>
-          <p class="tool-desc">Deterministic resolution across 6 national registries + worldwide GLEIF LEI. Resolves canonical names, registration codes, status, and legal forms.</p>
+          <p class="tool-desc">Deterministic resolution across configured national registries + worldwide GLEIF LEI. Resolves canonical names, registration codes, status, and legal forms.</p>
           <ul class="tool-features">
             <li>UK Companies House (CRN) &amp; Swiss ZEFIX (UID)</li>
-            <li>Australian ABR (ABN/ACN) &amp; Singapore ACRA (UEN)</li>
+            <li>Singapore ACRA (UEN)</li>
             <li>US SEC EDGAR (CIK/EIN) &amp; GLEIF LEI (200+ countries)</li>
           </ul>
         </div>
@@ -11980,14 +12160,13 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
     <!-- SECTION 4: Supported Jurisdictions & Data Upstreams -->
     <div class="section-head">
       <h2>\uD83C\uDF0D Supported Jurisdictions &amp; Primary Upstreams</h2>
-      <p>Direct integration with authoritative national company registries and global compliance authorities.</p>
+      <p>Registry availability depends on server configuration. See <a href="/v1/coverage">current registry coverage</a>.</p>
     </div>
     <div class="grid-2">
       <div class="card">
         <ul style="list-style:none; font-size:0.88rem; color:#334155;">
           <li style="margin-bottom:12px;"><strong>\uD83C\uDDEC\uD83C\uDDE7 UK Companies House:</strong> Real-time lookup of English, Welsh, Scottish, and Northern Irish company registration numbers (CRN) and official legal names.</li>
           <li style="margin-bottom:12px;"><strong>\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX Registry:</strong> Cantonal commercial registers, legal seats, and Unique Enterprise Identifiers (UID / CHE).</li>
-          <li style="margin-bottom:12px;"><strong>\uD83C\uDDE6\uD83C\uDDFA Australian Business Register (ABR):</strong> Australian Business Numbers (ABN) and Australian Company Numbers (ACN).</li>
           <li style="margin-bottom:12px;"><strong>\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA:</strong> Accounting &amp; Corporate Regulatory Authority Unique Entity Numbers (UEN) and business records.</li>
           <li><strong>\uD83C\uDDF1\uD83C\uDDF9 Lithuania Registr\u0173 centras (JAR):</strong> Legal entity code (JAR) and company register.</li>
         </ul>
@@ -12151,20 +12330,6 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         ],
         makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'CH' }; }
       },
-      'au': {
-        id: 'au',
-        name: '\uD83C\uDDE6\uD83C\uDDFA Australian ABR',
-        tool: 'resolve_entity',
-        method: 'POST',
-        endpoint: '/v1/entity/resolve',
-        price: '$0.002 USD',
-        summary: 'Australian Business Register (ABR) lookup by 11-digit ABN, 9-digit ACN, or legal name',
-        fields: [
-          { id: 'query', label: 'Company Name, ABN, or ACN', value: 'Atlassian Pty Ltd', placeholder: 'e.g. Atlassian Pty Ltd or 53102443916' },
-          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'AU', placeholder: 'AU' }
-        ],
-        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'AU' }; }
-      },
       'sg': {
         id: 'sg',
         name: '\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA',
@@ -12244,7 +12409,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         summary: 'Composite 1-shot KYB: concurrent entity resolution, live VIES VAT check, and OFAC/EU sanctions screening with verdict',
         fields: [
           { id: 'name', label: 'Vendor Legal Name', value: 'Siemens AG', placeholder: 'e.g. Siemens AG' },
-          { id: 'country', label: 'Country Code (ISO 2-letter)', value: 'DE', placeholder: 'e.g. DE, GB, US, CH, AU, SG' },
+          { id: 'country', label: 'Country Code (ISO 2-letter)', value: 'DE', placeholder: 'e.g. DE, GB, US, CH, SG' },
           { id: 'vatNumber', label: 'EU VAT Number (Optional)', value: 'DE129274202', placeholder: 'e.g. DE129274202' }
         ],
         makeBody: function(f) {
@@ -12624,8 +12789,8 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
       openapi: "3.1.0",
       info: {
         title: "Agentum Global Entity Resolver API",
-        version: "0.2.0",
-        description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
+        version: "0.2.1",
+        description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
       },
       servers: [{ url: config.publicBaseUrl }],
       paths
@@ -12673,8 +12838,8 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
   const handleMcpServerCard = (c) => c.json({
     name: "agentum-entity-resolver",
     title: "Agentum Global Corporate Entity, VAT & Sanctions Resolver",
-    version: "0.2.0",
-    description: "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions screening.",
+    version: "0.2.1",
+    description: "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions screening.",
     protocolVersion: "2025-03-26",
     endpoint: `${config.publicBaseUrl}/mcp`,
     transport: "streamable-http",
@@ -12952,7 +13117,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
       schema_version: "v1",
       name_for_human: "Agentum Entity & Compliance Resolver",
       name_for_model: "agentum_entity_resolver",
-      description_for_human: "Resolve global companies (UK CRN, Swiss UID, Australian ABN, Singapore UEN, US SEC CIK, EU registries, LEI), validate EU VAT via VIES, and screen OFAC/EU/UN sanctions.",
+      description_for_human: "Resolve global companies (UK CRN, Swiss UID, Singapore UEN, US SEC CIK, EU registries, LEI), validate EU VAT via VIES, and screen OFAC/EU/UN sanctions.",
       description_for_model: "Use this plugin whenever you need to verify a company registration number, look up an LEI or US SEC CIK, validate a European Union VAT number via VIES, or screen a company/individual against OFAC SDN, EU Financial Sanctions, and UN Security Council lists. Includes daily free quota; supports x402 v2 and Stripe/Tempo MPP micropayments.",
       auth: {
         type: "none"
@@ -12970,10 +13135,10 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
   const handleA2aCard = (c) => {
     return c.json({
       name: "Agentum Compliance & Entity Resolver Agent",
-      description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening.",
+      description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening.",
       url: config.publicBaseUrl,
       mcpUrl: `${config.publicBaseUrl}/mcp`,
-      version: "0.2.0",
+      version: "0.2.1",
       provider: {
         organization: "Agentum Network",
         url: "https://github.com/Algiras/agentum-skills"
@@ -12994,12 +13159,62 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         name: t.summary,
         description: t.description,
         tags: [t.category, "kyb", "compliance", "entity-resolution", "sanctions", "vat"],
-        examples: t.mcpName === "resolve_entity" ? ["Resolve NVIDIA CORP (US)", "Resolve Revolut Bank UAB (LT)", "Resolve Atlassian Pty Ltd (AU)", "Resolve Nestle SA (CH)"] : t.mcpName === "verify_eu_vat" ? ["Verify EU VAT IE6388047V", "Verify EU VAT LT100011706713", "Verify EU VAT DE129274202"] : ["Screen SEVERSTAL PAO against OFAC and EU sanctions"]
+        examples: t.mcpName === "resolve_entity" ? ["Resolve NVIDIA CORP (US)", "Resolve Revolut Bank UAB (LT)", "Resolve Nestle SA (CH)"] : t.mcpName === "verify_eu_vat" ? ["Verify EU VAT IE6388047V", "Verify EU VAT LT100011706713", "Verify EU VAT DE129274202"] : ["Screen SEVERSTAL PAO against OFAC and EU sanctions"]
       }))
     });
   };
   app.get("/.well-known/agent.json", handleA2aCard);
   app.get("/.well-known/agent-card.json", handleA2aCard);
+  const handleA2aJsonRpc = async (c) => {
+    let id = null;
+    try {
+      const body = await c.req.json();
+      id = body?.id ?? null;
+    } catch {}
+    return c.json({
+      jsonrpc: "2.0",
+      id,
+      error: {
+        code: -32601,
+        message: "Agentum operates primarily as a Model Context Protocol (MCP) server. Connect via Streamable HTTP MCP at /mcp or use the REST API endpoints documented in /openapi.json.",
+        data: {
+          mcpEndpoint: `${config.publicBaseUrl}/mcp`,
+          openApiSpec: `${config.publicBaseUrl}/openapi.json`,
+          agentCard: `${config.publicBaseUrl}/.well-known/agent.json`
+        }
+      }
+    }, 200);
+  };
+  app.post("/a2a", handleA2aJsonRpc);
+  app.post("/api/a2a", handleA2aJsonRpc);
+  app.post("/a2a/v1", handleA2aJsonRpc);
+  app.post("/a2a/jsonrpc", handleA2aJsonRpc);
+  const glamaManifest = {
+    $schema: "https://glama.ai/mcp/schemas/server.json",
+    maintainers: ["Algiras"],
+    name: "agentum-entity-resolver",
+    description: "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions Resolver with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments.",
+    repository: "https://github.com/Algiras/agentum-skills",
+    categories: ["compliance", "financial-services", "developer-tools"],
+    endpoints: [
+      {
+        transport: "streamable-http",
+        url: `${config.publicBaseUrl}/mcp`
+      }
+    ]
+  };
+  app.get("/.well-known/glama.json", (c) => c.json(glamaManifest));
+  app.get("/glama.json", (c) => c.json(glamaManifest));
+  const smitheryYaml = `# Smithery.ai MCP Server Configuration
+startCommand:
+  type: http
+  url: ${config.publicBaseUrl}/mcp
+  configSchema:
+    type: object
+    properties: {}
+`;
+  app.get("/smithery.yaml", (c) => c.text(smitheryYaml, 200, { "Content-Type": "text/yaml; charset=utf-8" }));
+  app.get("/.well-known/smithery.yaml", (c) => c.text(smitheryYaml, 200, { "Content-Type": "text/yaml; charset=utf-8" }));
   app.get("/.well-known/x402.json", (c) => {
     return c.json({
       x402Version: 2,
@@ -13097,6 +13312,9 @@ Sitemap: ${config.publicBaseUrl}/sitemap.xml
       "/.well-known/agent.json",
       "/.well-known/x402.json",
       "/.well-known/mpp.json",
+      "/.well-known/glama.json",
+      "/glama.json",
+      "/smithery.yaml",
       "/terms",
       "/privacy"
     ];
@@ -13132,7 +13350,7 @@ ${urls.map((u) => `  <url>
 `);
     const body = `# Agentum \u2014 Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
+> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
 
 ## Access & Pricing
 - **Free Tier:** ${config.freeCallsPerDay} free calls/day per agent (\`X-Agent-Id\` or IP) \u2014 zero signup or API keys required.
@@ -13193,7 +13411,7 @@ ${detailedTools}
     return c.json({
       mcpVersion: "2025-03-26",
       name: "agentum-entity-resolver",
-      version: "0.2.0",
+      version: "0.2.1",
       description: "Deterministic Global Corporate Entity, VAT & Sanctions Resolver with x402 v2 and Stripe/Tempo MPP micropayments",
       transport: {
         type: "streamable-http",
@@ -13846,7 +14064,7 @@ var MCP_PROMPTS = [
   },
   {
     name: "sanctions_escalation_review",
-    description: "Perform an adversarial sanctions and watchlist escalation review (including Cyrillic/Greek homoglyph and alias screening) across OFAC SDN, EU Financial Sanctions, and UN Security Council lists.",
+    description: "Perform an adversarial sanctions and watchlist escalation review (including Cyrillic/Greek homoglyph and alias screening) across OFAC SDN, EU Financial Sanctions, UN Security Council, and UK FCDO Sanctions List.",
     arguments: [
       {
         name: "entityName",
@@ -14234,9 +14452,9 @@ function mountMcpHttpAdapter(app, deps) {
               protocolVersion: negotiatedProto,
               serverInfo: {
                 name: "agentum-entity-resolver",
-                version: "0.2.0"
+                version: "0.2.1"
               },
-              instructions: `Use resolve_entity, verify_eu_vat, and screen_sanctions for authoritative global corporate entity resolution (UK, Switzerland, Australia, Singapore, US, EU, and worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening. Includes ${deps.config.freeCallsPerDay} free calls/day; subsequent calls use x402 v2 or Stripe/Tempo MPP via HTTP headers or _meta.`,
+              instructions: `Use resolve_entity, verify_eu_vat, screen_sanctions, check_vendor, verify_bank_payee, and batch_resolve for authoritative global corporate entity resolution, vendor KYB due diligence, bank account payee verification, live EU VIES VAT validation, and OFAC/EU/UN sanctions screening. Includes ${deps.config.freeCallsPerDay} free calls/day; subsequent calls use x402 v2 or Stripe/Tempo MPP via HTTP headers or _meta.`,
               capabilities: {
                 tools: { listChanged: false },
                 resources: { subscribe: false, listChanged: false },
@@ -14295,7 +14513,7 @@ function mountMcpHttpAdapter(app, deps) {
                 {
                   uri: "agentum://registries/coverage",
                   name: "Supported Corporate & Sanctions Registries",
-                  description: "Coverage metadata for GLEIF LEI, US SEC EDGAR, Lithuania Registr\u0173 centras JAR, EU Commission VIES VAT, OFAC SDN, EU Financial Sanctions, and UN Security Council lists",
+                  description: "Coverage metadata for GLEIF LEI, US SEC EDGAR, Lithuania Registr\u0173 centras JAR, EU Commission VIES VAT, OFAC SDN, EU Financial Sanctions, UN Security Council, and UK FCDO Sanctions List",
                   mimeType: "application/json"
                 },
                 {
@@ -14332,7 +14550,7 @@ function mountMcpHttpAdapter(app, deps) {
                 {
                   uriTemplate: "agentum://sanctions/{name}",
                   name: "Global Sanctions Screening Summary",
-                  description: "Compact sanctions screening summary (top 3 matches) against OFAC SDN, EU Consolidated Financial Sanctions, and UN Security Council lists",
+                  description: "Compact sanctions screening summary (top 3 matches) against OFAC SDN, EU Consolidated Financial Sanctions, UN Security Council, and UK FCDO Sanctions List",
                   mimeType: "application/json"
                 },
                 {
@@ -14409,20 +14627,21 @@ function mountMcpHttpAdapter(app, deps) {
                         L0_SCREENED: all.filter((p) => p.coverage === "L0_SCREENED").length
                       },
                       liveOfficialRegistries: [
-                        "UK Companies House (GB)",
+                        ...process.env.COMPANIES_HOUSE_API_KEY?.trim() ? ["UK Companies House (GB)"] : [],
                         "Swiss ZEFIX (CH)",
-                        "Australian ABR (AU)",
+                        ...process.env.ABR_GUID?.trim() ? ["Australian ABR (AU)"] : [],
                         "Singapore ACRA (SG)",
                         "US SEC EDGAR (US)",
                         "Lithuania Registr\u0173 centras JAR (LT)",
                         "France Recherche Entreprises (FR)",
+                        "Poland Ministry of Justice KRS (PL; KRS identifier lookup only)",
+                        "Latvia Enterprise Register open data (LV)",
                         "Czech ARES (CZ)",
                         "Norway Br\xF8nn\xF8ysundregistrene (NO)",
                         "Finland PRH Virre (FI)",
-                        "New Zealand NZBN (NZ)",
+                        ...process.env.NZBN_API_KEY?.trim() ? ["New Zealand NZBN (NZ)"] : [],
                         "Brazil Receita Federal CNPJ (BR)",
-                        "Canada Corporations (CA)",
-                        "Japan National Tax Agency (JP)",
+                        ...process.env.JP_NTA_APP_ID?.trim() ? ["Japan National Tax Agency (JP)"] : [],
                         "GLEIF Global LEI Index (GLOBAL)"
                       ],
                       taxAndAccountRegistries: [
@@ -14435,7 +14654,7 @@ function mountMcpHttpAdapter(app, deps) {
                         "European Union Consolidated Financial Sanctions (FSF)",
                         "United Nations Security Council Consolidated List (UN SC)"
                       ],
-                      fallbackAggregator: "OpenCorporates API (commercial paid fallback)"
+                      fallbackAggregator: process.env.OPENCORPORATES_API_KEY?.trim() ? "OpenCorporates API (commercial paid fallback; per-request opt-in required)" : null
                     }, null, 2)
                   }
                 ]
@@ -14756,7 +14975,7 @@ function mountMcpHttpAdapter(app, deps) {
           const entity = args.entityName ?? "<ENTITY_NAME>";
           promptText = `Conduct an adversarial sanctions escalation review for "${entity}":
 1. Call \`screen_sanctions\` with name="${entity}"${args.country ? `, country="${args.country}"` : ""} and threshold=0.70.
-2. Evaluate all returned matches across OFAC_SDN, EU_FSF, and UN_SC, paying special attention to Cyrillic/Latin homoglyphs, transliterated aliases, and registration numbers.
+2. Evaluate all returned matches across OFAC_SDN, EU_FSF, UN_SC, and UK_FCDO, paying special attention to Cyrillic/Latin homoglyphs, transliterated aliases, and registration numbers.
 3. Classify the counterparty as CLEAR, POTENTIAL_MATCH_ESCALATE, or CONFIRMED_SANCTIONED.`;
         } else {
           const vendor = args.vendorName ?? "<VENDOR_NAME>";
@@ -15650,14 +15869,14 @@ class InMemoryEntityRepositoryAdapter {
       this.entities.set(key, { ...entity });
     }
   }
-  async findByIdentifier(type, value, jurisdiction) {
+  async findByIdentifier(type, value, jurisdiction, scheme) {
     if (!value.trim())
       return null;
     const aliases = { VAT: "EU_VAT", TAX: "US_EIN", CIK: "US_CIK", NATIONAL_REG: "NATIONAL_ID" };
     const parsedType = IdentifierTypeSchema.safeParse(aliases[type] ?? type);
     if (!parsedType.success || parsedType.data === "NAME")
       return null;
-    const query = { ...classifyQuery(value, jurisdiction), type: parsedType.data };
+    const query = { ...classifyQuery(value, jurisdiction), type: parsedType.data, ...scheme ? { scheme } : {} };
     const targetJur = normalizeCountryCode(jurisdiction || query.inferredCountry || "");
     for (const entity of this.entities.values()) {
       if (targetJur && entity.jurisdiction.toUpperCase() !== targetJur)
@@ -15747,7 +15966,7 @@ class HybridPostgresEntityRepositoryAdapter {
       this.initPromise = null;
     return this.sqlHealthy ? this.sql : null;
   }
-  async findByIdentifier(type, value, jurisdiction) {
+  async findByIdentifier(type, value, jurisdiction, scheme) {
     const db = await this.ensureDb();
     if (db && this.sqlHealthy) {
       try {
@@ -15768,14 +15987,14 @@ class HybridPostgresEntityRepositoryAdapter {
               OR domains @> ${JSON.stringify([domain])}::text::jsonb)
         `;
         const candidates = rows.map(mapRowToEntity);
-        const matching = await new InMemoryEntityRepositoryAdapter(candidates).findByIdentifier(type, value, jurisdiction);
+        const matching = await new InMemoryEntityRepositoryAdapter(candidates).findByIdentifier(type, value, jurisdiction, scheme);
         if (matching)
           return matching;
       } catch {
         this.sqlHealthy = false;
       }
     }
-    return this.memory.findByIdentifier(type, value, jurisdiction);
+    return this.memory.findByIdentifier(type, value, jurisdiction, scheme);
   }
   async searchFuzzy(normalizedName, opts) {
     const db = await this.ensureDb();
@@ -15999,7 +16218,7 @@ var SEED_SANCTIONS = [
     remarks: "Designated under E.O. 13224"
   }
 ];
-var REQUIRED_FEEDS = ["OFAC_SDN", "EU_FSF", "UN_SC"];
+var REQUIRED_FEEDS = ["OFAC_SDN", "EU_FSF", "UN_SC", "UK_FCDO"];
 function assessCoverage(totalRecords, statuses, minRecords = 100, maxAgeMs = 168 * 3600 * 1000) {
   const issues = [];
   const refreshed = [];
@@ -16304,7 +16523,7 @@ class HybridPostgresSanctionsRepositoryAdapter {
         degradedReason: feedStatus.degradedReason,
         coverage: {
           recordCount: totalCount,
-          sourcesScreened: ["OFAC_SDN", "EU_FSF", "UN_SC"],
+          sourcesScreened: [...REQUIRED_FEEDS],
           lastSyncAt: feedStatus.lastRefreshedAt
         }
       };
@@ -16449,6 +16668,7 @@ var DEFAULT_BULK_FEED_URLS = {
   ofacSdnCsvUrl: "https://www.treasury.gov/ofac/downloads/sdn.csv",
   euFsfSimpleCsvUrl: "https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv",
   unScSimpleCsvUrl: "https://data.opensanctions.org/datasets/latest/un_sc_sanctions/targets.simple.csv",
+  ukFcdoSimpleCsvUrl: "https://data.opensanctions.org/datasets/latest/gb_fcdo_sanctions/targets.simple.csv",
   secCompanyTickersUrl: "https://www.sec.gov/files/company_tickers.json",
   ltJarBulkJsonUrl: "https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo?limit(500)",
   gleifBulkJsonUrl: "https://api.gleif.org/api/v1/lei-records?page[size]=200&page[number]=1"
@@ -16665,6 +16885,11 @@ class SanctionsCsvCollector {
     this.entries.push(...parseOpenSanctionsRows([this.header, row], this.source));
   }
 }
+var OPEN_SANCTIONS_FEEDS = {
+  eu_fsf_live: { listSource: "EU_FSF", urlKey: "euFsfSimpleCsvUrl" },
+  un_sc_live: { listSource: "UN_SC", urlKey: "unScSimpleCsvUrl" },
+  uk_fcdo_live: { listSource: "UK_FCDO", urlKey: "ukFcdoSimpleCsvUrl" }
+};
 
 class DatasetIngestWorkerAdapter {
   deps;
@@ -16755,6 +16980,7 @@ class DatasetIngestWorkerAdapter {
       "ofac_sdn_live",
       "eu_fsf_live",
       "un_sc_live",
+      "uk_fcdo_live",
       "sec_edgar_bulk",
       "lt_jar_bulk"
     ] : sources;
@@ -16798,9 +17024,10 @@ class DatasetIngestWorkerAdapter {
         }
         continue;
       }
-      if (src === "eu_fsf_live" || src === "un_sc_live") {
-        const listSource = src === "eu_fsf_live" ? "EU_FSF" : "UN_SC";
-        const url = src === "eu_fsf_live" ? this.feedUrls.euFsfSimpleCsvUrl : this.feedUrls.unScSimpleCsvUrl;
+      const openSanctionsFeed = OPEN_SANCTIONS_FEEDS[src];
+      if (openSanctionsFeed) {
+        const listSource = openSanctionsFeed.listSource;
+        const url = this.feedUrls[openSanctionsFeed.urlKey];
         let attempt;
         try {
           attempt = await this.beginFeedAttempt(listSource);
@@ -17868,6 +18095,8 @@ class UkCompaniesHouseAdapter {
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
   supports(query, jurisdiction) {
+    if (!this.apiKey?.trim())
+      return false;
     if (query.type === "UK_CRN")
       return true;
     if (query.inferredCountry === "GB" || query.inferredCountry === "UK")
@@ -17879,15 +18108,12 @@ class UkCompaniesHouseAdapter {
     return false;
   }
   async search(query, opts) {
+    if (!this.apiKey?.trim())
+      return [];
     const isCrn = query.type === "UK_CRN" || (/^[A-Z]{2}\d{6}$/i.test(query.cleanedValue) || /^\d{7,8}$/.test(query.cleanedValue) && (query.inferredCountry === "GB" || opts?.jurisdiction?.toUpperCase() === "GB"));
     const timeout = opts?.timeoutMs ?? 2200;
     const signal = AbortSignal.timeout(timeout);
-    const headers = {
-      Accept: "application/json"
-    };
-    if (this.apiKey) {
-      headers.Authorization = `Basic ${Buffer.from(`${this.apiKey}:`).toString("base64")}`;
-    }
+    const headers = this.headers();
     try {
       if (isCrn) {
         const crn = /^\d{1,8}$/.test(query.cleanedValue) ? query.cleanedValue.padStart(8, "0") : query.cleanedValue.toUpperCase();
@@ -17911,6 +18137,63 @@ class UkCompaniesHouseAdapter {
     } catch {
       return [];
     }
+  }
+  supportsEntity(entity) {
+    if (!this.apiKey?.trim())
+      return false;
+    const jur = entity.jurisdiction.toUpperCase();
+    return (jur === "GB" || jur === "UK") && Boolean(this.companyNumberOf(entity));
+  }
+  async listBeneficialOwners(entity, timeoutMs = 2200) {
+    const crn = this.companyNumberOf(entity);
+    if (!crn)
+      throw new Error("Entity has no UK company number");
+    if (!this.apiKey)
+      throw new Error("COMPANIES_HOUSE_API_KEY is not configured");
+    const url = `https://api.company-information.service.gov.uk/company/${encodeURIComponent(crn)}/persons-with-significant-control?items_per_page=100`;
+    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs), headers: this.headers() });
+    if (res.status === 404)
+      return [];
+    if (!res.ok)
+      throw new Error(`Companies House PSC lookup failed: HTTP ${res.status}`);
+    const data = await res.json();
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items.filter((item) => item && !item.ceased_on && item.ceased !== true).map((item) => this.mapPsc(item));
+  }
+  companyNumberOf(entity) {
+    const raw = (entity.registrationNumber ?? (entity.id?.startsWith("UK_CRN:") ? entity.primaryIdValue : "")).trim().toUpperCase();
+    if (/^\d{1,8}$/.test(raw))
+      return raw.padStart(8, "0");
+    if (/^[A-Z]{2}\d{6}$/.test(raw))
+      return raw;
+    return null;
+  }
+  headers() {
+    const headers = { Accept: "application/json" };
+    if (this.apiKey)
+      headers.Authorization = `Basic ${Buffer.from(`${this.apiKey}:`).toString("base64")}`;
+    return headers;
+  }
+  mapPsc(item) {
+    const kindRaw = String(item.kind ?? "");
+    const kind = kindRaw.startsWith("individual-") ? "INDIVIDUAL" : kindRaw.startsWith("corporate-entity-") ? "CORPORATE" : kindRaw.startsWith("legal-person-") ? "LEGAL_PERSON" : kindRaw.startsWith("super-secure-") ? "PROTECTED" : "UNKNOWN";
+    const dob = item.date_of_birth;
+    const ident = item.identification ?? {};
+    const str = (v) => typeof v === "string" && v.trim() ? v.trim() : undefined;
+    return {
+      name: str(item.name) ?? (kind === "PROTECTED" ? "Protected PSC (details suppressed)" : "UNKNOWN"),
+      kind,
+      naturesOfControl: Array.isArray(item.natures_of_control) ? item.natures_of_control.map(String) : [],
+      notifiedOn: str(item.notified_on),
+      ceasedOn: str(item.ceased_on),
+      nationality: str(item.nationality),
+      countryOfResidence: str(item.country_of_residence),
+      birthYearMonth: dob?.year && dob?.month ? `${dob.year}-${String(dob.month).padStart(2, "0")}` : undefined,
+      registrationNumber: str(ident.registration_number),
+      countryRegistered: str(ident.country_registered),
+      legalForm: str(ident.legal_form),
+      source: this.sourceName
+    };
   }
   mapStatus(statusRaw) {
     const s = String(statusRaw ?? "").toLowerCase();
@@ -18163,10 +18446,12 @@ class AustralianAbrAdapter {
   guid;
   fetchImpl;
   constructor(opts = {}) {
-    this.guid = opts.guid ?? process.env.ABR_GUID ?? "dummy-guid";
+    this.guid = opts.guid ?? process.env.ABR_GUID ?? "";
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
   supports(query, jurisdiction) {
+    if (!this.guid?.trim())
+      return false;
     if (query.type === "AU_ABN" || query.type === "AU_ACN")
       return true;
     if (query.inferredCountry === "AU")
@@ -18202,6 +18487,8 @@ class AustralianAbrAdapter {
     return null;
   }
   async search(query, opts) {
+    if (!this.guid?.trim())
+      return [];
     const timeout = opts?.timeoutMs ?? 2200;
     const signal = AbortSignal.timeout(timeout);
     try {
@@ -18501,6 +18788,8 @@ class ConfigurableRegistryAdapter {
     this.env = deps?.env ?? (typeof process !== "undefined" ? process.env : {});
   }
   hasRequiredCredentials(isIdLookup) {
+    if (this.config.enabled === false)
+      return false;
     const template = isIdLookup ? this.config.lookupUrl : this.config.searchUrl;
     if (!template)
       return false;
@@ -18508,7 +18797,7 @@ class ConfigurableRegistryAdapter {
     if (urlMatches) {
       for (const m of urlMatches) {
         const varName = m.slice(2, -1);
-        if (!this.env[varName] && !process.env[varName]) {
+        if (!this.env[varName]?.trim()) {
           return false;
         }
       }
@@ -18519,7 +18808,7 @@ class ConfigurableRegistryAdapter {
         if (hMatches) {
           for (const m of hMatches) {
             const varName = m.slice(2, -1);
-            if (!this.env[varName] && !process.env[varName]) {
+            if (!this.env[varName]?.trim()) {
               return false;
             }
           }
@@ -18529,6 +18818,9 @@ class ConfigurableRegistryAdapter {
     return true;
   }
   supports(query, jurisdiction) {
+    const isIdLookup = Boolean(query.scheme && this.config.schemes.includes(query.scheme));
+    if (!this.hasRequiredCredentials(isIdLookup))
+      return false;
     if (query.scheme && this.config.schemes.includes(query.scheme)) {
       return true;
     }
@@ -18546,7 +18838,8 @@ class ConfigurableRegistryAdapter {
     if (isIdLookup) {
       if (!this.hasRequiredCredentials(true))
         return [];
-      url = this.config.lookupUrl.replace("{id}", encodeURIComponent(query.cleanedValue));
+      const id = this.config.formatId?.(query.cleanedValue) ?? query.cleanedValue;
+      url = this.config.lookupUrl.replace("{id}", encodeURIComponent(id));
     } else if (query.type === "NAME" && this.config.searchUrl) {
       if (!this.hasRequiredCredentials(false))
         return [];
@@ -18556,7 +18849,7 @@ class ConfigurableRegistryAdapter {
     }
     let hasMissingCred = false;
     url = url.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-      const val = this.env[varName] || process.env[varName] || "";
+      const val = this.env[varName]?.trim() ?? "";
       if (!val)
         hasMissingCred = true;
       return encodeURIComponent(val);
@@ -18569,32 +18862,44 @@ class ConfigurableRegistryAdapter {
     if (this.config.headers) {
       for (const [key, rawVal] of Object.entries(this.config.headers)) {
         const val = rawVal.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-          return this.env[varName] || process.env[varName] || "";
+          return this.env[varName]?.trim() ?? "";
         });
         headers[key] = val;
       }
     }
     const timeout = opts?.timeoutMs || this.config.timeoutMs || 2500;
+    const body = !isIdLookup && this.config.searchBody ? JSON.stringify(this.config.searchBody(query.cleanedValue || query.raw)) : undefined;
+    if (body !== undefined)
+      headers["Content-Type"] = "application/json";
     try {
       const response = await this.fetchImpl(url, {
-        method: "GET",
+        method: body === undefined ? "GET" : "POST",
         headers,
+        body,
         signal: AbortSignal.timeout(timeout)
       });
       if (!response.ok) {
-        return [];
+        if (response.status === 404 || response.status === 410)
+          return [];
+        const retryAfter = response.headers?.get("retry-after");
+        const retrySeconds = retryAfter && /^\d+$/.test(retryAfter) ? Math.min(Number(retryAfter), 86400) : undefined;
+        throw new UpstreamProviderError(response.status === 429 ? "RATE_LIMITED" : response.status === 401 || response.status === 403 ? "ACCESS_DENIED" : "UNAVAILABLE", response.status, retrySeconds);
       }
       let data;
       try {
         data = await response.json();
       } catch {
-        return [];
+        throw new UpstreamProviderError("INVALID_RESPONSE");
       }
-      if (!data)
-        return [];
+      if (!data || typeof data !== "object")
+        throw new UpstreamProviderError("INVALID_RESPONSE");
+      if (this.config.validateResponse && !this.config.validateResponse(data, query)) {
+        throw new UpstreamProviderError("INVALID_RESPONSE");
+      }
       let items = [];
-      if (this.config.resultsPath && getByDotPath(data, this.config.resultsPath)) {
-        const extracted = getByDotPath(data, this.config.resultsPath);
+      const resultsPath = !isIdLookup && this.config.searchResultsPath ? this.config.searchResultsPath : this.config.resultsPath;
+      if (resultsPath && getByDotPath(data, resultsPath)) {
+        const extracted = getByDotPath(data, resultsPath);
         if (Array.isArray(extracted)) {
           items = extracted;
         } else if (extracted != null && typeof extracted === "object") {
@@ -18605,7 +18910,8 @@ class ConfigurableRegistryAdapter {
       }
       const records = [];
       const now = new Date().toISOString();
-      for (const item of items) {
+      for (const rawItem of items) {
+        const item = this.config.normalizeItem?.(rawItem) ?? rawItem;
         const idVal = getByDotPath(item, this.config.fieldMap.id);
         const nameVal = getByDotPath(item, this.config.fieldMap.name);
         if (!nameVal)
@@ -18666,7 +18972,7 @@ class ConfigurableRegistryAdapter {
           registrationAuthority: this.sourceName,
           vatNumber: null,
           vatValid: null,
-          taxId: null,
+          taxId: this.config.fieldMap.taxId ? getByDotPath(item, this.config.fieldMap.taxId) ?? null : null,
           cik: null,
           tickers: [],
           legalForm: this.config.fieldMap.legalForm ? getByDotPath(item, this.config.fieldMap.legalForm) ?? detectedLegalForm : detectedLegalForm,
@@ -18693,15 +18999,80 @@ class ConfigurableRegistryAdapter {
           ]
         });
       }
+      if (items.length > 0 && records.length === 0)
+        throw new UpstreamProviderError("INVALID_RESPONSE");
       return records;
-    } catch {
-      return [];
+    } catch (error) {
+      if (error instanceof UpstreamProviderError)
+        throw error;
+      throw new UpstreamProviderError(error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError") ? "TIMEOUT" : "UNAVAILABLE");
     }
   }
 }
 
 // src/adapters/outbound/upstreams/registry-configs.ts
+function normalizeFinnishCompany(company) {
+  const name = company.names?.find((n) => n.type === "1" && !n.endDate)?.name;
+  const address = company.addresses?.find((a) => a.type === 1) ?? company.addresses?.[0];
+  const postOffices = address?.postOffices;
+  const form = company.companyForms?.find((f) => !f.endDate)?.descriptions;
+  return {
+    businessId: company.businessId?.value,
+    name,
+    status: company.companySituations?.some((s) => !s.endDate) ? undefined : company.tradeRegisterStatus,
+    deletionDate: company.endDate,
+    registrationDate: company.registrationDate,
+    legalForm: form?.find((d) => d.languageCode === "3")?.description ?? form?.[0]?.description,
+    street: [address?.street, address?.buildingNumber].filter(Boolean).join(" "),
+    city: postOffices?.find((p) => p.languageCode === "1")?.city ?? postOffices?.[0]?.city,
+    postalCode: address?.postCode
+  };
+}
 var REGISTRY_CONFIGS = [
+  {
+    sourceName: "LV_UR",
+    country: "LV",
+    schemes: ["LV_REGCODE"],
+    lookupUrl: "https://data.gov.lv/dati/api/3/action/datastore_search?resource_id=25e80bf3-f107-4ab4-89ef-251b5b9374e9&limit=20&filters=%7B%22regcode%22%3A%22{id}%22%7D",
+    searchUrl: "https://data.gov.lv/dati/api/3/action/datastore_search?resource_id=25e80bf3-f107-4ab4-89ef-251b5b9374e9&limit=20&q={q}",
+    resultsPath: "result.records",
+    validateResponse: (data) => data.success === true && Array.isArray(data.result?.records),
+    normalizeItem: (item) => ({
+      id: item.regcode,
+      name: item.name,
+      legalForm: item.type_text,
+      street: item.address,
+      postalCode: item.index,
+      incorporationDate: typeof item.registered === "string" ? item.registered.slice(0, 10) : undefined,
+      deletionDate: item.terminated
+    }),
+    fieldMap: { id: "id", name: "name", legalForm: "legalForm", street: "street", postalCode: "postalCode", incorporationDate: "incorporationDate" },
+    statusMap: {}
+  },
+  {
+    sourceName: "PL_KRS",
+    country: "PL",
+    schemes: ["PL_KRS"],
+    lookupUrl: "https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/{id}?rejestr=P&format=json",
+    resultsPath: "odpis",
+    validateResponse: (data, query) => data.odpis?.naglowekA?.numerKRS === query.cleanedValue && Boolean(data.odpis?.dane?.dzial1?.danePodmiotu?.nazwa),
+    normalizeItem: (item) => {
+      const company = item.dane?.dzial1?.danePodmiotu;
+      const address = item.dane?.dzial1?.siedzibaIAdres?.adres;
+      return {
+        id: item.naglowekA?.numerKRS,
+        name: company?.nazwa,
+        legalForm: company?.formaPrawna,
+        taxId: company?.identyfikatory?.nip,
+        street: [address?.ulica, address?.nrDomu, address?.nrLokalu].filter(Boolean).join(" "),
+        city: address?.miejscowosc,
+        postalCode: address?.kodPocztowy,
+        inLiquidation: Boolean(item.dane?.dzial6?.likwidacja && Object.keys(item.dane.dzial6.likwidacja).length)
+      };
+    },
+    fieldMap: { id: "id", name: "name", taxId: "taxId", legalForm: "legalForm", street: "street", city: "city", postalCode: "postalCode" },
+    statusMap: {}
+  },
   {
     sourceName: "FR_RECHERCHE_ENTREPRISES",
     country: "FR",
@@ -18728,7 +19099,9 @@ var REGISTRY_CONFIGS = [
     country: "CZ",
     schemes: ["CZ_ICO"],
     lookupUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{id}",
-    searchUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty?obchodniJmeno={q}",
+    searchUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat",
+    searchBody: (term) => ({ obchodniJmeno: term, start: 0, pocet: 20 }),
+    searchResultsPath: "ekonomickeSubjekty",
     fieldMap: {
       id: "ico",
       name: "obchodniJmeno",
@@ -18764,21 +19137,25 @@ var REGISTRY_CONFIGS = [
     sourceName: "FI_PRH_YTJ",
     country: "FI",
     schemes: ["FI_YTUNNUS"],
-    lookupUrl: "https://avoindata.prh.fi/bis/v1/{id}",
-    searchUrl: "https://avoindata.prh.fi/bis/v1?totalResults=true&name={q}",
-    resultsPath: "results",
+    lookupUrl: "https://avoindata.prh.fi/opendata-ytj-api/v3/companies?businessId={id}",
+    searchUrl: "https://avoindata.prh.fi/opendata-ytj-api/v3/companies?name={q}",
+    formatId: (id) => /^\d{8}$/.test(id) ? `${id.slice(0, 7)}-${id.slice(7)}` : id,
+    resultsPath: "companies",
+    normalizeItem: normalizeFinnishCompany,
     fieldMap: {
       id: "businessId",
       name: "name",
       status: "status",
-      street: "addresses.0.street",
-      city: "addresses.0.city",
-      postalCode: "addresses.0.postCode"
+      street: "street",
+      city: "city",
+      postalCode: "postalCode",
+      legalForm: "legalForm",
+      incorporationDate: "registrationDate"
     },
     statusMap: {
-      "0": "ACTIVE",
-      "1": "DISSOLVED",
-      ACTIVE: "ACTIVE"
+      "1": "ACTIVE",
+      "2": "INACTIVE",
+      "4": "DISSOLVED"
     }
   },
   {
@@ -18822,6 +19199,7 @@ var REGISTRY_CONFIGS = [
     }
   },
   {
+    enabled: false,
     sourceName: "CA_CORP",
     country: "CA",
     schemes: ["CA_BN"],
@@ -18904,9 +19282,13 @@ class OpenCorporatesAggregatorAdapter {
     this.costPerCallUsd = deps?.costPerCallUsd ?? 0.05;
   }
   supports(query, jurisdiction) {
+    if (!this.apiKey?.trim())
+      return false;
     return true;
   }
   async search(query, opts) {
+    if (!this.apiKey?.trim())
+      return [];
     const term = query.cleanedValue || query.raw;
     if (!term)
       return [];
@@ -19108,11 +19490,12 @@ function createApp(overrides = {}, customDeps) {
     minRecords: appConfig.nodeEnv === "production" ? 100 : 1
   });
   const configurableAdapters = REGISTRY_CONFIGS.map((cfg) => new ConfigurableRegistryAdapter(cfg, { fetchImpl }));
+  const ukCompaniesHouse = new UkCompaniesHouseAdapter({ fetchImpl });
   const upstreamProviders = [
     new GleifUpstreamAdapter(fetchImpl),
     new LithuaniaJarUpstreamAdapter(fetchImpl),
     new SecEdgarUpstreamAdapter(appConfig.secEdgarUserAgent, fetchImpl),
-    new UkCompaniesHouseAdapter({ fetchImpl }),
+    ukCompaniesHouse,
     new SwissZefixAdapter({ fetchImpl }),
     new AustralianAbrAdapter({ fetchImpl }),
     new SingaporeAcraAdapter({ fetchImpl }),
@@ -19130,6 +19513,7 @@ function createApp(overrides = {}, customDeps) {
       new PolandWhiteListAdapter({ fetchImpl }),
       new CzechVatAccountsAdapter({ fetchImpl })
     ],
+    beneficialOwnershipAdapters: [ukCompaniesHouse],
     vatValidator
   });
   const registry = new ToolRegistry;
@@ -19217,7 +19601,7 @@ function scheduleRefresh(refresh, intervalMs) {
 // src/index.ts
 var { app, config: config3, ingestWorker } = createApp();
 if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
-  const syncSources = config3.nodeEnv === "production" ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
+  const syncSources = config3.nodeEnv === "production" ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "uk_fcdo_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
   const refresh = () => {
     ingestWorker.runSync(syncSources).then((report) => {
       for (const [source, detail] of Object.entries(report.sourceDetails)) {

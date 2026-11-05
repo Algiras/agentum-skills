@@ -1,6 +1,8 @@
 # Agentum — Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> **Zero-Signup Streamable HTTP MCP Server & REST API** for deterministic corporate entity resolution across global national registries (**UK Companies House**, **Swiss ZEFIX**, **Australian ABR**, **Singapore ACRA**, **US SEC EDGAR**, **European Registries**, and **Worldwide GLEIF LEI**), live **EU Commission VIES VAT** validation, and **OFAC SDN + EU Financial Sanctions + UN Security Council** screening (`26,650+` live records).
+Registry availability depends on the server configuration. UK Companies House is verified locally; hosted UK access is not yet confirmed. Australian ABR and New Zealand NZBN are disabled without credentials; Japan NTA is pending approval. GLEIF lookup can still return LEI holders in these countries. Check `/v1/coverage` for the connected server’s current registry coverage.
+
+> **Zero-Signup Streamable HTTP MCP Server & REST API** for deterministic corporate entity resolution across global national registries (**UK Companies House**, **Swiss ZEFIX**, **Singapore ACRA**, **US SEC EDGAR**, **European Registries**, and **Worldwide GLEIF LEI**), live **EU Commission VIES VAT** validation, and **OFAC SDN + EU Financial Sanctions + UN Security Council** screening (`26,650+` live records).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Streamable%20HTTP-blueviolet)](https://agentum.asimplek.cloud/mcp)

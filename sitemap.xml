@@ -86,6 +86,21 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://agentum.asimplek.cloud/.well-known/glama.json</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://agentum.asimplek.cloud/glama.json</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://agentum.asimplek.cloud/smithery.yaml</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://agentum.asimplek.cloud/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

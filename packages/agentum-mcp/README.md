@@ -1,6 +1,8 @@
 # agentum-mcp
 
-> **Zero-Configuration Model Context Protocol (MCP) Stdio Bridge** for [Agentum](https://agentum.asimplek.cloud) — Deterministic Global Corporate Entity Resolution (**UK Companies House**, **Swiss ZEFIX**, **Australian ABR**, **Singapore ACRA**, **US SEC EDGAR CIK/EIN**, **Lithuania Registrų centras JAR**, **GLEIF LEI**), live **European Commission VIES VAT** validation, and **OFAC SDN + EU Financial Sanctions + UN Security Council** screening.
+Registry availability depends on the server configuration. UK Companies House is verified locally; hosted UK access is not yet confirmed. Australian ABR and New Zealand NZBN are disabled without credentials; Japan NTA is pending approval. GLEIF lookup can still return LEI holders in these countries. Check `/v1/coverage` for the connected server’s current registry coverage.
+
+> **Zero-Configuration Model Context Protocol (MCP) Stdio Bridge** for [Agentum](https://agentum.asimplek.cloud) — Deterministic Global Corporate Entity Resolution (**UK Companies House**, **Swiss ZEFIX**, **Singapore ACRA**, **US SEC EDGAR CIK/EIN**, **Lithuania Registrų centras JAR**, **GLEIF LEI**), live **European Commission VIES VAT** validation, and **OFAC SDN + EU Financial Sanctions + UN Security Council** screening.
 
 Includes **5 free calls per day** automatically (no API keys or signups required) and built-in **autonomous Base EVM wallet management** for inline **Coinbase x402 v2** USDC micropayments (0.05 USDC/call) beyond the free tier.
 
@@ -83,7 +85,7 @@ Add `agentum-mcp` to your editor MCP configuration using `npx -y agentum-mcp`.
 
 ## Available Tools
 
-- `resolve_entity`: Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK Companies House, EU-27, Swiss ZEFIX, Australian ABR, Singapore ACRA, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.
+- `resolve_entity`: Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK Companies House, EU-27, Swiss ZEFIX, Singapore ACRA, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.
 - `verify_eu_vat`: Validates EU VAT numbers in real-time against the European Commission VIES database.
 - `screen_sanctions`: Screens companies and individuals against 26,650+ live records from US OFAC SDN, EU Financial Sanctions, and the UN Security Council.
 

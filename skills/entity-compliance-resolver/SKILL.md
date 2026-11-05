@@ -1,11 +1,13 @@
 ---
 name: entity-compliance-resolver
-description: Deterministic Global Corporate Entity Resolution across national registries (UK Companies House CRN, Swiss ZEFIX UID, Australian ABR ABN/ACN, Singapore ACRA UEN, US SEC EDGAR CIK/EIN, Lithuania Registrų centras JAR, European Union Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Agentum MCP, LangChain, or REST API with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments. Use whenever an agent needs to verify a company registration number, look up an LEI, validate an EU VAT number via VIES, or screen a business/counterparty against OFAC SDN, EU Financial Sanctions, and UN Security Council lists.
+description: Deterministic Global Corporate Entity Resolution across national registries (UK Companies House CRN, Swiss ZEFIX UID, Singapore ACRA UEN, US SEC EDGAR CIK/EIN, Lithuania Registrų centras JAR, European Union Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Agentum MCP, LangChain, or REST API with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments. Use whenever an agent needs to verify a company registration number, look up an LEI, validate an EU VAT number via VIES, or screen a business/counterparty against OFAC SDN, EU Financial Sanctions, and UN Security Council lists.
 ---
 
 # Agentum — Deterministic Global Corporate Entity, VAT & Sanctions Resolver
 
 Use **Agentum** (`https://agentum.asimplek.cloud`) for deterministic, authoritative corporate identity resolution and compliance checks across global jurisdictions.
+
+Registry availability depends on the server configuration. UK Companies House is verified locally; hosted UK access is not yet confirmed. Australian ABR and New Zealand NZBN are disabled without credentials; Japan NTA is pending approval. GLEIF lookup can still return LEI holders in these countries. Check `/v1/coverage` for the connected server’s current registry coverage.
 
 ## Endpoints, SDKs & Transports
 
@@ -23,7 +25,6 @@ Use **Agentum** (`https://agentum.asimplek.cloud`) for deterministic, authoritat
 Resolves a company or legal entity across primary commercial jurisdictions worldwide:
 - 🇬🇧 **United Kingdom:** Companies House (CRN 8-char)
 - 🇨🇭 **Switzerland:** ZEFIX Central Business Names Index (UID `CHE-xxx.xxx.xxx`)
-- 🇦🇺 **Australia:** ABR Australian Business Register (ABN 11-digit, ACN 9-digit)
 - 🇸🇬 **Singapore:** ACRA Business Registry (UEN 9/10-char)
 - 🇺🇸 **United States:** SEC EDGAR (CIK 10-digit / EIN)
 - 🇪🇺 **European Union:** National business registries (e.g. Lithuania Registrų centras JAR)
@@ -31,8 +32,8 @@ Resolves a company or legal entity across primary commercial jurisdictions world
 - **Input:**
   ```json
   {
-    "query": "Atlassian Pty Ltd",
-    "jurisdiction": "AU",
+    "query": "Nestle SA",
+    "jurisdiction": "CH",
     "checkSanctions": true,
     "verifyVat": false
   }
@@ -87,7 +88,7 @@ Concurrently resolves multiple corporate entity names, registration numbers, or 
     "items": [
       { "query": "Siemens AG", "country": "DE" },
       { "query": "Rolls-Royce plc", "country": "GB" },
-      { "query": "Atlassian Pty Ltd", "country": "AU" }
+      { "query": "Nestle SA", "country": "CH" }
     ]
   }
   ```

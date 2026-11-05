@@ -1,0 +1,57 @@
+{
+  "name": "agentum-agentkit",
+  "version": "0.1.0",
+  "description": "Coinbase AgentKit action provider for Agentum: deterministic global corporate entity resolution, EU VIES VAT, OFAC/EU/UN sanctions screening, KYB vendor checks and IBAN payee verification, paid per call in USDC on Base via x402 from the agent's own wallet.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "keywords": [
+    "agentkit",
+    "coinbase-agentkit",
+    "action-provider",
+    "agentum",
+    "entity-resolution",
+    "kyb",
+    "compliance",
+    "sanctions",
+    "ofac",
+    "vies-vat",
+    "lei",
+    "x402",
+    "base",
+    "usdc",
+    "ai-agents"
+  ],
+  "author": "Algimantas Krasauskas / Agentum Network <compliance@asimplek.cloud>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Algiras/agentum-skills.git",
+    "directory": "packages/agentum-agentkit"
+  },
+  "homepage": "https://agentum.asimplek.cloud",
+  "peerDependencies": {
+    "@coinbase/agentkit": ">=0.10.0 <1.0.0",
+    "zod": ">=3.23.8 <4.0.0"
+  },
+  "dependencies": {
+    "@x402/core": "~2.30.0",
+    "@x402/evm": "~2.30.0",
+    "@x402/fetch": "~2.30.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@coinbase/agentkit": "^0.10.4",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3",
+    "zod": "^3.25.0"
+  }
+}

@@ -1,6 +1,6 @@
 # Company events and direct sanctions feeds
 
-Core implementation merged on 2026-11-05 in [PR #1](https://github.com/Algiras/agentum/pull/1), commit `476c4ee6f38dc49a87717d3ad1bad39a67f74684`. This distribution sync includes the standalone server and SDK support; hosted deployment and new package publication are not yet verified. The original checkout's separate A2A/Glama/Smithery discovery edits are excluded.
+Core implementation merged on 2026-11-05 in [PR #1](https://github.com/Algiras/agentum/pull/1), commit `476c4ee6f38dc49a87717d3ad1bad39a67f74684`. This distribution sync includes the standalone server and SDK support; the distribution merged as `bd905e3`, and npm publication succeeded for `agentum-langchain@0.3.0` and `agentum-mcp@0.2.3`. Hosted deployment is not yet verified. The original checkout's separate A2A/Glama/Smithery discovery edits are excluded.
 
 ## Optional BODACC company notices
 

@@ -145,4 +145,4 @@ MIT © [Algimantas Krasauskas](https://github.com/Algiras) / [Agentum](https://a
 
 ## Optional company notices (0.3.0)
 
-`resolveEntity({ query: "891506057", jurisdiction: "FR", includeCompanyEvents: true })` opts into official French BODACC notices on servers supporting this option. The tool and OpenAI schema expose the same flag. Notices are historical evidence and do not establish current status or ownership. The core change is merged; hosted deployment has not yet been verified. See [release evidence](../../docs/company-events-and-official-sanctions.md).
+`resolveEntity({ query: "891506057", jurisdiction: "FR", includeCompanyEvents: true })` opts into official French BODACC notices on servers supporting this option. The tool and OpenAI schema expose the same flag. Notices are historical evidence and do not establish current status or ownership. The core change is merged; hosted deployment has not yet been verified. See [release evidence](https://github.com/Algiras/agentum-skills/blob/main/docs/company-events-and-official-sanctions.md).

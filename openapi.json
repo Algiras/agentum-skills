@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:3000"
+      "url": "https://agentum.asimplek.cloud"
     }
   ],
   "paths": {
@@ -24,7 +24,7 @@
           "scheme": "exact",
           "priceUsd": "0.005",
           "network": "eip155:84532",
-          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "payTo": "0x000000000000000000000000000000000000dEaD",
           "facilitatorUrl": "https://x402.org/facilitator",
           "freeCallsPerDay": 5
         },
@@ -32,10 +32,9 @@
           "priceUsd": "0.005",
           "currency": "USD",
           "methods": [
-            "tempo",
-            "stripe"
+            "tempo"
           ],
-          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "recipient": "0x000000000000000000000000000000000000dEaD",
           "testnet": true
         },
         "requestBody": {
@@ -72,6 +71,10 @@
                   },
                   "includeOfficers": {
                     "description": "Include corporate directors, executives, and officers when available",
+                    "type": "boolean"
+                  },
+                  "allowPaidSources": {
+                    "description": "Allow fallback to commercial paid aggregators when official registries are paywalled or unavailable",
                     "type": "boolean"
                   }
                 },
@@ -110,6 +113,7 @@
                         "AU_ABN",
                         "AU_ACN",
                         "SG_UEN",
+                        "NATIONAL_ID",
                         "DOMAIN",
                         "NAME"
                       ]
@@ -163,73 +167,45 @@
                               "type": "string"
                             },
                             "lei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registrationNumber": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registrationAuthority": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "vatNumber": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "vatValid": {
-                              "anyOf": [
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "boolean",
+                                "null"
                               ]
                             },
                             "taxId": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "cik": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "tickers": {
@@ -239,13 +215,9 @@
                               }
                             },
                             "legalForm": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "status": {
@@ -259,13 +231,9 @@
                               ]
                             },
                             "incorporationDate": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "legalAddress": {
@@ -331,23 +299,15 @@
                               ]
                             },
                             "parentLei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "ultimateParentLei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "domains": {
@@ -469,7 +429,8 @@
                               "enum": [
                                 "CLEAR",
                                 "POTENTIAL_MATCH",
-                                "EXACT_MATCH"
+                                "EXACT_MATCH",
+                                "UNKNOWN"
                               ]
                             },
                             "matchScore": {
@@ -490,7 +451,8 @@
                                     "type": "string",
                                     "enum": [
                                       "OFAC_SDN",
-                                      "EU_FSF"
+                                      "EU_FSF",
+                                      "UN_SC"
                                     ]
                                   },
                                   "externalId": {
@@ -525,6 +487,38 @@
                                 ],
                                 "additionalProperties": false
                               }
+                            },
+                            "degraded": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "degradedReason": {
+                              "type": "string"
+                            },
+                            "coverage": {
+                              "type": "object",
+                              "properties": {
+                                "recordCount": {
+                                  "type": "number"
+                                },
+                                "sourcesScreened": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "lastSyncAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "recordCount",
+                                "sourcesScreened"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -532,7 +526,8 @@
                             "riskLevel",
                             "matchScore",
                             "matchedLists",
-                            "matches"
+                            "matches",
+                            "degraded"
                           ],
                           "additionalProperties": false
                         },
@@ -559,23 +554,15 @@
                               "type": "string"
                             },
                             "registeredName": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registeredAddress": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "checkedAt": {
@@ -650,73 +637,45 @@
                             "type": "string"
                           },
                           "lei": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "registrationNumber": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "registrationAuthority": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "vatNumber": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "vatValid": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "taxId": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "cik": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "tickers": {
@@ -726,13 +685,9 @@
                             }
                           },
                           "legalForm": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "status": {
@@ -746,13 +701,9 @@
                             ]
                           },
                           "incorporationDate": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "legalAddress": {
@@ -818,23 +769,15 @@
                             ]
                           },
                           "parentLei": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "ultimateParentLei": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "domains": {
@@ -939,6 +882,31 @@
                         "additionalProperties": false
                       }
                     },
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "country": {
+                          "type": "string"
+                        },
+                        "level": {
+                          "type": "string"
+                        },
+                        "sourcesTried": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "paidSourceUsed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "country",
+                        "level",
+                        "sourcesTried",
+                        "paidSourceUsed"
+                      ],
+                      "additionalProperties": false
+                    },
                     "latencyMs": {
                       "type": "number"
                     }
@@ -978,7 +946,7 @@
           "scheme": "exact",
           "priceUsd": "0.005",
           "network": "eip155:84532",
-          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "payTo": "0x000000000000000000000000000000000000dEaD",
           "facilitatorUrl": "https://x402.org/facilitator",
           "freeCallsPerDay": 5
         },
@@ -986,10 +954,9 @@
           "priceUsd": "0.005",
           "currency": "USD",
           "methods": [
-            "tempo",
-            "stripe"
+            "tempo"
           ],
-          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "recipient": "0x000000000000000000000000000000000000dEaD",
           "testnet": true
         },
         "requestBody": {
@@ -1034,23 +1001,15 @@
                       "type": "string"
                     },
                     "registeredName": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "registeredAddress": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "checkedAt": {
@@ -1107,73 +1066,45 @@
                               "type": "string"
                             },
                             "lei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registrationNumber": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registrationAuthority": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "vatNumber": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "vatValid": {
-                              "anyOf": [
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "boolean",
+                                "null"
                               ]
                             },
                             "taxId": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "cik": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "tickers": {
@@ -1183,13 +1114,9 @@
                               }
                             },
                             "legalForm": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "status": {
@@ -1203,13 +1130,9 @@
                               ]
                             },
                             "incorporationDate": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "legalAddress": {
@@ -1275,23 +1198,15 @@
                               ]
                             },
                             "parentLei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "ultimateParentLei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "domains": {
@@ -1436,7 +1351,7 @@
           "scheme": "exact",
           "priceUsd": "0.005",
           "network": "eip155:84532",
-          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "payTo": "0x000000000000000000000000000000000000dEaD",
           "facilitatorUrl": "https://x402.org/facilitator",
           "freeCallsPerDay": 5
         },
@@ -1444,10 +1359,9 @@
           "priceUsd": "0.005",
           "currency": "USD",
           "methods": [
-            "tempo",
-            "stripe"
+            "tempo"
           ],
-          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "recipient": "0x000000000000000000000000000000000000dEaD",
           "testnet": true
         },
         "requestBody": {
@@ -1501,7 +1415,8 @@
                       "enum": [
                         "CLEAR",
                         "POTENTIAL_MATCH",
-                        "EXACT_MATCH"
+                        "EXACT_MATCH",
+                        "UNKNOWN"
                       ]
                     },
                     "matchScore": {
@@ -1522,7 +1437,8 @@
                             "type": "string",
                             "enum": [
                               "OFAC_SDN",
-                              "EU_FSF"
+                              "EU_FSF",
+                              "UN_SC"
                             ]
                           },
                           "externalId": {
@@ -1557,6 +1473,38 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "degraded": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "degradedReason": {
+                      "type": "string"
+                    },
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "recordCount": {
+                          "type": "number"
+                        },
+                        "sourcesScreened": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "lastSyncAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "recordCount",
+                        "sourcesScreened"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -1564,7 +1512,8 @@
                     "riskLevel",
                     "matchScore",
                     "matchedLists",
-                    "matches"
+                    "matches",
+                    "degraded"
                   ],
                   "additionalProperties": false
                 }
@@ -1590,7 +1539,7 @@
           "scheme": "exact",
           "priceUsd": "0.010",
           "network": "eip155:84532",
-          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "payTo": "0x000000000000000000000000000000000000dEaD",
           "facilitatorUrl": "https://x402.org/facilitator",
           "freeCallsPerDay": 5
         },
@@ -1598,10 +1547,9 @@
           "priceUsd": "0.010",
           "currency": "USD",
           "methods": [
-            "tempo",
-            "stripe"
+            "tempo"
           ],
-          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "recipient": "0x000000000000000000000000000000000000dEaD",
           "testnet": true
         },
         "requestBody": {
@@ -1677,13 +1625,9 @@
                       "type": "boolean"
                     },
                     "vatValid": {
-                      "anyOf": [
-                        {
-                          "type": "boolean"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "boolean",
+                        "null"
                       ]
                     },
                     "entity": {
@@ -1726,73 +1670,45 @@
                               "type": "string"
                             },
                             "lei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registrationNumber": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registrationAuthority": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "vatNumber": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "vatValid": {
-                              "anyOf": [
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "boolean",
+                                "null"
                               ]
                             },
                             "taxId": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "cik": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "tickers": {
@@ -1802,13 +1718,9 @@
                               }
                             },
                             "legalForm": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "status": {
@@ -1822,13 +1734,9 @@
                               ]
                             },
                             "incorporationDate": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "legalAddress": {
@@ -1894,23 +1802,15 @@
                               ]
                             },
                             "parentLei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "ultimateParentLei": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "domains": {
@@ -2037,23 +1937,15 @@
                               "type": "string"
                             },
                             "registeredName": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "registeredAddress": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "checkedAt": {
@@ -2101,7 +1993,8 @@
                               "enum": [
                                 "CLEAR",
                                 "POTENTIAL_MATCH",
-                                "EXACT_MATCH"
+                                "EXACT_MATCH",
+                                "UNKNOWN"
                               ]
                             },
                             "matchScore": {
@@ -2122,7 +2015,8 @@
                                     "type": "string",
                                     "enum": [
                                       "OFAC_SDN",
-                                      "EU_FSF"
+                                      "EU_FSF",
+                                      "UN_SC"
                                     ]
                                   },
                                   "externalId": {
@@ -2157,6 +2051,38 @@
                                 ],
                                 "additionalProperties": false
                               }
+                            },
+                            "degraded": {
+                              "default": false,
+                              "type": "boolean"
+                            },
+                            "degradedReason": {
+                              "type": "string"
+                            },
+                            "coverage": {
+                              "type": "object",
+                              "properties": {
+                                "recordCount": {
+                                  "type": "number"
+                                },
+                                "sourcesScreened": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "lastSyncAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "recordCount",
+                                "sourcesScreened"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -2164,7 +2090,8 @@
                             "riskLevel",
                             "matchScore",
                             "matchedLists",
-                            "matches"
+                            "matches",
+                            "degraded"
                           ],
                           "additionalProperties": false
                         },
@@ -2220,7 +2147,7 @@
           "scheme": "exact",
           "priceUsd": "0.003",
           "network": "eip155:84532",
-          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "payTo": "0x000000000000000000000000000000000000dEaD",
           "facilitatorUrl": "https://x402.org/facilitator",
           "freeCallsPerDay": 5
         },
@@ -2228,10 +2155,9 @@
           "priceUsd": "0.003",
           "currency": "USD",
           "methods": [
-            "tempo",
-            "stripe"
+            "tempo"
           ],
-          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "recipient": "0x000000000000000000000000000000000000dEaD",
           "testnet": true
         },
         "requestBody": {
@@ -2252,6 +2178,10 @@
                   },
                   "payeeName": {
                     "description": "Optional legal payee name to cross-check against bank account jurisdiction",
+                    "type": "string"
+                  },
+                  "payeeTaxId": {
+                    "description": "National tax/business registration number (e.g. Polish NIP or Czech IČO) to verify account ownership against official public registers",
                     "type": "string"
                   }
                 },
@@ -2281,40 +2211,40 @@
                       "type": "string"
                     },
                     "bankCode": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "checksumValid": {
                       "type": "boolean"
                     },
                     "countryMatch": {
-                      "anyOf": [
-                        {
-                          "type": "boolean"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "boolean",
+                        "null"
                       ]
                     },
                     "expectedLength": {
-                      "anyOf": [
-                        {
-                          "type": "number"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "number",
+                        "null"
                       ]
                     },
                     "actualLength": {
                       "type": "number"
+                    },
+                    "ownershipVerified": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "ownershipSource": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "issues": {
                       "type": "array",
@@ -2362,7 +2292,7 @@
           "scheme": "exact",
           "priceUsd": "0.025",
           "network": "eip155:84532",
-          "payTo": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "payTo": "0x000000000000000000000000000000000000dEaD",
           "facilitatorUrl": "https://x402.org/facilitator",
           "freeCallsPerDay": 5
         },
@@ -2370,10 +2300,9 @@
           "priceUsd": "0.025",
           "currency": "USD",
           "methods": [
-            "tempo",
-            "stripe"
+            "tempo"
           ],
-          "recipient": "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
+          "recipient": "0x000000000000000000000000000000000000dEaD",
           "testnet": true
         },
         "requestBody": {
@@ -2491,73 +2420,45 @@
                                     "type": "string"
                                   },
                                   "lei": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "registrationNumber": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "registrationAuthority": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "vatNumber": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "vatValid": {
-                                    "anyOf": [
-                                      {
-                                        "type": "boolean"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "boolean",
+                                      "null"
                                     ]
                                   },
                                   "taxId": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "cik": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "tickers": {
@@ -2567,13 +2468,9 @@
                                     }
                                   },
                                   "legalForm": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "status": {
@@ -2587,13 +2484,9 @@
                                     ]
                                   },
                                   "incorporationDate": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "legalAddress": {
@@ -2659,23 +2552,15 @@
                                     ]
                                   },
                                   "parentLei": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "ultimateParentLei": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "domains": {

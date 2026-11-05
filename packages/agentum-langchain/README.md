@@ -1,9 +1,11 @@
 # Agentum LangChain Toolkit (`agentum-langchain`)
 
+Registry availability depends on the server configuration. UK Companies House is verified locally; hosted UK access is not yet confirmed. Australian ABR and New Zealand NZBN are disabled without credentials; Japan NTA is pending approval. GLEIF lookup can still return LEI holders in these countries. Check `/v1/coverage` for the connected server’s current registry coverage.
+
 [![npm version](https://img.shields.io/npm/v/agentum-langchain.svg)](https://www.npmjs.com/package/agentum-langchain)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Official LangChain and multi-provider AI agent toolkit for [Agentum](https://agentum.asimplek.cloud) — Authoritative, deterministic corporate entity resolution across global national registries (**UK Companies House**, **Swiss ZEFIX**, **Australian ABR**, **Singapore ACRA**, **US SEC EDGAR**, **European Union Registries**, and **Worldwide GLEIF LEI**), live **European Commission VIES VAT** validation, and **OFAC SDN / EU Financial / UN Sanctions** screening.
+Official LangChain and multi-provider AI agent toolkit for [Agentum](https://agentum.asimplek.cloud) — Authoritative, deterministic corporate entity resolution across global national registries (**UK Companies House**, **Swiss ZEFIX**, **Singapore ACRA**, **US SEC EDGAR**, **European Union Registries**, and **Worldwide GLEIF LEI**), live **European Commission VIES VAT** validation, and **OFAC SDN / EU Financial / UN Sanctions** screening.
 
 Includes **zero-signup free tier** (10 calls/day) and autonomous micropayment settlement via Coinbase **x402 v2** on Base USDC.
 
@@ -42,7 +44,7 @@ const response = await agent.invoke({
   messages: [
     {
       role: "user",
-      content: "Verify Grab Holdings in Singapore (UEN) and Atlassian in Australia (ABN), and check sanctions.",
+      content: "Verify Grab Holdings in Singapore (UEN) and Nestle in Switzerland (UID), and check sanctions.",
     },
   ],
 });
@@ -61,7 +63,6 @@ Resolves companies across global registries by legal name, national registration
 - **National Registry Coverage:**
   - 🇬🇧 **United Kingdom:** Companies House (CRN 8-char)
   - 🇨🇭 **Switzerland:** ZEFIX Central Business Names Index (UID `CHE-xxx.xxx.xxx`)
-  - 🇦🇺 **Australia:** ABR Australian Business Register (ABN 11-digit, ACN 9-digit)
   - 🇸🇬 **Singapore:** ACRA Business Registry (UEN 9/10-char)
   - 🇺🇸 **United States:** SEC EDGAR (CIK 10-digit / EIN)
   - 🇪🇺 **European Union:** National business registers & VIES VAT
@@ -141,3 +142,7 @@ const response = await openai.chat.completions.create({
 ## License
 
 MIT © [Algimantas Krasauskas](https://github.com/Algiras) / [Agentum](https://agentum.asimplek.cloud)
+
+## Optional company notices (0.3.0)
+
+`resolveEntity({ query: "891506057", jurisdiction: "FR", includeCompanyEvents: true })` opts into official French BODACC notices on servers supporting this option. The tool and OpenAI schema expose the same flag. Notices are historical evidence and do not establish current status or ownership. The core change is merged; hosted deployment has not yet been verified. See [release evidence](../../docs/company-events-and-official-sanctions.md).

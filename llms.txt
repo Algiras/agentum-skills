@@ -1,22 +1,22 @@
 # Agentum — Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening.
+> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
 
 ## Access & Pricing
 - **Free Tier:** 5 free calls/day per agent (`X-Agent-Id` or IP) — zero signup or API keys required.
 - **Inline HTTP 402 Micropayments:**
-  1. **x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on `eip155:84532` to `0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e`.
+  1. **x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on Base (`eip155:8453` / testnet `eip155:84532`) to `0x000000000000000000000000000000000000dEaD`.
   2. **Stripe + Tempo MPP (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Settles Tempo stablecoins and Stripe PaymentIntents / Shared Payment Tokens.
 
 ## Machine Discovery Endpoints
-- Streamable HTTP MCP Server: http://localhost:3000/mcp
-- MCP Manifest: http://localhost:3000/.well-known/mcp.json
-- OpenAPI 3.1 Spec: http://localhost:3000/openapi.json
-- OpenAI Plugin Manifest: http://localhost:3000/.well-known/ai-plugin.json
-- A2A Agent Card: http://localhost:3000/.well-known/agent.json
-- x402 Bazaar Manifest: http://localhost:3000/.well-known/x402.json
-- MPP Manifest: http://localhost:3000/.well-known/mpp.json
-- Full LLM Guide: http://localhost:3000/llms-full.txt
+- Streamable HTTP MCP Server: https://agentum.asimplek.cloud/mcp
+- MCP Manifest: https://agentum.asimplek.cloud/.well-known/mcp.json
+- OpenAPI 3.1 Spec: https://agentum.asimplek.cloud/openapi.json
+- OpenAI Plugin Manifest: https://agentum.asimplek.cloud/.well-known/ai-plugin.json
+- A2A Agent Card: https://agentum.asimplek.cloud/.well-known/agent.json
+- x402 Bazaar Manifest: https://agentum.asimplek.cloud/.well-known/x402.json
+- MPP Manifest: https://agentum.asimplek.cloud/.well-known/mpp.json
+- Full LLM Guide: https://agentum.asimplek.cloud/llms-full.txt
 - Skills & Plugin Repo: https://github.com/Algiras/agentum-skills
 
 ## Available Tools

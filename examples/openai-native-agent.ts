@@ -38,7 +38,7 @@ async function main() {
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: "user",
-      content: "Please check company registration and sanctions for 'Atlassian' in Australia (ABN) and 'Nestle' in Switzerland (UID).",
+      content: "Please check company registration and sanctions for 'Nestle' in Switzerland (ABN) and 'Nestle' in Switzerland (UID).",
     },
   ];
 

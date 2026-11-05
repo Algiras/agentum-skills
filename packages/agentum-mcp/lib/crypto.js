@@ -5,6 +5,8 @@
  */
 
 const crypto = require("node:crypto");
+const { verifyMessage } = require("viem");
+const { privateKeyToAccount } = require("viem/accounts");
 
 // Keccak-256 constants
 const RC = [
@@ -123,51 +125,36 @@ function privateKeyToAddress(privateKeyHex) {
   return toChecksumAddress("0x" + hash.slice(-20).toString("hex"));
 }
 
-function createSec1KeyObject(rawHex) {
-  const sec1Der = Buffer.concat([
-    Buffer.from("302e0201010420", "hex"),
-    Buffer.from(rawHex, "hex"),
-    Buffer.from("a00706052b8104000a", "hex"),
-  ]);
-  return crypto.createPrivateKey({ key: sec1Der, format: "der", type: "sec1" });
-}
-
-function signMessage(message, privateKeyHex) {
+async function signMessage(message, privateKeyHex) {
   const hex = normalizePrivateKey(privateKeyHex);
-  const keyObj = createSec1KeyObject(hex);
-
-  const msgBuffer = Buffer.isBuffer(message) ? message : Buffer.from(String(message), "utf-8");
-
-  // Format Ethereum signed message: \x19Ethereum Signed Message:\n<length><message>
-  const prefix = Buffer.from(`\x19Ethereum Signed Message:\n${msgBuffer.length}`, "utf-8");
-  const prefixed = Buffer.concat([prefix, msgBuffer]);
-
-  // Sign using SHA256 (standard secp256k1 signature)
-  const signer = crypto.createSign("SHA256");
-  signer.update(prefixed);
-  const rawSig = signer.sign({ key: keyObj, dsaEncoding: "ieee-p1363" }); // 64 bytes: r (32) + s (32)
-
-  const r = "0x" + rawSig.subarray(0, 32).toString("hex");
-  const s = "0x" + rawSig.subarray(32, 64).toString("hex");
-  const v = 27; // Standard EVM recovery byte
-  const vHex = v.toString(16).padStart(2, "0");
-  const signature = "0x" + rawSig.toString("hex") + vHex;
-
+  const account = privateKeyToAccount(`0x${hex}`);
+  const msgStr = typeof message === "string" ? message : Buffer.isBuffer(message) ? message.toString("utf-8") : String(message);
+  const signature = await account.signMessage({ message: msgStr });
+  const rawSig = signature.slice(2);
+  const r = "0x" + rawSig.substring(0, 64);
+  const s = "0x" + rawSig.substring(64, 128);
+  const v = parseInt(rawSig.substring(128, 130), 16);
   return { r, s, v, signature };
 }
 
-function verifySignature(message, signatureHex, expectedAddress) {
+async function verifySignature(message, signatureHex, expectedAddress) {
   try {
     if (!signatureHex || typeof signatureHex !== "string" || !signatureHex.startsWith("0x")) {
       return false;
     }
-    const cleanSig = signatureHex.slice(2);
-    if (cleanSig.length !== 130) {
+    if (signatureHex.length !== 132) {
       return false;
     }
-    // We check address format validity
-    const expected = toChecksumAddress(expectedAddress);
-    return expected.startsWith("0x") && expected.length === 42;
+    if (!expectedAddress || typeof expectedAddress !== "string") {
+      return false;
+    }
+    const msgStr = typeof message === "string" ? message : Buffer.isBuffer(message) ? message.toString("utf-8") : String(message);
+    const valid = await verifyMessage({
+      address: expectedAddress,
+      message: msgStr,
+      signature: signatureHex,
+    });
+    return valid === true;
   } catch {
     return false;
   }

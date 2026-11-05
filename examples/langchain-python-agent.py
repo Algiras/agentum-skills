@@ -2,7 +2,7 @@
 Example: Python LangChain Agent with Agentum Corporate Entity & Compliance API
 
 Demonstrates how to build a Python LangChain agent that resolves corporate entities across
-global registries (UK, Switzerland, Australia, Singapore, US, EU) and screens sanctions.
+global registries (UK, Switzerland, Singapore, US, EU) and screens sanctions.
 
 Requirements:
     pip install langchain langchain-openai httpx
@@ -28,7 +28,7 @@ AGENT_ID = "langchain-python-agent"
 @tool
 def resolve_entity(query: str, jurisdiction: Optional[str] = None, check_sanctions: bool = False, verify_vat: bool = False) -> str:
     """Authoritative deterministic corporate identity resolution across global national registries
-    (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI).
+    (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI).
     Resolves registration number, legal form, status, registered address, tax ID, and LEI.
     """
     payload = {
@@ -118,7 +118,7 @@ Thought:{agent_scratchpad}""")
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
     query = (
-        "Verify 'Revolut Bank UAB' in Lithuania with EU VAT LT100011706713, and 'Atlassian' in Australia. "
+        "Verify 'Revolut Bank UAB' in Lithuania with EU VAT LT100011706713, and 'Nestle' in Switzerland. "
         "Confirm their official registration numbers, check VAT validity, and verify whether either has any sanctions hits."
     )
 

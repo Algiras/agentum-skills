@@ -16,10 +16,11 @@ import {
 } from "./client.js";
 
 export const ResolveEntitySchema = z.object({
+  includeCompanyEvents: z.boolean().optional().describe("Include recent official company notices where available (France BODACC); notices do not establish current status or ownership."),
   query: z
     .string()
     .describe(
-      "Company legal name, registration number (UK CRN, Swiss UID, Australian ABN/ACN, Singapore UEN, Lithuanian JAR, US SEC CIK/EIN), LEI (20-character ISO 17442), EU VAT number, or corporate domain."
+      "Company legal name, registration number (UK CRN, Swiss UID, Singapore UEN, Lithuanian JAR, US SEC CIK/EIN), LEI (20-character ISO 17442), EU VAT number, or corporate domain."
     ),
   jurisdiction: z
     .string()
@@ -80,7 +81,7 @@ export const CheckVendorSchema = z.object({
   registrationNumber: z
     .string()
     .optional()
-    .describe("Optional company number (UK CRN, Swiss UID, Australian ABN, Singapore UEN, US CIK, LEI)."),
+    .describe("Optional company number (UK CRN, Swiss UID, Singapore UEN, US CIK, LEI)."),
   domain: z.string().optional().describe("Optional primary corporate web domain (e.g. 'siemens.com')."),
 });
 
@@ -118,7 +119,7 @@ export function createResolveEntityTool(client: AgentumClient): StructuredTool {
     {
       name: "resolve_entity",
       description:
-        "Authoritative deterministic corporate identity resolution across global registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI). Resolves registration number, legal form, status, registered address, tax ID, and LEI.",
+        "Authoritative deterministic corporate identity resolution across global registries (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI). Resolves registration number, legal form, status, registered address, tax ID, and LEI.",
       schema: ResolveEntitySchema,
     }
   );

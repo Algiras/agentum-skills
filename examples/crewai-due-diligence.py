@@ -25,7 +25,7 @@ AGENTUM_BASE_URL = os.getenv("AGENTUM_URL", "https://agentum.asimplek.cloud")
 @tool("resolve_entity")
 def resolve_entity(query: str, jurisdiction: Optional[str] = None) -> str:
     """Resolves corporate identity across global national registries (UK, Switzerland,
-    Australia, Singapore, US, EU, and worldwide GLEIF LEI). Returns legal name, registration number,
+    Singapore, US, EU, and worldwide GLEIF LEI). Returns legal name, registration number,
     status, and address.
     """
     with httpx.Client(timeout=15.0) as client:
@@ -65,7 +65,7 @@ def main():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("Notice: OPENAI_API_KEY is not set. Simulating direct registry lookup:")
-        print(resolve_entity.invoke({"query": "53004085616", "jurisdiction": "AU"}))
+        print(resolve_entity.invoke({"query": "53004085616", "jurisdiction": "CH"}))
         return
 
     # Agent 1: Corporate Investigator
@@ -88,7 +88,7 @@ def main():
 
     # Tasks
     task_investigate = Task(
-        description="Verify the corporate identity and registration of 'Grab Holdings' in Singapore and 'Atlassian' in Australia.",
+        description="Verify the corporate identity and registration of 'Grab Holdings' in Singapore and 'Nestle' in Switzerland.",
         expected_output="Detailed registration profile with national ID, status, and jurisdiction for each entity.",
         agent=investigator,
     )

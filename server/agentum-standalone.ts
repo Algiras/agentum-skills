@@ -1,5 +1,1767 @@
 // @bun
-// src/adapters/outbound/persistence/payment-ledger.adapter.ts
+var __create = Object.create;
+var __getProtoOf = Object.getPrototypeOf;
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+function __accessProp(key) {
+  return this[key];
+}
+var __toESMCache_node;
+var __toESMCache_esm;
+var __toESM = (mod, isNodeMode, target) => {
+  var canCache = mod != null && typeof mod === "object";
+  if (canCache) {
+    var cache = isNodeMode ? __toESMCache_node ??= new WeakMap : __toESMCache_esm ??= new WeakMap;
+    var cached = cache.get(mod);
+    if (cached)
+      return cached;
+  }
+  target = mod != null ? __create(__getProtoOf(mod)) : {};
+  const to = isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
+  if (mod && typeof mod === "object" || typeof mod === "function") {
+    for (let key of __getOwnPropNames(mod))
+      if (!__hasOwnProp.call(to, key))
+        __defProp(to, key, {
+          get: __accessProp.bind(mod, key),
+          enumerable: true
+        });
+  }
+  if (canCache)
+    cache.set(mod, to);
+  return to;
+};
+var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+var __returnValue = (v) => v;
+function __exportSetter(name, newValue) {
+  this[name] = __returnValue.bind(null, newValue);
+}
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, {
+      get: all[name],
+      enumerable: true,
+      configurable: true,
+      set: __exportSetter.bind(all, name)
+    });
+};
+
+// ../../../../Projects/agentum/node_modules/xmlchars/xml/1.0/ed5.js
+var require_ed5 = __commonJS(function(exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  exports.CHAR = `\t
+\r -\uD7FF\uE000-\uFFFD\uD800\uDC00-\uDBFF\uDFFF`;
+  exports.S = ` 	\r
+`;
+  exports.NAME_START_CHAR = ":A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\uD800\uDC00-\uDB7F\uDFFF";
+  exports.NAME_CHAR = "-" + exports.NAME_START_CHAR + ".0-9\xB7\u0300-\u036F\u203F-\u2040";
+  exports.CHAR_RE = new RegExp("^[" + exports.CHAR + "]$", "u");
+  exports.S_RE = new RegExp("^[" + exports.S + "]+$", "u");
+  exports.NAME_START_CHAR_RE = new RegExp("^[" + exports.NAME_START_CHAR + "]$", "u");
+  exports.NAME_CHAR_RE = new RegExp("^[" + exports.NAME_CHAR + "]$", "u");
+  exports.NAME_RE = new RegExp("^[" + exports.NAME_START_CHAR + "][" + exports.NAME_CHAR + "]*$", "u");
+  exports.NMTOKEN_RE = new RegExp("^[" + exports.NAME_CHAR + "]+$", "u");
+  var TAB = 9;
+  var NL = 10;
+  var CR = 13;
+  var SPACE = 32;
+  exports.S_LIST = [SPACE, NL, CR, TAB];
+  function isChar(c) {
+    return c >= SPACE && c <= 55295 || c === NL || c === CR || c === TAB || c >= 57344 && c <= 65533 || c >= 65536 && c <= 1114111;
+  }
+  exports.isChar = isChar;
+  function isS(c) {
+    return c === SPACE || c === NL || c === CR || c === TAB;
+  }
+  exports.isS = isS;
+  function isNameStartChar(c) {
+    return c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 58 || c === 95 || c === 8204 || c === 8205 || c >= 192 && c <= 214 || c >= 216 && c <= 246 || c >= 248 && c <= 767 || c >= 880 && c <= 893 || c >= 895 && c <= 8191 || c >= 8304 && c <= 8591 || c >= 11264 && c <= 12271 || c >= 12289 && c <= 55295 || c >= 63744 && c <= 64975 || c >= 65008 && c <= 65533 || c >= 65536 && c <= 983039;
+  }
+  exports.isNameStartChar = isNameStartChar;
+  function isNameChar(c) {
+    return isNameStartChar(c) || c >= 48 && c <= 57 || c === 45 || c === 46 || c === 183 || c >= 768 && c <= 879 || c >= 8255 && c <= 8256;
+  }
+  exports.isNameChar = isNameChar;
+});
+
+// ../../../../Projects/agentum/node_modules/xmlchars/xml/1.1/ed2.js
+var require_ed2 = __commonJS(function(exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  exports.CHAR = "\x01-\uD7FF\uE000-\uFFFD\uD800\uDC00-\uDBFF\uDFFF";
+  exports.RESTRICTED_CHAR = "\x01-\b\v\f\x0E-\x1F\x7F-\x84\x86-\x9F";
+  exports.S = ` 	\r
+`;
+  exports.NAME_START_CHAR = ":A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\uD800\uDC00-\uDB7F\uDFFF";
+  exports.NAME_CHAR = "-" + exports.NAME_START_CHAR + ".0-9\xB7\u0300-\u036F\u203F-\u2040";
+  exports.CHAR_RE = new RegExp("^[" + exports.CHAR + "]$", "u");
+  exports.RESTRICTED_CHAR_RE = new RegExp("^[" + exports.RESTRICTED_CHAR + "]$", "u");
+  exports.S_RE = new RegExp("^[" + exports.S + "]+$", "u");
+  exports.NAME_START_CHAR_RE = new RegExp("^[" + exports.NAME_START_CHAR + "]$", "u");
+  exports.NAME_CHAR_RE = new RegExp("^[" + exports.NAME_CHAR + "]$", "u");
+  exports.NAME_RE = new RegExp("^[" + exports.NAME_START_CHAR + "][" + exports.NAME_CHAR + "]*$", "u");
+  exports.NMTOKEN_RE = new RegExp("^[" + exports.NAME_CHAR + "]+$", "u");
+  var TAB = 9;
+  var NL = 10;
+  var CR = 13;
+  var SPACE = 32;
+  exports.S_LIST = [SPACE, NL, CR, TAB];
+  function isChar(c) {
+    return c >= 1 && c <= 55295 || c >= 57344 && c <= 65533 || c >= 65536 && c <= 1114111;
+  }
+  exports.isChar = isChar;
+  function isRestrictedChar(c) {
+    return c >= 1 && c <= 8 || c === 11 || c === 12 || c >= 14 && c <= 31 || c >= 127 && c <= 132 || c >= 134 && c <= 159;
+  }
+  exports.isRestrictedChar = isRestrictedChar;
+  function isCharAndNotRestricted(c) {
+    return c === 9 || c === 10 || c === 13 || c > 31 && c < 127 || c === 133 || c > 159 && c <= 55295 || c >= 57344 && c <= 65533 || c >= 65536 && c <= 1114111;
+  }
+  exports.isCharAndNotRestricted = isCharAndNotRestricted;
+  function isS(c) {
+    return c === SPACE || c === NL || c === CR || c === TAB;
+  }
+  exports.isS = isS;
+  function isNameStartChar(c) {
+    return c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 58 || c === 95 || c === 8204 || c === 8205 || c >= 192 && c <= 214 || c >= 216 && c <= 246 || c >= 248 && c <= 767 || c >= 880 && c <= 893 || c >= 895 && c <= 8191 || c >= 8304 && c <= 8591 || c >= 11264 && c <= 12271 || c >= 12289 && c <= 55295 || c >= 63744 && c <= 64975 || c >= 65008 && c <= 65533 || c >= 65536 && c <= 983039;
+  }
+  exports.isNameStartChar = isNameStartChar;
+  function isNameChar(c) {
+    return isNameStartChar(c) || c >= 48 && c <= 57 || c === 45 || c === 46 || c === 183 || c >= 768 && c <= 879 || c >= 8255 && c <= 8256;
+  }
+  exports.isNameChar = isNameChar;
+});
+
+// ../../../../Projects/agentum/node_modules/xmlchars/xmlns/1.0/ed3.js
+var require_ed3 = __commonJS(function(exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  exports.NC_NAME_START_CHAR = "A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\uD800\uDC00-\uDB7F\uDFFF";
+  exports.NC_NAME_CHAR = "-" + exports.NC_NAME_START_CHAR + ".0-9\xB7\u0300-\u036F\u203F-\u2040";
+  exports.NC_NAME_START_CHAR_RE = new RegExp("^[" + exports.NC_NAME_START_CHAR + "]$", "u");
+  exports.NC_NAME_CHAR_RE = new RegExp("^[" + exports.NC_NAME_CHAR + "]$", "u");
+  exports.NC_NAME_RE = new RegExp("^[" + exports.NC_NAME_START_CHAR + "][" + exports.NC_NAME_CHAR + "]*$", "u");
+  function isNCNameStartChar(c) {
+    return c >= 65 && c <= 90 || c === 95 || c >= 97 && c <= 122 || c >= 192 && c <= 214 || c >= 216 && c <= 246 || c >= 248 && c <= 767 || c >= 880 && c <= 893 || c >= 895 && c <= 8191 || c >= 8204 && c <= 8205 || c >= 8304 && c <= 8591 || c >= 11264 && c <= 12271 || c >= 12289 && c <= 55295 || c >= 63744 && c <= 64975 || c >= 65008 && c <= 65533 || c >= 65536 && c <= 983039;
+  }
+  exports.isNCNameStartChar = isNCNameStartChar;
+  function isNCNameChar(c) {
+    return isNCNameStartChar(c) || (c === 45 || c === 46 || c >= 48 && c <= 57 || c === 183 || c >= 768 && c <= 879 || c >= 8255 && c <= 8256);
+  }
+  exports.isNCNameChar = isNCNameChar;
+});
+
+// ../../../../Projects/agentum/node_modules/saxes/saxes.js
+var require_saxes = __commonJS(function(exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  exports.SaxesParser = exports.EVENTS = undefined;
+  var ed5 = require_ed5();
+  var ed2 = require_ed2();
+  var NSed3 = require_ed3();
+  var isS = ed5.isS;
+  var isChar10 = ed5.isChar;
+  var isNameStartChar = ed5.isNameStartChar;
+  var isNameChar = ed5.isNameChar;
+  var S_LIST = ed5.S_LIST;
+  var NAME_RE = ed5.NAME_RE;
+  var isChar11 = ed2.isChar;
+  var isNCNameStartChar = NSed3.isNCNameStartChar;
+  var isNCNameChar = NSed3.isNCNameChar;
+  var NC_NAME_RE = NSed3.NC_NAME_RE;
+  var XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
+  var XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
+  var rootNS = {
+    __proto__: null,
+    xml: XML_NAMESPACE,
+    xmlns: XMLNS_NAMESPACE
+  };
+  var XML_ENTITIES = {
+    __proto__: null,
+    amp: "&",
+    gt: ">",
+    lt: "<",
+    quot: '"',
+    apos: "'"
+  };
+  var EOC = -1;
+  var NL_LIKE = -2;
+  var S_BEGIN = 0;
+  var S_BEGIN_WHITESPACE = 1;
+  var S_DOCTYPE = 2;
+  var S_DOCTYPE_QUOTE = 3;
+  var S_DTD = 4;
+  var S_DTD_QUOTED = 5;
+  var S_DTD_OPEN_WAKA = 6;
+  var S_DTD_OPEN_WAKA_BANG = 7;
+  var S_DTD_COMMENT = 8;
+  var S_DTD_COMMENT_ENDING = 9;
+  var S_DTD_COMMENT_ENDED = 10;
+  var S_DTD_PI = 11;
+  var S_DTD_PI_ENDING = 12;
+  var S_TEXT = 13;
+  var S_ENTITY = 14;
+  var S_OPEN_WAKA = 15;
+  var S_OPEN_WAKA_BANG = 16;
+  var S_COMMENT = 17;
+  var S_COMMENT_ENDING = 18;
+  var S_COMMENT_ENDED = 19;
+  var S_CDATA = 20;
+  var S_CDATA_ENDING = 21;
+  var S_CDATA_ENDING_2 = 22;
+  var S_PI_FIRST_CHAR = 23;
+  var S_PI_REST = 24;
+  var S_PI_BODY = 25;
+  var S_PI_ENDING = 26;
+  var S_XML_DECL_NAME_START = 27;
+  var S_XML_DECL_NAME = 28;
+  var S_XML_DECL_EQ = 29;
+  var S_XML_DECL_VALUE_START = 30;
+  var S_XML_DECL_VALUE = 31;
+  var S_XML_DECL_SEPARATOR = 32;
+  var S_XML_DECL_ENDING = 33;
+  var S_OPEN_TAG = 34;
+  var S_OPEN_TAG_SLASH = 35;
+  var S_ATTRIB = 36;
+  var S_ATTRIB_NAME = 37;
+  var S_ATTRIB_NAME_SAW_WHITE = 38;
+  var S_ATTRIB_VALUE = 39;
+  var S_ATTRIB_VALUE_QUOTED = 40;
+  var S_ATTRIB_VALUE_CLOSED = 41;
+  var S_ATTRIB_VALUE_UNQUOTED = 42;
+  var S_CLOSE_TAG = 43;
+  var S_CLOSE_TAG_SAW_WHITE = 44;
+  var TAB = 9;
+  var NL = 10;
+  var CR = 13;
+  var SPACE = 32;
+  var BANG = 33;
+  var DQUOTE = 34;
+  var AMP = 38;
+  var SQUOTE = 39;
+  var MINUS = 45;
+  var FORWARD_SLASH = 47;
+  var SEMICOLON = 59;
+  var LESS = 60;
+  var EQUAL = 61;
+  var GREATER = 62;
+  var QUESTION = 63;
+  var OPEN_BRACKET = 91;
+  var CLOSE_BRACKET = 93;
+  var NEL = 133;
+  var LS = 8232;
+  var isQuote = (c) => c === DQUOTE || c === SQUOTE;
+  var QUOTES = [DQUOTE, SQUOTE];
+  var DOCTYPE_TERMINATOR = [...QUOTES, OPEN_BRACKET, GREATER];
+  var DTD_TERMINATOR = [...QUOTES, LESS, CLOSE_BRACKET];
+  var XML_DECL_NAME_TERMINATOR = [EQUAL, QUESTION, ...S_LIST];
+  var ATTRIB_VALUE_UNQUOTED_TERMINATOR = [...S_LIST, GREATER, AMP, LESS];
+  function nsPairCheck(parser, prefix, uri) {
+    switch (prefix) {
+      case "xml":
+        if (uri !== XML_NAMESPACE) {
+          parser.fail(`xml prefix must be bound to ${XML_NAMESPACE}.`);
+        }
+        break;
+      case "xmlns":
+        if (uri !== XMLNS_NAMESPACE) {
+          parser.fail(`xmlns prefix must be bound to ${XMLNS_NAMESPACE}.`);
+        }
+        break;
+      default:
+    }
+    switch (uri) {
+      case XMLNS_NAMESPACE:
+        parser.fail(prefix === "" ? `the default namespace may not be set to ${uri}.` : `may not assign a prefix (even "xmlns") to the URI ${XMLNS_NAMESPACE}.`);
+        break;
+      case XML_NAMESPACE:
+        switch (prefix) {
+          case "xml":
+            break;
+          case "":
+            parser.fail(`the default namespace may not be set to ${uri}.`);
+            break;
+          default:
+            parser.fail("may not assign the xml namespace to another prefix.");
+        }
+        break;
+      default:
+    }
+  }
+  function nsMappingCheck(parser, mapping) {
+    for (const local of Object.keys(mapping)) {
+      nsPairCheck(parser, local, mapping[local]);
+    }
+  }
+  var isNCName = (name) => NC_NAME_RE.test(name);
+  var isName = (name) => NAME_RE.test(name);
+  var FORBIDDEN_START = 0;
+  var FORBIDDEN_BRACKET = 1;
+  var FORBIDDEN_BRACKET_BRACKET = 2;
+  exports.EVENTS = [
+    "xmldecl",
+    "text",
+    "processinginstruction",
+    "doctype",
+    "comment",
+    "opentagstart",
+    "attribute",
+    "opentag",
+    "closetag",
+    "cdata",
+    "error",
+    "end",
+    "ready"
+  ];
+  var EVENT_NAME_TO_HANDLER_NAME = {
+    xmldecl: "xmldeclHandler",
+    text: "textHandler",
+    processinginstruction: "piHandler",
+    doctype: "doctypeHandler",
+    comment: "commentHandler",
+    opentagstart: "openTagStartHandler",
+    attribute: "attributeHandler",
+    opentag: "openTagHandler",
+    closetag: "closeTagHandler",
+    cdata: "cdataHandler",
+    error: "errorHandler",
+    end: "endHandler",
+    ready: "readyHandler"
+  };
+
+  class SaxesParser {
+    constructor(opt) {
+      this.opt = opt !== null && opt !== undefined ? opt : {};
+      this.fragmentOpt = !!this.opt.fragment;
+      const xmlnsOpt = this.xmlnsOpt = !!this.opt.xmlns;
+      this.trackPosition = this.opt.position !== false;
+      this.fileName = this.opt.fileName;
+      if (xmlnsOpt) {
+        this.nameStartCheck = isNCNameStartChar;
+        this.nameCheck = isNCNameChar;
+        this.isName = isNCName;
+        this.processAttribs = this.processAttribsNS;
+        this.pushAttrib = this.pushAttribNS;
+        this.ns = Object.assign({ __proto__: null }, rootNS);
+        const additional = this.opt.additionalNamespaces;
+        if (additional != null) {
+          nsMappingCheck(this, additional);
+          Object.assign(this.ns, additional);
+        }
+      } else {
+        this.nameStartCheck = isNameStartChar;
+        this.nameCheck = isNameChar;
+        this.isName = isName;
+        this.processAttribs = this.processAttribsPlain;
+        this.pushAttrib = this.pushAttribPlain;
+      }
+      this.stateTable = [
+        this.sBegin,
+        this.sBeginWhitespace,
+        this.sDoctype,
+        this.sDoctypeQuote,
+        this.sDTD,
+        this.sDTDQuoted,
+        this.sDTDOpenWaka,
+        this.sDTDOpenWakaBang,
+        this.sDTDComment,
+        this.sDTDCommentEnding,
+        this.sDTDCommentEnded,
+        this.sDTDPI,
+        this.sDTDPIEnding,
+        this.sText,
+        this.sEntity,
+        this.sOpenWaka,
+        this.sOpenWakaBang,
+        this.sComment,
+        this.sCommentEnding,
+        this.sCommentEnded,
+        this.sCData,
+        this.sCDataEnding,
+        this.sCDataEnding2,
+        this.sPIFirstChar,
+        this.sPIRest,
+        this.sPIBody,
+        this.sPIEnding,
+        this.sXMLDeclNameStart,
+        this.sXMLDeclName,
+        this.sXMLDeclEq,
+        this.sXMLDeclValueStart,
+        this.sXMLDeclValue,
+        this.sXMLDeclSeparator,
+        this.sXMLDeclEnding,
+        this.sOpenTag,
+        this.sOpenTagSlash,
+        this.sAttrib,
+        this.sAttribName,
+        this.sAttribNameSawWhite,
+        this.sAttribValue,
+        this.sAttribValueQuoted,
+        this.sAttribValueClosed,
+        this.sAttribValueUnquoted,
+        this.sCloseTag,
+        this.sCloseTagSawWhite
+      ];
+      this._init();
+    }
+    get closed() {
+      return this._closed;
+    }
+    _init() {
+      var _a;
+      this.openWakaBang = "";
+      this.text = "";
+      this.name = "";
+      this.piTarget = "";
+      this.entity = "";
+      this.q = null;
+      this.tags = [];
+      this.tag = null;
+      this.topNS = null;
+      this.chunk = "";
+      this.chunkPosition = 0;
+      this.i = 0;
+      this.prevI = 0;
+      this.carriedFromPrevious = undefined;
+      this.forbiddenState = FORBIDDEN_START;
+      this.attribList = [];
+      const { fragmentOpt } = this;
+      this.state = fragmentOpt ? S_TEXT : S_BEGIN;
+      this.reportedTextBeforeRoot = this.reportedTextAfterRoot = this.closedRoot = this.sawRoot = fragmentOpt;
+      this.xmlDeclPossible = !fragmentOpt;
+      this.xmlDeclExpects = ["version"];
+      this.entityReturnState = undefined;
+      let { defaultXMLVersion } = this.opt;
+      if (defaultXMLVersion === undefined) {
+        if (this.opt.forceXMLVersion === true) {
+          throw new Error("forceXMLVersion set but defaultXMLVersion is not set");
+        }
+        defaultXMLVersion = "1.0";
+      }
+      this.setXMLVersion(defaultXMLVersion);
+      this.positionAtNewLine = 0;
+      this.doctype = false;
+      this._closed = false;
+      this.xmlDecl = {
+        version: undefined,
+        encoding: undefined,
+        standalone: undefined
+      };
+      this.line = 1;
+      this.column = 0;
+      this.ENTITIES = Object.create(XML_ENTITIES);
+      (_a = this.readyHandler) === null || _a === undefined || _a.call(this);
+    }
+    get position() {
+      return this.chunkPosition + this.i;
+    }
+    get columnIndex() {
+      return this.position - this.positionAtNewLine;
+    }
+    on(name, handler) {
+      this[EVENT_NAME_TO_HANDLER_NAME[name]] = handler;
+    }
+    off(name) {
+      this[EVENT_NAME_TO_HANDLER_NAME[name]] = undefined;
+    }
+    makeError(message) {
+      var _a;
+      let msg = (_a = this.fileName) !== null && _a !== undefined ? _a : "";
+      if (this.trackPosition) {
+        if (msg.length > 0) {
+          msg += ":";
+        }
+        msg += `${this.line}:${this.column}`;
+      }
+      if (msg.length > 0) {
+        msg += ": ";
+      }
+      return new Error(msg + message);
+    }
+    fail(message) {
+      const err = this.makeError(message);
+      const handler = this.errorHandler;
+      if (handler === undefined) {
+        throw err;
+      } else {
+        handler(err);
+      }
+      return this;
+    }
+    write(chunk) {
+      if (this.closed) {
+        return this.fail("cannot write after close; assign an onready handler.");
+      }
+      let end = false;
+      if (chunk === null) {
+        end = true;
+        chunk = "";
+      } else if (typeof chunk === "object") {
+        chunk = chunk.toString();
+      }
+      if (this.carriedFromPrevious !== undefined) {
+        chunk = `${this.carriedFromPrevious}${chunk}`;
+        this.carriedFromPrevious = undefined;
+      }
+      let limit = chunk.length;
+      const lastCode = chunk.charCodeAt(limit - 1);
+      if (!end && (lastCode === CR || lastCode >= 55296 && lastCode <= 56319)) {
+        this.carriedFromPrevious = chunk[limit - 1];
+        limit--;
+        chunk = chunk.slice(0, limit);
+      }
+      const { stateTable } = this;
+      this.chunk = chunk;
+      this.i = 0;
+      while (this.i < limit) {
+        stateTable[this.state].call(this);
+      }
+      this.chunkPosition += limit;
+      return end ? this.end() : this;
+    }
+    close() {
+      return this.write(null);
+    }
+    getCode10() {
+      const { chunk, i } = this;
+      this.prevI = i;
+      this.i = i + 1;
+      if (i >= chunk.length) {
+        return EOC;
+      }
+      const code = chunk.charCodeAt(i);
+      this.column++;
+      if (code < 55296) {
+        if (code >= SPACE || code === TAB) {
+          return code;
+        }
+        switch (code) {
+          case NL:
+            this.line++;
+            this.column = 0;
+            this.positionAtNewLine = this.position;
+            return NL;
+          case CR:
+            if (chunk.charCodeAt(i + 1) === NL) {
+              this.i = i + 2;
+            }
+            this.line++;
+            this.column = 0;
+            this.positionAtNewLine = this.position;
+            return NL_LIKE;
+          default:
+            this.fail("disallowed character.");
+            return code;
+        }
+      }
+      if (code > 56319) {
+        if (!(code >= 57344 && code <= 65533)) {
+          this.fail("disallowed character.");
+        }
+        return code;
+      }
+      const final = 65536 + (code - 55296) * 1024 + (chunk.charCodeAt(i + 1) - 56320);
+      this.i = i + 2;
+      if (final > 1114111) {
+        this.fail("disallowed character.");
+      }
+      return final;
+    }
+    getCode11() {
+      const { chunk, i } = this;
+      this.prevI = i;
+      this.i = i + 1;
+      if (i >= chunk.length) {
+        return EOC;
+      }
+      const code = chunk.charCodeAt(i);
+      this.column++;
+      if (code < 55296) {
+        if (code > 31 && code < 127 || code > 159 && code !== LS || code === TAB) {
+          return code;
+        }
+        switch (code) {
+          case NL:
+            this.line++;
+            this.column = 0;
+            this.positionAtNewLine = this.position;
+            return NL;
+          case CR: {
+            const next = chunk.charCodeAt(i + 1);
+            if (next === NL || next === NEL) {
+              this.i = i + 2;
+            }
+          }
+          case NEL:
+          case LS:
+            this.line++;
+            this.column = 0;
+            this.positionAtNewLine = this.position;
+            return NL_LIKE;
+          default:
+            this.fail("disallowed character.");
+            return code;
+        }
+      }
+      if (code > 56319) {
+        if (!(code >= 57344 && code <= 65533)) {
+          this.fail("disallowed character.");
+        }
+        return code;
+      }
+      const final = 65536 + (code - 55296) * 1024 + (chunk.charCodeAt(i + 1) - 56320);
+      this.i = i + 2;
+      if (final > 1114111) {
+        this.fail("disallowed character.");
+      }
+      return final;
+    }
+    getCodeNorm() {
+      const c = this.getCode();
+      return c === NL_LIKE ? NL : c;
+    }
+    unget() {
+      this.i = this.prevI;
+      this.column--;
+    }
+    captureTo(chars) {
+      let { i: start } = this;
+      const { chunk } = this;
+      while (true) {
+        const c = this.getCode();
+        const isNLLike = c === NL_LIKE;
+        const final = isNLLike ? NL : c;
+        if (final === EOC || chars.includes(final)) {
+          this.text += chunk.slice(start, this.prevI);
+          return final;
+        }
+        if (isNLLike) {
+          this.text += `${chunk.slice(start, this.prevI)}
+`;
+          start = this.i;
+        }
+      }
+    }
+    captureToChar(char) {
+      let { i: start } = this;
+      const { chunk } = this;
+      while (true) {
+        let c = this.getCode();
+        switch (c) {
+          case NL_LIKE:
+            this.text += `${chunk.slice(start, this.prevI)}
+`;
+            start = this.i;
+            c = NL;
+            break;
+          case EOC:
+            this.text += chunk.slice(start);
+            return false;
+          default:
+        }
+        if (c === char) {
+          this.text += chunk.slice(start, this.prevI);
+          return true;
+        }
+      }
+    }
+    captureNameChars() {
+      const { chunk, i: start } = this;
+      while (true) {
+        const c = this.getCode();
+        if (c === EOC) {
+          this.name += chunk.slice(start);
+          return EOC;
+        }
+        if (!isNameChar(c)) {
+          this.name += chunk.slice(start, this.prevI);
+          return c === NL_LIKE ? NL : c;
+        }
+      }
+    }
+    skipSpaces() {
+      while (true) {
+        const c = this.getCodeNorm();
+        if (c === EOC || !isS(c)) {
+          return c;
+        }
+      }
+    }
+    setXMLVersion(version) {
+      this.currentXMLVersion = version;
+      if (version === "1.0") {
+        this.isChar = isChar10;
+        this.getCode = this.getCode10;
+      } else {
+        this.isChar = isChar11;
+        this.getCode = this.getCode11;
+      }
+    }
+    sBegin() {
+      if (this.chunk.charCodeAt(0) === 65279) {
+        this.i++;
+        this.column++;
+      }
+      this.state = S_BEGIN_WHITESPACE;
+    }
+    sBeginWhitespace() {
+      const iBefore = this.i;
+      const c = this.skipSpaces();
+      if (this.prevI !== iBefore) {
+        this.xmlDeclPossible = false;
+      }
+      switch (c) {
+        case LESS:
+          this.state = S_OPEN_WAKA;
+          if (this.text.length !== 0) {
+            throw new Error("no-empty text at start");
+          }
+          break;
+        case EOC:
+          break;
+        default:
+          this.unget();
+          this.state = S_TEXT;
+          this.xmlDeclPossible = false;
+      }
+    }
+    sDoctype() {
+      var _a;
+      const c = this.captureTo(DOCTYPE_TERMINATOR);
+      switch (c) {
+        case GREATER: {
+          (_a = this.doctypeHandler) === null || _a === undefined || _a.call(this, this.text);
+          this.text = "";
+          this.state = S_TEXT;
+          this.doctype = true;
+          break;
+        }
+        case EOC:
+          break;
+        default:
+          this.text += String.fromCodePoint(c);
+          if (c === OPEN_BRACKET) {
+            this.state = S_DTD;
+          } else if (isQuote(c)) {
+            this.state = S_DOCTYPE_QUOTE;
+            this.q = c;
+          }
+      }
+    }
+    sDoctypeQuote() {
+      const q = this.q;
+      if (this.captureToChar(q)) {
+        this.text += String.fromCodePoint(q);
+        this.q = null;
+        this.state = S_DOCTYPE;
+      }
+    }
+    sDTD() {
+      const c = this.captureTo(DTD_TERMINATOR);
+      if (c === EOC) {
+        return;
+      }
+      this.text += String.fromCodePoint(c);
+      if (c === CLOSE_BRACKET) {
+        this.state = S_DOCTYPE;
+      } else if (c === LESS) {
+        this.state = S_DTD_OPEN_WAKA;
+      } else if (isQuote(c)) {
+        this.state = S_DTD_QUOTED;
+        this.q = c;
+      }
+    }
+    sDTDQuoted() {
+      const q = this.q;
+      if (this.captureToChar(q)) {
+        this.text += String.fromCodePoint(q);
+        this.state = S_DTD;
+        this.q = null;
+      }
+    }
+    sDTDOpenWaka() {
+      const c = this.getCodeNorm();
+      this.text += String.fromCodePoint(c);
+      switch (c) {
+        case BANG:
+          this.state = S_DTD_OPEN_WAKA_BANG;
+          this.openWakaBang = "";
+          break;
+        case QUESTION:
+          this.state = S_DTD_PI;
+          break;
+        default:
+          this.state = S_DTD;
+      }
+    }
+    sDTDOpenWakaBang() {
+      const char = String.fromCodePoint(this.getCodeNorm());
+      const owb = this.openWakaBang += char;
+      this.text += char;
+      if (owb !== "-") {
+        this.state = owb === "--" ? S_DTD_COMMENT : S_DTD;
+        this.openWakaBang = "";
+      }
+    }
+    sDTDComment() {
+      if (this.captureToChar(MINUS)) {
+        this.text += "-";
+        this.state = S_DTD_COMMENT_ENDING;
+      }
+    }
+    sDTDCommentEnding() {
+      const c = this.getCodeNorm();
+      this.text += String.fromCodePoint(c);
+      this.state = c === MINUS ? S_DTD_COMMENT_ENDED : S_DTD_COMMENT;
+    }
+    sDTDCommentEnded() {
+      const c = this.getCodeNorm();
+      this.text += String.fromCodePoint(c);
+      if (c === GREATER) {
+        this.state = S_DTD;
+      } else {
+        this.fail("malformed comment.");
+        this.state = S_DTD_COMMENT;
+      }
+    }
+    sDTDPI() {
+      if (this.captureToChar(QUESTION)) {
+        this.text += "?";
+        this.state = S_DTD_PI_ENDING;
+      }
+    }
+    sDTDPIEnding() {
+      const c = this.getCodeNorm();
+      this.text += String.fromCodePoint(c);
+      if (c === GREATER) {
+        this.state = S_DTD;
+      }
+    }
+    sText() {
+      if (this.tags.length !== 0) {
+        this.handleTextInRoot();
+      } else {
+        this.handleTextOutsideRoot();
+      }
+    }
+    sEntity() {
+      let { i: start } = this;
+      const { chunk } = this;
+      loop:
+        while (true) {
+          switch (this.getCode()) {
+            case NL_LIKE:
+              this.entity += `${chunk.slice(start, this.prevI)}
+`;
+              start = this.i;
+              break;
+            case SEMICOLON: {
+              const { entityReturnState } = this;
+              const entity = this.entity + chunk.slice(start, this.prevI);
+              this.state = entityReturnState;
+              let parsed;
+              if (entity === "") {
+                this.fail("empty entity name.");
+                parsed = "&;";
+              } else {
+                parsed = this.parseEntity(entity);
+                this.entity = "";
+              }
+              if (entityReturnState !== S_TEXT || this.textHandler !== undefined) {
+                this.text += parsed;
+              }
+              break loop;
+            }
+            case EOC:
+              this.entity += chunk.slice(start);
+              break loop;
+            default:
+          }
+        }
+    }
+    sOpenWaka() {
+      const c = this.getCode();
+      if (isNameStartChar(c)) {
+        this.state = S_OPEN_TAG;
+        this.unget();
+        this.xmlDeclPossible = false;
+      } else {
+        switch (c) {
+          case FORWARD_SLASH:
+            this.state = S_CLOSE_TAG;
+            this.xmlDeclPossible = false;
+            break;
+          case BANG:
+            this.state = S_OPEN_WAKA_BANG;
+            this.openWakaBang = "";
+            this.xmlDeclPossible = false;
+            break;
+          case QUESTION:
+            this.state = S_PI_FIRST_CHAR;
+            break;
+          default:
+            this.fail("disallowed character in tag name");
+            this.state = S_TEXT;
+            this.xmlDeclPossible = false;
+        }
+      }
+    }
+    sOpenWakaBang() {
+      this.openWakaBang += String.fromCodePoint(this.getCodeNorm());
+      switch (this.openWakaBang) {
+        case "[CDATA[":
+          if (!this.sawRoot && !this.reportedTextBeforeRoot) {
+            this.fail("text data outside of root node.");
+            this.reportedTextBeforeRoot = true;
+          }
+          if (this.closedRoot && !this.reportedTextAfterRoot) {
+            this.fail("text data outside of root node.");
+            this.reportedTextAfterRoot = true;
+          }
+          this.state = S_CDATA;
+          this.openWakaBang = "";
+          break;
+        case "--":
+          this.state = S_COMMENT;
+          this.openWakaBang = "";
+          break;
+        case "DOCTYPE":
+          this.state = S_DOCTYPE;
+          if (this.doctype || this.sawRoot) {
+            this.fail("inappropriately located doctype declaration.");
+          }
+          this.openWakaBang = "";
+          break;
+        default:
+          if (this.openWakaBang.length >= 7) {
+            this.fail("incorrect syntax.");
+          }
+      }
+    }
+    sComment() {
+      if (this.captureToChar(MINUS)) {
+        this.state = S_COMMENT_ENDING;
+      }
+    }
+    sCommentEnding() {
+      var _a;
+      const c = this.getCodeNorm();
+      if (c === MINUS) {
+        this.state = S_COMMENT_ENDED;
+        (_a = this.commentHandler) === null || _a === undefined || _a.call(this, this.text);
+        this.text = "";
+      } else {
+        this.text += `-${String.fromCodePoint(c)}`;
+        this.state = S_COMMENT;
+      }
+    }
+    sCommentEnded() {
+      const c = this.getCodeNorm();
+      if (c !== GREATER) {
+        this.fail("malformed comment.");
+        this.text += `--${String.fromCodePoint(c)}`;
+        this.state = S_COMMENT;
+      } else {
+        this.state = S_TEXT;
+      }
+    }
+    sCData() {
+      if (this.captureToChar(CLOSE_BRACKET)) {
+        this.state = S_CDATA_ENDING;
+      }
+    }
+    sCDataEnding() {
+      const c = this.getCodeNorm();
+      if (c === CLOSE_BRACKET) {
+        this.state = S_CDATA_ENDING_2;
+      } else {
+        this.text += `]${String.fromCodePoint(c)}`;
+        this.state = S_CDATA;
+      }
+    }
+    sCDataEnding2() {
+      var _a;
+      const c = this.getCodeNorm();
+      switch (c) {
+        case GREATER: {
+          (_a = this.cdataHandler) === null || _a === undefined || _a.call(this, this.text);
+          this.text = "";
+          this.state = S_TEXT;
+          break;
+        }
+        case CLOSE_BRACKET:
+          this.text += "]";
+          break;
+        default:
+          this.text += `]]${String.fromCodePoint(c)}`;
+          this.state = S_CDATA;
+      }
+    }
+    sPIFirstChar() {
+      const c = this.getCodeNorm();
+      if (this.nameStartCheck(c)) {
+        this.piTarget += String.fromCodePoint(c);
+        this.state = S_PI_REST;
+      } else if (c === QUESTION || isS(c)) {
+        this.fail("processing instruction without a target.");
+        this.state = c === QUESTION ? S_PI_ENDING : S_PI_BODY;
+      } else {
+        this.fail("disallowed character in processing instruction name.");
+        this.piTarget += String.fromCodePoint(c);
+        this.state = S_PI_REST;
+      }
+    }
+    sPIRest() {
+      const { chunk, i: start } = this;
+      while (true) {
+        const c = this.getCodeNorm();
+        if (c === EOC) {
+          this.piTarget += chunk.slice(start);
+          return;
+        }
+        if (!this.nameCheck(c)) {
+          this.piTarget += chunk.slice(start, this.prevI);
+          const isQuestion = c === QUESTION;
+          if (isQuestion || isS(c)) {
+            if (this.piTarget === "xml") {
+              if (!this.xmlDeclPossible) {
+                this.fail("an XML declaration must be at the start of the document.");
+              }
+              this.state = isQuestion ? S_XML_DECL_ENDING : S_XML_DECL_NAME_START;
+            } else {
+              this.state = isQuestion ? S_PI_ENDING : S_PI_BODY;
+            }
+          } else {
+            this.fail("disallowed character in processing instruction name.");
+            this.piTarget += String.fromCodePoint(c);
+          }
+          break;
+        }
+      }
+    }
+    sPIBody() {
+      if (this.text.length === 0) {
+        const c = this.getCodeNorm();
+        if (c === QUESTION) {
+          this.state = S_PI_ENDING;
+        } else if (!isS(c)) {
+          this.text = String.fromCodePoint(c);
+        }
+      } else if (this.captureToChar(QUESTION)) {
+        this.state = S_PI_ENDING;
+      }
+    }
+    sPIEnding() {
+      var _a;
+      const c = this.getCodeNorm();
+      if (c === GREATER) {
+        const { piTarget } = this;
+        if (piTarget.toLowerCase() === "xml") {
+          this.fail("the XML declaration must appear at the start of the document.");
+        }
+        (_a = this.piHandler) === null || _a === undefined || _a.call(this, {
+          target: piTarget,
+          body: this.text
+        });
+        this.piTarget = this.text = "";
+        this.state = S_TEXT;
+      } else if (c === QUESTION) {
+        this.text += "?";
+      } else {
+        this.text += `?${String.fromCodePoint(c)}`;
+        this.state = S_PI_BODY;
+      }
+      this.xmlDeclPossible = false;
+    }
+    sXMLDeclNameStart() {
+      const c = this.skipSpaces();
+      if (c === QUESTION) {
+        this.state = S_XML_DECL_ENDING;
+        return;
+      }
+      if (c !== EOC) {
+        this.state = S_XML_DECL_NAME;
+        this.name = String.fromCodePoint(c);
+      }
+    }
+    sXMLDeclName() {
+      const c = this.captureTo(XML_DECL_NAME_TERMINATOR);
+      if (c === QUESTION) {
+        this.state = S_XML_DECL_ENDING;
+        this.name += this.text;
+        this.text = "";
+        this.fail("XML declaration is incomplete.");
+        return;
+      }
+      if (!(isS(c) || c === EQUAL)) {
+        return;
+      }
+      this.name += this.text;
+      this.text = "";
+      if (!this.xmlDeclExpects.includes(this.name)) {
+        switch (this.name.length) {
+          case 0:
+            this.fail("did not expect any more name/value pairs.");
+            break;
+          case 1:
+            this.fail(`expected the name ${this.xmlDeclExpects[0]}.`);
+            break;
+          default:
+            this.fail(`expected one of ${this.xmlDeclExpects.join(", ")}`);
+        }
+      }
+      this.state = c === EQUAL ? S_XML_DECL_VALUE_START : S_XML_DECL_EQ;
+    }
+    sXMLDeclEq() {
+      const c = this.getCodeNorm();
+      if (c === QUESTION) {
+        this.state = S_XML_DECL_ENDING;
+        this.fail("XML declaration is incomplete.");
+        return;
+      }
+      if (isS(c)) {
+        return;
+      }
+      if (c !== EQUAL) {
+        this.fail("value required.");
+      }
+      this.state = S_XML_DECL_VALUE_START;
+    }
+    sXMLDeclValueStart() {
+      const c = this.getCodeNorm();
+      if (c === QUESTION) {
+        this.state = S_XML_DECL_ENDING;
+        this.fail("XML declaration is incomplete.");
+        return;
+      }
+      if (isS(c)) {
+        return;
+      }
+      if (!isQuote(c)) {
+        this.fail("value must be quoted.");
+        this.q = SPACE;
+      } else {
+        this.q = c;
+      }
+      this.state = S_XML_DECL_VALUE;
+    }
+    sXMLDeclValue() {
+      const c = this.captureTo([this.q, QUESTION]);
+      if (c === QUESTION) {
+        this.state = S_XML_DECL_ENDING;
+        this.text = "";
+        this.fail("XML declaration is incomplete.");
+        return;
+      }
+      if (c === EOC) {
+        return;
+      }
+      const value = this.text;
+      this.text = "";
+      switch (this.name) {
+        case "version": {
+          this.xmlDeclExpects = ["encoding", "standalone"];
+          const version = value;
+          this.xmlDecl.version = version;
+          if (!/^1\.[0-9]+$/.test(version)) {
+            this.fail("version number must match /^1\\.[0-9]+$/.");
+          } else if (!this.opt.forceXMLVersion) {
+            this.setXMLVersion(version);
+          }
+          break;
+        }
+        case "encoding":
+          if (!/^[A-Za-z][A-Za-z0-9._-]*$/.test(value)) {
+            this.fail("encoding value must match /^[A-Za-z0-9][A-Za-z0-9._-]*$/.");
+          }
+          this.xmlDeclExpects = ["standalone"];
+          this.xmlDecl.encoding = value;
+          break;
+        case "standalone":
+          if (value !== "yes" && value !== "no") {
+            this.fail('standalone value must match "yes" or "no".');
+          }
+          this.xmlDeclExpects = [];
+          this.xmlDecl.standalone = value;
+          break;
+        default:
+      }
+      this.name = "";
+      this.state = S_XML_DECL_SEPARATOR;
+    }
+    sXMLDeclSeparator() {
+      const c = this.getCodeNorm();
+      if (c === QUESTION) {
+        this.state = S_XML_DECL_ENDING;
+        return;
+      }
+      if (!isS(c)) {
+        this.fail("whitespace required.");
+        this.unget();
+      }
+      this.state = S_XML_DECL_NAME_START;
+    }
+    sXMLDeclEnding() {
+      var _a;
+      const c = this.getCodeNorm();
+      if (c === GREATER) {
+        if (this.piTarget !== "xml") {
+          this.fail("processing instructions are not allowed before root.");
+        } else if (this.name !== "version" && this.xmlDeclExpects.includes("version")) {
+          this.fail("XML declaration must contain a version.");
+        }
+        (_a = this.xmldeclHandler) === null || _a === undefined || _a.call(this, this.xmlDecl);
+        this.name = "";
+        this.piTarget = this.text = "";
+        this.state = S_TEXT;
+      } else {
+        this.fail("The character ? is disallowed anywhere in XML declarations.");
+      }
+      this.xmlDeclPossible = false;
+    }
+    sOpenTag() {
+      var _a;
+      const c = this.captureNameChars();
+      if (c === EOC) {
+        return;
+      }
+      const tag = this.tag = {
+        name: this.name,
+        attributes: Object.create(null)
+      };
+      this.name = "";
+      if (this.xmlnsOpt) {
+        this.topNS = tag.ns = Object.create(null);
+      }
+      (_a = this.openTagStartHandler) === null || _a === undefined || _a.call(this, tag);
+      this.sawRoot = true;
+      if (!this.fragmentOpt && this.closedRoot) {
+        this.fail("documents may contain only one root.");
+      }
+      switch (c) {
+        case GREATER:
+          this.openTag();
+          break;
+        case FORWARD_SLASH:
+          this.state = S_OPEN_TAG_SLASH;
+          break;
+        default:
+          if (!isS(c)) {
+            this.fail("disallowed character in tag name.");
+          }
+          this.state = S_ATTRIB;
+      }
+    }
+    sOpenTagSlash() {
+      if (this.getCode() === GREATER) {
+        this.openSelfClosingTag();
+      } else {
+        this.fail("forward-slash in opening tag not followed by >.");
+        this.state = S_ATTRIB;
+      }
+    }
+    sAttrib() {
+      const c = this.skipSpaces();
+      if (c === EOC) {
+        return;
+      }
+      if (isNameStartChar(c)) {
+        this.unget();
+        this.state = S_ATTRIB_NAME;
+      } else if (c === GREATER) {
+        this.openTag();
+      } else if (c === FORWARD_SLASH) {
+        this.state = S_OPEN_TAG_SLASH;
+      } else {
+        this.fail("disallowed character in attribute name.");
+      }
+    }
+    sAttribName() {
+      const c = this.captureNameChars();
+      if (c === EQUAL) {
+        this.state = S_ATTRIB_VALUE;
+      } else if (isS(c)) {
+        this.state = S_ATTRIB_NAME_SAW_WHITE;
+      } else if (c === GREATER) {
+        this.fail("attribute without value.");
+        this.pushAttrib(this.name, this.name);
+        this.name = this.text = "";
+        this.openTag();
+      } else if (c !== EOC) {
+        this.fail("disallowed character in attribute name.");
+      }
+    }
+    sAttribNameSawWhite() {
+      const c = this.skipSpaces();
+      switch (c) {
+        case EOC:
+          return;
+        case EQUAL:
+          this.state = S_ATTRIB_VALUE;
+          break;
+        default:
+          this.fail("attribute without value.");
+          this.text = "";
+          this.name = "";
+          if (c === GREATER) {
+            this.openTag();
+          } else if (isNameStartChar(c)) {
+            this.unget();
+            this.state = S_ATTRIB_NAME;
+          } else {
+            this.fail("disallowed character in attribute name.");
+            this.state = S_ATTRIB;
+          }
+      }
+    }
+    sAttribValue() {
+      const c = this.getCodeNorm();
+      if (isQuote(c)) {
+        this.q = c;
+        this.state = S_ATTRIB_VALUE_QUOTED;
+      } else if (!isS(c)) {
+        this.fail("unquoted attribute value.");
+        this.state = S_ATTRIB_VALUE_UNQUOTED;
+        this.unget();
+      }
+    }
+    sAttribValueQuoted() {
+      const { q, chunk } = this;
+      let { i: start } = this;
+      while (true) {
+        switch (this.getCode()) {
+          case q:
+            this.pushAttrib(this.name, this.text + chunk.slice(start, this.prevI));
+            this.name = this.text = "";
+            this.q = null;
+            this.state = S_ATTRIB_VALUE_CLOSED;
+            return;
+          case AMP:
+            this.text += chunk.slice(start, this.prevI);
+            this.state = S_ENTITY;
+            this.entityReturnState = S_ATTRIB_VALUE_QUOTED;
+            return;
+          case NL:
+          case NL_LIKE:
+          case TAB:
+            this.text += `${chunk.slice(start, this.prevI)} `;
+            start = this.i;
+            break;
+          case LESS:
+            this.text += chunk.slice(start, this.prevI);
+            this.fail("disallowed character.");
+            return;
+          case EOC:
+            this.text += chunk.slice(start);
+            return;
+          default:
+        }
+      }
+    }
+    sAttribValueClosed() {
+      const c = this.getCodeNorm();
+      if (isS(c)) {
+        this.state = S_ATTRIB;
+      } else if (c === GREATER) {
+        this.openTag();
+      } else if (c === FORWARD_SLASH) {
+        this.state = S_OPEN_TAG_SLASH;
+      } else if (isNameStartChar(c)) {
+        this.fail("no whitespace between attributes.");
+        this.unget();
+        this.state = S_ATTRIB_NAME;
+      } else {
+        this.fail("disallowed character in attribute name.");
+      }
+    }
+    sAttribValueUnquoted() {
+      const c = this.captureTo(ATTRIB_VALUE_UNQUOTED_TERMINATOR);
+      switch (c) {
+        case AMP:
+          this.state = S_ENTITY;
+          this.entityReturnState = S_ATTRIB_VALUE_UNQUOTED;
+          break;
+        case LESS:
+          this.fail("disallowed character.");
+          break;
+        case EOC:
+          break;
+        default:
+          if (this.text.includes("]]>")) {
+            this.fail('the string "]]>" is disallowed in char data.');
+          }
+          this.pushAttrib(this.name, this.text);
+          this.name = this.text = "";
+          if (c === GREATER) {
+            this.openTag();
+          } else {
+            this.state = S_ATTRIB;
+          }
+      }
+    }
+    sCloseTag() {
+      const c = this.captureNameChars();
+      if (c === GREATER) {
+        this.closeTag();
+      } else if (isS(c)) {
+        this.state = S_CLOSE_TAG_SAW_WHITE;
+      } else if (c !== EOC) {
+        this.fail("disallowed character in closing tag.");
+      }
+    }
+    sCloseTagSawWhite() {
+      switch (this.skipSpaces()) {
+        case GREATER:
+          this.closeTag();
+          break;
+        case EOC:
+          break;
+        default:
+          this.fail("disallowed character in closing tag.");
+      }
+    }
+    handleTextInRoot() {
+      let { i: start, forbiddenState } = this;
+      const { chunk, textHandler: handler } = this;
+      scanLoop:
+        while (true) {
+          switch (this.getCode()) {
+            case LESS: {
+              this.state = S_OPEN_WAKA;
+              if (handler !== undefined) {
+                const { text } = this;
+                const slice = chunk.slice(start, this.prevI);
+                if (text.length !== 0) {
+                  handler(text + slice);
+                  this.text = "";
+                } else if (slice.length !== 0) {
+                  handler(slice);
+                }
+              }
+              forbiddenState = FORBIDDEN_START;
+              break scanLoop;
+            }
+            case AMP:
+              this.state = S_ENTITY;
+              this.entityReturnState = S_TEXT;
+              if (handler !== undefined) {
+                this.text += chunk.slice(start, this.prevI);
+              }
+              forbiddenState = FORBIDDEN_START;
+              break scanLoop;
+            case CLOSE_BRACKET:
+              switch (forbiddenState) {
+                case FORBIDDEN_START:
+                  forbiddenState = FORBIDDEN_BRACKET;
+                  break;
+                case FORBIDDEN_BRACKET:
+                  forbiddenState = FORBIDDEN_BRACKET_BRACKET;
+                  break;
+                case FORBIDDEN_BRACKET_BRACKET:
+                  break;
+                default:
+                  throw new Error("impossible state");
+              }
+              break;
+            case GREATER:
+              if (forbiddenState === FORBIDDEN_BRACKET_BRACKET) {
+                this.fail('the string "]]>" is disallowed in char data.');
+              }
+              forbiddenState = FORBIDDEN_START;
+              break;
+            case NL_LIKE:
+              if (handler !== undefined) {
+                this.text += `${chunk.slice(start, this.prevI)}
+`;
+              }
+              start = this.i;
+              forbiddenState = FORBIDDEN_START;
+              break;
+            case EOC:
+              if (handler !== undefined) {
+                this.text += chunk.slice(start);
+              }
+              break scanLoop;
+            default:
+              forbiddenState = FORBIDDEN_START;
+          }
+        }
+      this.forbiddenState = forbiddenState;
+    }
+    handleTextOutsideRoot() {
+      let { i: start } = this;
+      const { chunk, textHandler: handler } = this;
+      let nonSpace = false;
+      outRootLoop:
+        while (true) {
+          const code = this.getCode();
+          switch (code) {
+            case LESS: {
+              this.state = S_OPEN_WAKA;
+              if (handler !== undefined) {
+                const { text } = this;
+                const slice = chunk.slice(start, this.prevI);
+                if (text.length !== 0) {
+                  handler(text + slice);
+                  this.text = "";
+                } else if (slice.length !== 0) {
+                  handler(slice);
+                }
+              }
+              break outRootLoop;
+            }
+            case AMP:
+              this.state = S_ENTITY;
+              this.entityReturnState = S_TEXT;
+              if (handler !== undefined) {
+                this.text += chunk.slice(start, this.prevI);
+              }
+              nonSpace = true;
+              break outRootLoop;
+            case NL_LIKE:
+              if (handler !== undefined) {
+                this.text += `${chunk.slice(start, this.prevI)}
+`;
+              }
+              start = this.i;
+              break;
+            case EOC:
+              if (handler !== undefined) {
+                this.text += chunk.slice(start);
+              }
+              break outRootLoop;
+            default:
+              if (!isS(code)) {
+                nonSpace = true;
+              }
+          }
+        }
+      if (!nonSpace) {
+        return;
+      }
+      if (!this.sawRoot && !this.reportedTextBeforeRoot) {
+        this.fail("text data outside of root node.");
+        this.reportedTextBeforeRoot = true;
+      }
+      if (this.closedRoot && !this.reportedTextAfterRoot) {
+        this.fail("text data outside of root node.");
+        this.reportedTextAfterRoot = true;
+      }
+    }
+    pushAttribNS(name, value) {
+      var _a;
+      const { prefix, local } = this.qname(name);
+      const attr = { name, prefix, local, value };
+      this.attribList.push(attr);
+      (_a = this.attributeHandler) === null || _a === undefined || _a.call(this, attr);
+      if (prefix === "xmlns") {
+        const trimmed = value.trim();
+        if (this.currentXMLVersion === "1.0" && trimmed === "") {
+          this.fail("invalid attempt to undefine prefix in XML 1.0");
+        }
+        this.topNS[local] = trimmed;
+        nsPairCheck(this, local, trimmed);
+      } else if (name === "xmlns") {
+        const trimmed = value.trim();
+        this.topNS[""] = trimmed;
+        nsPairCheck(this, "", trimmed);
+      }
+    }
+    pushAttribPlain(name, value) {
+      var _a;
+      const attr = { name, value };
+      this.attribList.push(attr);
+      (_a = this.attributeHandler) === null || _a === undefined || _a.call(this, attr);
+    }
+    end() {
+      var _a, _b;
+      if (!this.sawRoot) {
+        this.fail("document must contain a root element.");
+      }
+      const { tags } = this;
+      while (tags.length > 0) {
+        const tag = tags.pop();
+        this.fail(`unclosed tag: ${tag.name}`);
+      }
+      if (this.state !== S_BEGIN && this.state !== S_TEXT) {
+        this.fail("unexpected end.");
+      }
+      const { text } = this;
+      if (text.length !== 0) {
+        (_a = this.textHandler) === null || _a === undefined || _a.call(this, text);
+        this.text = "";
+      }
+      this._closed = true;
+      (_b = this.endHandler) === null || _b === undefined || _b.call(this);
+      this._init();
+      return this;
+    }
+    resolve(prefix) {
+      var _a, _b;
+      let uri = this.topNS[prefix];
+      if (uri !== undefined) {
+        return uri;
+      }
+      const { tags } = this;
+      for (let index = tags.length - 1;index >= 0; index--) {
+        uri = tags[index].ns[prefix];
+        if (uri !== undefined) {
+          return uri;
+        }
+      }
+      uri = this.ns[prefix];
+      if (uri !== undefined) {
+        return uri;
+      }
+      return (_b = (_a = this.opt).resolvePrefix) === null || _b === undefined ? undefined : _b.call(_a, prefix);
+    }
+    qname(name) {
+      const colon = name.indexOf(":");
+      if (colon === -1) {
+        return { prefix: "", local: name };
+      }
+      const local = name.slice(colon + 1);
+      const prefix = name.slice(0, colon);
+      if (prefix === "" || local === "" || local.includes(":")) {
+        this.fail(`malformed name: ${name}.`);
+      }
+      return { prefix, local };
+    }
+    processAttribsNS() {
+      var _a;
+      const { attribList } = this;
+      const tag = this.tag;
+      {
+        const { prefix, local } = this.qname(tag.name);
+        tag.prefix = prefix;
+        tag.local = local;
+        const uri = tag.uri = (_a = this.resolve(prefix)) !== null && _a !== undefined ? _a : "";
+        if (prefix !== "") {
+          if (prefix === "xmlns") {
+            this.fail('tags may not have "xmlns" as prefix.');
+          }
+          if (uri === "") {
+            this.fail(`unbound namespace prefix: ${JSON.stringify(prefix)}.`);
+            tag.uri = prefix;
+          }
+        }
+      }
+      if (attribList.length === 0) {
+        return;
+      }
+      const { attributes } = tag;
+      const seen = new Set;
+      for (const attr of attribList) {
+        const { name, prefix, local } = attr;
+        let uri;
+        let eqname;
+        if (prefix === "") {
+          uri = name === "xmlns" ? XMLNS_NAMESPACE : "";
+          eqname = name;
+        } else {
+          uri = this.resolve(prefix);
+          if (uri === undefined) {
+            this.fail(`unbound namespace prefix: ${JSON.stringify(prefix)}.`);
+            uri = prefix;
+          }
+          eqname = `{${uri}}${local}`;
+        }
+        if (seen.has(eqname)) {
+          this.fail(`duplicate attribute: ${eqname}.`);
+        }
+        seen.add(eqname);
+        attr.uri = uri;
+        attributes[name] = attr;
+      }
+      this.attribList = [];
+    }
+    processAttribsPlain() {
+      const { attribList } = this;
+      const attributes = this.tag.attributes;
+      for (const { name, value } of attribList) {
+        if (attributes[name] !== undefined) {
+          this.fail(`duplicate attribute: ${name}.`);
+        }
+        attributes[name] = value;
+      }
+      this.attribList = [];
+    }
+    openTag() {
+      var _a;
+      this.processAttribs();
+      const { tags } = this;
+      const tag = this.tag;
+      tag.isSelfClosing = false;
+      (_a = this.openTagHandler) === null || _a === undefined || _a.call(this, tag);
+      tags.push(tag);
+      this.state = S_TEXT;
+      this.name = "";
+    }
+    openSelfClosingTag() {
+      var _a, _b, _c;
+      this.processAttribs();
+      const { tags } = this;
+      const tag = this.tag;
+      tag.isSelfClosing = true;
+      (_a = this.openTagHandler) === null || _a === undefined || _a.call(this, tag);
+      (_b = this.closeTagHandler) === null || _b === undefined || _b.call(this, tag);
+      const top = this.tag = (_c = tags[tags.length - 1]) !== null && _c !== undefined ? _c : null;
+      if (top === null) {
+        this.closedRoot = true;
+      }
+      this.state = S_TEXT;
+      this.name = "";
+    }
+    closeTag() {
+      const { tags, name } = this;
+      this.state = S_TEXT;
+      this.name = "";
+      if (name === "") {
+        this.fail("weird empty close tag.");
+        this.text += "</>";
+        return;
+      }
+      const handler = this.closeTagHandler;
+      let l = tags.length;
+      while (l-- > 0) {
+        const tag = this.tag = tags.pop();
+        this.topNS = tag.ns;
+        handler === null || handler === undefined || handler(tag);
+        if (tag.name === name) {
+          break;
+        }
+        this.fail("unexpected close tag.");
+      }
+      if (l === 0) {
+        this.closedRoot = true;
+      } else if (l < 0) {
+        this.fail(`unmatched closing tag: ${name}.`);
+        this.text += `</${name}>`;
+      }
+    }
+    parseEntity(entity) {
+      if (entity[0] !== "#") {
+        const defined = this.ENTITIES[entity];
+        if (defined !== undefined) {
+          return defined;
+        }
+        this.fail(this.isName(entity) ? "undefined entity." : "disallowed character in entity name.");
+        return `&${entity};`;
+      }
+      let num = NaN;
+      if (entity[1] === "x" && /^#x[0-9a-f]+$/i.test(entity)) {
+        num = parseInt(entity.slice(2), 16);
+      } else if (/^#[0-9]+$/.test(entity)) {
+        num = parseInt(entity.slice(1), 10);
+      }
+      if (!this.isChar(num)) {
+        this.fail("malformed character entity.");
+        return `&${entity};`;
+      }
+      return String.fromCodePoint(num);
+    }
+  }
+  exports.SaxesParser = SaxesParser;
+});
+
+// ../../agentum-clean-release/agentum/src/adapters/outbound/persistence/payment-ledger.adapter.ts
 var CREATE_TABLE = `CREATE TABLE IF NOT EXISTS payment_consumptions (
   payment_key TEXT PRIMARY KEY, rail TEXT NOT NULL, resource TEXT NOT NULL,
   price_usd TEXT NOT NULL, fingerprint TEXT NOT NULL, status TEXT NOT NULL,
@@ -75,7 +1837,7 @@ class PostgresPaymentLedger {
   }
 }
 
-// node_modules/hono/dist/http-exception.js
+// ../../../../Projects/agentum/node_modules/hono/dist/http-exception.js
 var HTTPException = class extends Error {
   res;
   status;
@@ -94,10 +1856,10 @@ var HTTPException = class extends Error {
   }
 };
 
-// node_modules/hono/dist/request/constants.js
+// ../../../../Projects/agentum/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = Symbol();
 
-// node_modules/hono/dist/utils/crypto.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/crypto.js
 var sha256 = async (data) => {
   return await createHash(data, {
     name: "SHA-256",
@@ -120,7 +1882,7 @@ var createHash = async (data, algorithm) => {
   return null;
 };
 
-// node_modules/hono/dist/utils/buffer.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/buffer.js
 var constantTimeEqualString = (a, b) => {
   const aLen = a.length;
   const bLen = b.length;
@@ -157,7 +1919,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
 };
 
-// node_modules/hono/dist/utils/body.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/body.js
 var MAX_NESTED_OBJECTS = 1e4;
 var isRawRequest = (request) => ("headers" in request);
 var parseBody = async (request, options = Object.create(null)) => {
@@ -236,7 +1998,7 @@ var throwNestingLimitExceeded = () => {
   throw new Error("Nesting limit exceeded");
 };
 
-// node_modules/hono/dist/utils/url.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "")
@@ -432,7 +2194,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// node_modules/hono/dist/request.js
+// ../../../../Projects/agentum/node_modules/hono/dist/request.js
 var HonoRequest = class {
   raw;
   #validatedData;
@@ -539,7 +2301,7 @@ var HonoRequest = class {
   }
 };
 
-// node_modules/hono/dist/utils/html.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -576,7 +2338,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
     return resStr;
 };
 
-// node_modules/hono/dist/context.js
+// ../../../../Projects/agentum/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -743,7 +2505,7 @@ var Context = class {
   };
 };
 
-// node_modules/hono/dist/compose.js
+// ../../../../Projects/agentum/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -780,7 +2542,7 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// node_modules/hono/dist/router.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router.js
 var METHODS = [
   "get",
   "post",
@@ -794,10 +2556,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// node_modules/hono/dist/utils/constants.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// node_modules/hono/dist/hono-base.js
+// ../../../../Projects/agentum/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -1014,10 +2776,10 @@ var Hono = class Hono {
   };
 };
 
-// node_modules/hono/dist/router/utils.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/utils.js
 var createNullObject = () => Object.create(null);
 
-// node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -1036,7 +2798,7 @@ function match(method, path) {
   return match(method, path);
 }
 
-// node_modules/hono/dist/router/reg-exp-router/node.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
 var PATH_ERROR = Symbol();
@@ -1134,7 +2896,7 @@ var Node = class Node {
   }
 };
 
-// node_modules/hono/dist/router/reg-exp-router/trie.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1202,7 +2964,7 @@ var Trie = class {
   }
 };
 
-// node_modules/hono/dist/router/reg-exp-router/router.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/reg-exp-router/router.js
 var wildcardRegExpCache = createNullObject();
 function buildWildcardRegExp(path) {
   return wildcardRegExpCache[path] ??= new RegExp(`^${path.replace(/\/:[^/{}]+(?:\{\[\^\/]\+})?(?=[/{]|$)|\/?\*$|([.\\+*[^\]$()?{}|])/g, (match, metaChar) => metaChar ? `\\${metaChar}` : match === "/*" ? TAIL_WILDCARD_REG_EXP_STR : match === "*" ? ".*" : `/:${LABEL_REG_EXP_STR}`)}$`);
@@ -1307,7 +3069,7 @@ var RegExpRouter = class {
   }
 };
 
-// node_modules/hono/dist/router/smart-router/router.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1360,7 +3122,7 @@ var SmartRouter = class {
   }
 };
 
-// node_modules/hono/dist/router/trie-router/node.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = createNullObject();
 var order = 0;
 var Node2 = class Node {
@@ -1497,7 +3259,7 @@ var Node2 = class Node {
   }
 };
 
-// node_modules/hono/dist/router/trie-router/router.js
+// ../../../../Projects/agentum/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node = new Node2;
@@ -1510,7 +3272,7 @@ var TrieRouter = class {
   }
 };
 
-// node_modules/hono/dist/hono.js
+// ../../../../Projects/agentum/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1518,7 +3280,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// node_modules/hono/dist/middleware/cors/index.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/cors/index.js
 var cors = (options) => {
   const opts = {
     origin: "*",
@@ -1600,7 +3362,7 @@ var cors = (options) => {
   };
 };
 
-// node_modules/hono/dist/middleware/body-limit/index.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/body-limit/index.js
 var ERROR_MESSAGE = "Payload Too Large";
 var bodyLimit = (options) => {
   const onError = options.onError || (() => {
@@ -1639,7 +3401,7 @@ var bodyLimit = (options) => {
   };
 };
 
-// node_modules/hono/dist/middleware/request-id/request-id.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/request-id/request-id.js
 var requestId = ({ limitLength = 255, headerName = "X-Request-Id", generator = () => crypto.randomUUID() } = {}) => {
   return async function requestId(c, next) {
     let reqId = headerName ? c.req.header(headerName) : undefined;
@@ -1652,7 +3414,7 @@ var requestId = ({ limitLength = 255, headerName = "X-Request-Id", generator = (
   };
 };
 
-// node_modules/hono/dist/utils/encode.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/encode.js
 var decodeBase64Url = (str) => {
   return decodeBase64(str.replace(/_|-/g, (m) => ({
     _: "/",
@@ -1681,7 +3443,7 @@ var decodeBase64 = (str) => {
   return bytes;
 };
 
-// node_modules/hono/dist/middleware/secure-headers/secure-headers.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/secure-headers/secure-headers.js
 var HEADERS_MAP = {
   crossOriginEmbedderPolicy: ["Cross-Origin-Embedder-Policy", "require-corp"],
   crossOriginResourcePolicy: ["Cross-Origin-Resource-Policy", "same-origin"],
@@ -1810,7 +3572,7 @@ function setHeaders(ctx, headersToSet) {
   });
 }
 
-// node_modules/hono/dist/middleware/timeout/index.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/timeout/index.js
 var defaultTimeoutException = new HTTPException(504, { message: "Gateway Timeout" });
 var timeout = (duration, exception = defaultTimeoutException) => {
   return async function timeout(context, next) {
@@ -1829,7 +3591,7 @@ var timeout = (duration, exception = defaultTimeoutException) => {
   };
 };
 
-// node_modules/hono/dist/middleware/timing/timing.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/timing/timing.js
 var getTime = () => {
   try {
     return performance.now();
@@ -1914,7 +3676,7 @@ var endTime = (c, name, precision) => {
   metrics.timers.delete(name);
 };
 
-// src/domain/iban.ts
+// ../../agentum-clean-release/agentum/src/domain/iban.ts
 var IBAN_LENGTHS_BY_COUNTRY = {
   AL: 28,
   AD: 24,
@@ -2084,7 +3846,7 @@ function verifyBankPayee(cmd) {
   };
 }
 
-// src/domain/countries/types.ts
+// ../../agentum-clean-release/agentum/src/domain/countries/types.ts
 var COUNTRY_ALIASES = {
   UK: "GB",
   EL: "GR"
@@ -2096,34 +3858,7 @@ function normalizeCountryCode(code) {
   return COUNTRY_ALIASES[upper] || upper;
 }
 
-// src/domain/entity-identifier.ts
-function matchesEntityIdentifier(entity, query) {
-  const clean = (value) => value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  const equal = (value) => Boolean(value && clean(value) === clean(query.cleanedValue));
-  const primary = entity.primaryIdType === query.type && equal(entity.primaryIdValue);
-  switch (query.type) {
-    case "LEI":
-      return primary || equal(entity.lei);
-    case "EU_VAT":
-      return primary || equal(entity.vatNumber);
-    case "US_EIN":
-      return primary || equal(entity.taxId);
-    case "US_CIK": {
-      const cik = entity.cik ?? (entity.primaryIdType === "US_CIK" ? entity.primaryIdValue : null);
-      return Boolean(cik && cik.replace(/^0+/, "") === query.cleanedValue.replace(/^0+/, ""));
-    }
-    case "DOMAIN": {
-      const domain = (value) => value.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-      return entity.domains.some((value) => domain(value) === domain(query.cleanedValue));
-    }
-    case "NAME":
-      return false;
-    default:
-      return primary || equal(entity.registrationNumber) || query.type === "NATIONAL_ID" && equal(entity.taxId);
-  }
-}
-
-// src/domain/identifiers/checksums.ts
+// ../../agentum-clean-release/agentum/src/domain/identifiers/checksums.ts
 function luhn(digits) {
   const clean = digits.replace(/\D/g, "");
   if (!clean)
@@ -2291,10 +4026,11 @@ function fiYtunnusChecksum(cleanRaw) {
   return expected === parseInt(clean[7], 10);
 }
 
-// src/domain/identifiers/registry.ts
+// ../../agentum-clean-release/agentum/src/domain/identifiers/registry.ts
 var cleanDigits = (raw) => raw.replace(/\D/g, "");
 var cleanAlphaNum = (raw) => raw.toUpperCase().replace(/[\s-]/g, "");
 var NATIONAL_ID_SCHEMES = [
+  { scheme: "LV_REGCODE", country: "LV", kind: "COMPANY", pattern: /^\d{11}$/, normalize: cleanDigits },
   {
     scheme: "FR_SIREN",
     country: "FR",
@@ -2528,18 +4264,22 @@ function validateNationalId(raw, country) {
     return null;
   const iso2 = normalizeCountryCode(country);
   const candidates = NATIONAL_ID_SCHEMES.filter((s) => s.country === iso2);
+  let invalid = null;
   for (const validator of candidates) {
     const cleaned = validator.normalize(raw);
     if (validator.pattern.test(cleaned)) {
       const valid = validator.checksum ? validator.checksum(cleaned) : true;
-      return {
+      const result = {
         scheme: validator.scheme,
         valid,
         cleaned
       };
+      if (valid)
+        return result;
+      invalid ??= result;
     }
   }
-  return null;
+  return invalid;
 }
 function detectSchemes(raw, countryHint) {
   if (!raw)
@@ -2563,7 +4303,90 @@ function detectSchemes(raw, countryHint) {
   return matches;
 }
 
-// src/domain/normalize.ts
+// ../../agentum-clean-release/agentum/src/domain/entity-identifier.ts
+function registrationKey(record) {
+  if (!record.registrationNumber)
+    return null;
+  const country = normalizeCountryCode(record.jurisdiction);
+  const matches = NATIONAL_ID_SCHEMES.filter((s) => {
+    if (s.country !== country || s.kind === "TAX")
+      return false;
+    const id = s.normalize(record.registrationNumber);
+    return s.pattern.test(id) && (!s.checksum || s.checksum(id));
+  });
+  if (matches.length !== 1)
+    return null;
+  const scheme = matches[0];
+  return `${country}:${scheme.scheme}:${scheme.normalize(record.registrationNumber)}`;
+}
+function coalesceRegistryRecords(records) {
+  const result = [];
+  const primaryKeys = new Set;
+  for (const record of records) {
+    const primaryKey = `${record.jurisdiction}:${record.primaryIdType}:${record.primaryIdValue}`;
+    if (primaryKeys.has(primaryKey))
+      continue;
+    primaryKeys.add(primaryKey);
+    const key = registrationKey(record);
+    const index = key ? result.findIndex((other) => {
+      const corroborating = record.primaryIdType === "NATIONAL_REG" && other.sources.some((s) => s.source === "GLEIF") || other.primaryIdType === "NATIONAL_REG" && record.sources.some((s) => s.source === "GLEIF");
+      return corroborating && registrationKey(other) === key && other.normalizedName === record.normalizedName && !(other.lei && record.lei && other.lei !== record.lei);
+    }) : -1;
+    if (index < 0) {
+      result.push(record);
+      continue;
+    }
+    const other = result[index];
+    const national = record.primaryIdType === "NATIONAL_REG" ? record : other;
+    const gleif = national === record ? other : record;
+    result[index] = {
+      ...national,
+      lei: national.lei ?? gleif.lei,
+      parentLei: national.parentLei ?? gleif.parentLei,
+      ultimateParentLei: national.ultimateParentLei ?? gleif.ultimateParentLei,
+      headquartersAddress: national.headquartersAddress ?? gleif.headquartersAddress,
+      aliases: [...new Set([...national.aliases, ...gleif.aliases])],
+      tickers: [...new Set([...national.tickers, ...gleif.tickers])],
+      domains: [...new Set([...national.domains, ...gleif.domains])],
+      sources: [...national.sources, ...gleif.sources].filter((source, i, all) => all.findIndex((s) => s.source === source.source && s.sourceId === source.sourceId) === i)
+    };
+  }
+  return result;
+}
+function matchesEntityIdentifier(entity, query) {
+  const clean = (value) => value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const equal = (value) => Boolean(value && clean(value) === clean(query.cleanedValue));
+  const primary = entity.primaryIdType === query.type && equal(entity.primaryIdValue);
+  switch (query.type) {
+    case "LEI":
+      return primary || equal(entity.lei);
+    case "EU_VAT":
+      return primary || equal(entity.vatNumber);
+    case "US_EIN":
+      return primary || equal(entity.taxId);
+    case "US_CIK": {
+      const cik = entity.cik ?? (entity.primaryIdType === "US_CIK" ? entity.primaryIdValue : null);
+      return Boolean(cik && cik.replace(/^0+/, "") === query.cleanedValue.replace(/^0+/, ""));
+    }
+    case "DOMAIN": {
+      const domain = (value) => value.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      return entity.domains.some((value) => domain(value) === domain(query.cleanedValue));
+    }
+    case "NAME":
+      return false;
+    case "NATIONAL_ID": {
+      if (query.scheme === "PL_NIP")
+        return equal(entity.taxId);
+      if (query.scheme === "PL_KRS")
+        return equal(entity.registrationNumber) && (entity.registrationAuthority === "PL_KRS" || entity.sources.some((s) => s.source === "PL_KRS"));
+      return primary || equal(entity.registrationNumber) || equal(entity.taxId);
+    }
+    default:
+      return primary || equal(entity.registrationNumber);
+  }
+}
+
+// ../../agentum-clean-release/agentum/src/domain/normalize.ts
 var LEGAL_FORMS = [
   { pattern: "UZDAROJI AKCINE BENDROVE", form: "UAB" },
   { pattern: "AKCINE BENDROVE", form: "AB" },
@@ -2736,6 +4559,24 @@ function classifyQuery(raw, jurisdictionHint) {
   const trimmed = raw.trim();
   const cleanDigits = trimmed.replace(/[\s-]/g, "");
   const cleanAlphanum = trimmed.toUpperCase().replace(/[\s-]/g, "");
+  const polishPrefix = /^(KRS|NIP|REGON)\s*:\s*([\d\s-]+)$/i.exec(trimmed);
+  if (polishPrefix || jurisdictionHint?.toUpperCase() === "PL" && /^[\d\s-]+$/.test(trimmed)) {
+    const match = polishPrefix ? { scheme: `PL_${polishPrefix[1].toUpperCase()}`, cleaned: polishPrefix[2].replace(/\D/g, ""), valid: true } : validateNationalId(trimmed, "PL");
+    const explicitScheme = polishPrefix?.[1].toUpperCase();
+    const validExplicit = !polishPrefix || (explicitScheme === "NIP" ? validateNationalId(match?.cleaned ?? "", "PL")?.scheme === "PL_NIP" : explicitScheme === "REGON" ? /^(\d{9}|\d{14})$/.test(match?.cleaned ?? "") : /^\d{10}$/.test(match?.cleaned ?? ""));
+    if (match?.valid && validExplicit)
+      return {
+        raw,
+        type: "NATIONAL_ID",
+        scheme: match.scheme,
+        cleanedValue: match.cleaned,
+        normalizedName: match.cleaned,
+        detectedLegalForm: null,
+        inferredCountry: "PL"
+      };
+    if (polishPrefix)
+      return { raw, type: "NAME", cleanedValue: trimmed, normalizedName: trimmed.toUpperCase(), detectedLegalForm: null, inferredCountry: "PL" };
+  }
   const domain = extractDomain(trimmed);
   if (domain) {
     const domainLabel = domain.split(".")[0];
@@ -2917,7 +4758,7 @@ function classifyQuery(raw, jurisdictionHint) {
       };
     }
   }
-  if (jurisdictionHint) {
+  if (jurisdictionHint && (jurisdictionHint.toUpperCase() !== "PL" || /^[\d\s-]+$/.test(trimmed))) {
     const nationalMatch = validateNationalId(trimmed, jurisdictionHint);
     if (nationalMatch && nationalMatch.valid) {
       return {
@@ -3019,7 +4860,7 @@ function wordTrigramSimilarity(a, b) {
   return maxWindowSim;
 }
 
-// src/domain/countries/catalog.ts
+// ../../agentum-clean-release/agentum/src/domain/countries/catalog.ts
 var ISO_ENTRIES = [
   ["AD", "Andorra", "Europe"],
   ["AE", "United Arab Emirates", "Asia"],
@@ -3281,7 +5122,8 @@ var OVERLAY_PROFILES = {
       {
         id: "uk_companies_house",
         kind: "LIVE_API",
-        access: "FREE",
+        access: "FREE_REGISTRATION",
+        envKey: "COMPANIES_HOUSE_API_KEY",
         cacheTtlSeconds: 86400,
         resaleAllowed: true,
         costPerCallUsd: 0
@@ -3313,7 +5155,8 @@ var OVERLAY_PROFILES = {
       {
         id: "au_abr",
         kind: "LIVE_API",
-        access: "FREE",
+        access: "FREE_REGISTRATION",
+        envKey: "ABR_GUID",
         cacheTtlSeconds: 86400,
         resaleAllowed: true,
         costPerCallUsd: 0
@@ -3391,14 +5234,39 @@ var OVERLAY_PROFILES = {
     legalForms: ["Sp. z o.o.", "S.A.", "Sp. k."],
     sources: [
       {
-        id: "pl_mf_whitelist",
+        id: "pl_krs",
         kind: "LIVE_API",
+        access: "FREE",
+        cacheTtlSeconds: 86400,
+        resaleAllowed: true,
+        costPerCallUsd: 0,
+        operations: ["ENTITY_ID_LOOKUP"]
+      },
+      {
+        id: "pl_mf_whitelist",
+        operations: ["BANK_ACCOUNT_OWNERSHIP"],
+        kind: "TAX_AUTHORITY",
         access: "FREE",
         cacheTtlSeconds: 86400,
         resaleAllowed: true,
         costPerCallUsd: 0
       }
     ]
+  },
+  LV: {
+    coverage: "L2_VERIFIED",
+    wave: 1,
+    idSchemes: ["LV_REGCODE"],
+    legalForms: ["SIA", "AS"],
+    sources: [{
+      id: "lv_ur",
+      kind: "LIVE_API",
+      access: "FREE",
+      cacheTtlSeconds: 86400,
+      resaleAllowed: true,
+      costPerCallUsd: 0,
+      operations: ["ENTITY_ID_LOOKUP", "ENTITY_NAME_SEARCH"]
+    }]
   },
   CZ: {
     coverage: "L2_VERIFIED",
@@ -3521,6 +5389,7 @@ var OVERLAY_PROFILES = {
     sources: [
       {
         id: "ca_corp",
+        implemented: false,
         kind: "LIVE_API",
         access: "FREE",
         cacheTtlSeconds: 86400 * 7,
@@ -3575,11 +5444,11 @@ for (const [iso2, name, region] of ISO_ENTRIES) {
     sources: overlay.sources ?? []
   });
 }
-function getCountryProfile(code) {
+function getCountryProfile(code, env = process.env) {
   const iso2 = normalizeCountryCode(code);
   const found = COUNTRY_MAP.get(iso2);
   if (found) {
-    return found;
+    return withAvailableSources(found, env);
   }
   return {
     iso2: iso2 || "XX",
@@ -3592,15 +5461,38 @@ function getCountryProfile(code) {
     sources: []
   };
 }
-function listCoverage() {
-  return Array.from(COUNTRY_MAP.values());
+function withAvailableSources(profile, env) {
+  const sources = profile.sources.filter((source) => source.kind !== "BULK" && source.implemented !== false && (!source.envKey || Boolean(env[source.envKey]?.trim())));
+  return {
+    ...profile,
+    sources,
+    coverage: profile.coverage === "L2_VERIFIED" && profile.sources.length > 0 && sources.length === 0 ? profile.idSchemes.length > 0 ? "L1_VALIDATED" : "L0_SCREENED" : profile.coverage
+  };
+}
+function listCoverage(env = process.env) {
+  return Array.from(COUNTRY_MAP.values(), (profile) => withAvailableSources(profile, env));
 }
 
-// src/application/source-router.ts
+// ../../agentum-clean-release/agentum/src/ports/outbound/upstream-provider.port.ts
+class UpstreamProviderError extends Error {
+  reason;
+  httpStatus;
+  retryAfterSeconds;
+  constructor(reason, httpStatus, retryAfterSeconds) {
+    super(reason);
+    this.reason = reason;
+    this.httpStatus = httpStatus;
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.name = "UpstreamProviderError";
+  }
+}
+
+// ../../agentum-clean-release/agentum/src/application/source-router.ts
 class SourceRouter {
   free;
   paid;
   timeoutMs;
+  inFlight = new Map;
   constructor(deps) {
     this.free = deps.free;
     this.paid = deps.paid;
@@ -3612,10 +5504,23 @@ class SourceRouter {
     const freePromises = supportedFree.map(async (provider) => {
       const start = Date.now();
       try {
-        const records = await provider.search(query, {
-          jurisdiction: opts.jurisdiction,
-          timeoutMs: this.timeoutMs
-        });
+        const key = JSON.stringify([provider.sourceName, query, opts.jurisdiction]);
+        let pending = this.inFlight.get(key);
+        if (!pending) {
+          pending = provider.search(query, {
+            jurisdiction: opts.jurisdiction,
+            timeoutMs: this.timeoutMs
+          });
+          if (this.inFlight.size < 128) {
+            this.inFlight.set(key, pending);
+            const finish = () => {
+              if (this.inFlight.get(key) === pending)
+                this.inFlight.delete(key);
+            };
+            pending.then(finish, finish);
+          }
+        }
+        const records = (await pending).map((record) => structuredClone(record));
         const elapsed = Date.now() - start;
         const status = records.length > 0 ? "HIT" : "MISS";
         sourcesTried.push({
@@ -3625,13 +5530,18 @@ class SourceRouter {
           ms: elapsed
         });
         return records;
-      } catch {
+      } catch (error) {
         const elapsed = Date.now() - start;
         sourcesTried.push({
           source: provider.sourceName,
           tier: "FREE",
           status: "ERROR",
-          ms: elapsed
+          ms: elapsed,
+          ...error instanceof UpstreamProviderError ? {
+            reason: error.reason,
+            httpStatus: error.httpStatus,
+            retryAfterSeconds: error.retryAfterSeconds
+          } : { reason: "UNAVAILABLE" }
         });
         return [];
       }
@@ -3688,438 +5598,7 @@ class SourceRouter {
   }
 }
 
-// src/application/entity-service.ts
-class EntityApplicationService {
-  deps;
-  sourceRouter;
-  constructor(deps) {
-    this.deps = deps;
-    this.sourceRouter = new SourceRouter({
-      free: this.deps.upstreamProviders,
-      paid: this.deps.commercialAggregator,
-      timeoutMs: 2200
-    });
-  }
-  async resolveEntity(cmd) {
-    const startedAt = Date.now();
-    const countryInput = cmd.jurisdiction || cmd.country;
-    const requestedJurisdiction = countryInput ? normalizeCountryCode(countryInput) : undefined;
-    const classified = classifyQuery(cmd.query, requestedJurisdiction);
-    const effectiveJurisdiction = requestedJurisdiction || (classified.type !== "NAME" ? classified.inferredCountry : undefined) || undefined;
-    const cleanPart = encodeURIComponent(classified.cleanedValue.toLowerCase());
-    const jurPart = encodeURIComponent((effectiveJurisdiction ?? "all").toLowerCase());
-    const identityCacheKey = `agentum:identity:v1:${classified.type}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}`;
-    let candidates = [];
-    let best = null;
-    let modeUsed = this.deps.config.resolverMode;
-    let vatVerification = null;
-    let routerAttempts = [];
-    let paidUsed = false;
-    const cachedIdentity = await this.deps.cacheStore.getCache(identityCacheKey);
-    if (cachedIdentity) {
-      best = cachedIdentity.best;
-      candidates = cachedIdentity.candidates;
-      modeUsed = "cache";
-      vatVerification = cachedIdentity.vatVerification;
-      routerAttempts = cachedIdentity.routerAttempts;
-      paidUsed = cachedIdentity.paidUsed;
-    } else {
-      if (this.deps.config.resolverMode !== "live") {
-        if (classified.type !== "NAME") {
-          const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction);
-          if (exact) {
-            candidates.push({ ...exact, confidence: 0.99 });
-          }
-        }
-        if (candidates.length === 0) {
-          const fuzzy = await this.deps.entityRepo.searchFuzzy(classified.normalizedName, { jurisdiction: effectiveJurisdiction, limit: 5 });
-          candidates.push(...fuzzy);
-        }
-        candidates.sort((a, b) => b.confidence - a.confidence);
-      }
-      const shouldQueryUpstream = this.deps.config.resolverMode === "live" || this.deps.config.resolverMode === "hybrid" && (candidates.length === 0 || candidates[0].confidence < 0.82);
-      if (shouldQueryUpstream) {
-        const routerRes = await this.sourceRouter.resolve(classified, {
-          jurisdiction: effectiveJurisdiction,
-          allowPaidSources: cmd.allowPaidSources
-        });
-        routerAttempts = routerRes.sourcesTried;
-        paidUsed = routerRes.costUsd > 0;
-        const upstreamRecords = routerRes.records;
-        if (upstreamRecords.length > 0) {
-          await this.deps.entityRepo.upsertMany(upstreamRecords);
-          const combined = [...candidates, ...upstreamRecords];
-          const seen = new Set;
-          const deduplicated = [];
-          for (const item of combined) {
-            const key = `${item.jurisdiction}:${item.primaryIdType}:${item.primaryIdValue}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              deduplicated.push(item);
-            }
-          }
-          candidates = deduplicated;
-        }
-      }
-      for (const c of candidates) {
-        if (effectiveJurisdiction && normalizeCountryCode(c.jurisdiction) !== normalizeCountryCode(effectiveJurisdiction)) {
-          c.confidence = 0;
-          continue;
-        }
-        if (classified.type !== "NAME" && classified.cleanedValue) {
-          if (matchesEntityIdentifier(c, classified)) {
-            c.confidence = Math.max(c.confidence, 0.95);
-          } else {
-            c.confidence = Math.min(c.confidence, 0.1);
-          }
-        } else {
-          const queryTerm = classified.normalizedName || classified.cleanedValue || classified.raw;
-          const nameSim = Math.max(trigramSimilarity(queryTerm, c.normalizedName), wordTrigramSimilarity(queryTerm, c.normalizedName));
-          const aliasSims = (c.aliases || []).map((a) => {
-            const { normalizedName: aNorm } = normalizeCompanyName(a);
-            return Math.max(trigramSimilarity(queryTerm, aNorm), wordTrigramSimilarity(queryTerm, aNorm));
-          });
-          const bestSim = Math.max(nameSim, ...aliasSims);
-          c.confidence = Math.round(bestSim * 100) / 100;
-        }
-      }
-      candidates.sort((a, b) => b.confidence - a.confidence);
-      let ambiguous = false;
-      if (classified.type === "NAME" && candidates.length >= 2) {
-        const c1 = candidates[0];
-        const c2 = candidates[1];
-        if (c1 && c2 && c1.confidence - c2.confidence < 0.05) {
-          ambiguous = true;
-        }
-      }
-      best = ambiguous ? null : candidates[0] ?? null;
-      if (best && best.confidence < 0.6) {
-        best = null;
-      }
-      if (cmd.verifyVat && (best?.vatNumber || classified.type === "EU_VAT")) {
-        const vatToVerify = best?.vatNumber ?? classified.cleanedValue;
-        try {
-          vatVerification = await this.deps.vatValidator.verifyVat(vatToVerify, this.deps.config.viesTimeoutMs);
-        } catch (err) {
-          vatVerification = {
-            valid: false,
-            countryCode: vatToVerify.slice(0, 2).toUpperCase(),
-            vatNumber: vatToVerify.slice(2),
-            fullVat: vatToVerify.toUpperCase(),
-            registeredName: null,
-            registeredAddress: null,
-            checkedAt: new Date().toISOString(),
-            source: "EU_VIES",
-            error: err instanceof Error ? err.message : String(err)
-          };
-        }
-      }
-      if (best !== null) {
-        await this.deps.cacheStore.setCache(identityCacheKey, {
-          best,
-          candidates,
-          modeUsed,
-          vatVerification,
-          routerAttempts,
-          paidUsed
-        }, 3600);
-      }
-    }
-    let compliance = null;
-    if (cmd.checkSanctions !== false) {
-      compliance = await this.deps.sanctionsRepo.screen({
-        name: best?.canonicalName ?? cmd.query,
-        country: best?.jurisdiction ?? cmd.jurisdiction,
-        registrationNumber: best?.registrationNumber ?? best?.lei ?? undefined
-      });
-    }
-    const targetCountry = effectiveJurisdiction || classified.inferredCountry || "XX";
-    const profile = getCountryProfile(targetCountry);
-    const isResolved = best !== null && best.confidence >= 0.6;
-    const result = {
-      resolved: isResolved,
-      confidence: best ? best.confidence : 0,
-      queryType: classified.type,
-      modeUsed,
-      entity: best,
-      compliance,
-      vatVerification,
-      candidates,
-      coverage: {
-        country: profile.iso2,
-        level: profile.coverage,
-        sourcesTried: routerAttempts,
-        paidSourceUsed: paidUsed
-      },
-      latencyMs: Math.max(1, Date.now() - startedAt)
-    };
-    return result;
-  }
-  async verifyVat(input) {
-    const normalized = input.vatNumber.replace(/\s+/g, "").toUpperCase();
-    const cacheKey = `agentum:vat:v1:${normalized}`;
-    const cached = await this.deps.cacheStore.getCache(cacheKey);
-    if (cached) {
-      return { ...cached, source: "CACHE" };
-    }
-    const res = await this.deps.vatValidator.verifyVat(input.vatNumber, this.deps.config.viesTimeoutMs);
-    let linkedEntity = await this.deps.entityRepo.findByIdentifier("EU_VAT", res.fullVat);
-    if (!linkedEntity && res.registeredName) {
-      const fuzzy = await this.deps.entityRepo.searchFuzzy(normalizeCompanyName(res.registeredName).normalizedName, { jurisdiction: res.countryCode, limit: 1 });
-      linkedEntity = fuzzy[0] ?? null;
-    }
-    const result = {
-      ...res,
-      linkedEntity: linkedEntity ?? null
-    };
-    await this.deps.cacheStore.setCache(cacheKey, result, 3600);
-    return result;
-  }
-  async screenSanctions(input) {
-    return this.deps.sanctionsRepo.screen(input);
-  }
-  async checkVendor(cmd) {
-    const auditTrail = [];
-    const evaluatedAt = new Date().toISOString();
-    auditTrail.push(`[1/3] Initiating automated KYB due diligence for '${cmd.name}' (${cmd.country ?? "Global"})...`);
-    const entityPromise = this.resolveEntity({
-      query: cmd.registrationNumber || cmd.name,
-      jurisdiction: cmd.country,
-      country: cmd.country
-    });
-    const vatPromise = cmd.vatNumber ? this.verifyVat({ vatNumber: cmd.vatNumber }) : Promise.resolve(null);
-    const sanctionsPromise = this.screenSanctions({
-      name: cmd.name,
-      country: cmd.country,
-      registrationNumber: cmd.registrationNumber
-    });
-    const [entityRes, vatRes, sanctionsRes] = await Promise.all([
-      entityPromise,
-      vatPromise,
-      sanctionsPromise
-    ]);
-    const entity = entityRes.entity;
-    if (entityRes.resolved && entity) {
-      auditTrail.push(`      \u2713 Entity Resolved: '${entity.canonicalName}' (${entity.jurisdiction}) | Primary ID: ${entity.primaryIdValue} (${entity.primaryIdType})`);
-      if (entity.lei)
-        auditTrail.push(`      \u2713 GLEIF LEI: ${entity.lei}`);
-    } else {
-      auditTrail.push(`      \u26A0\uFE0F Entity resolution yielded no exact match (confidence=${entityRes.confidence})`);
-    }
-    let vatValid = null;
-    let vatOwnershipMismatch = false;
-    let vatOwnershipConfirmed = false;
-    if (vatRes) {
-      vatValid = vatRes.valid;
-      auditTrail.push(`[2/3] EU VIES VAT Check '${cmd.vatNumber}': ${vatValid ? "VALID (registered)" : "INVALID / UNCONFIRMED"}`);
-      if (vatValid && entity) {
-        const entityVat = entity.vatNumber?.replace(/\s+/g, "").toUpperCase();
-        const inputVat = cmd.vatNumber?.replace(/\s+/g, "").toUpperCase();
-        if (entityVat && inputVat && entityVat === inputVat) {
-          vatOwnershipConfirmed = true;
-          auditTrail.push(`      \u2713 VAT Ownership Confirmed: Entity record contains registered VAT '${inputVat}'`);
-        } else if (vatRes.linkedEntity) {
-          const isSameEntity = Boolean(entity.id) && vatRes.linkedEntity.id === entity.id || vatRes.linkedEntity.jurisdiction === entity.jurisdiction && vatRes.linkedEntity.primaryIdType === entity.primaryIdType && vatRes.linkedEntity.primaryIdValue === entity.primaryIdValue;
-          if (isSameEntity) {
-            vatOwnershipConfirmed = true;
-            auditTrail.push(`      \u2713 VAT Ownership Confirmed: Linked entity matches resolved entity (${entity.canonicalName})`);
-          } else {
-            vatOwnershipMismatch = true;
-            auditTrail.push(`      \uD83D\uDEA8 VAT OWNERSHIP MISMATCH: VAT '${cmd.vatNumber}' is registered to '${vatRes.linkedEntity.canonicalName}' (${vatRes.linkedEntity.primaryIdValue}), NOT '${entity.canonicalName}'`);
-          }
-        } else if (vatRes.registeredName) {
-          const sim = trigramSimilarity(vatRes.registeredName, entity.canonicalName);
-          if (sim >= 0.6) {
-            vatOwnershipConfirmed = true;
-            auditTrail.push(`      \u2713 VAT Ownership Confirmed via registered name similarity (${Math.round(sim * 100)}%)`);
-          } else if (sim < 0.3) {
-            vatOwnershipMismatch = true;
-            auditTrail.push(`      \uD83D\uDEA8 VAT OWNERSHIP MISMATCH: VAT '${cmd.vatNumber}' registered name '${vatRes.registeredName}' does not match '${entity.canonicalName}' (similarity ${Math.round(sim * 100)}%)`);
-          }
-        }
-      }
-    } else {
-      auditTrail.push(`[2/3] VAT Check: Skipped (no EU VAT number provided)`);
-    }
-    const canonicalSanctions = entityRes.compliance;
-    const suppliedHit = sanctionsRes.sanctioned === true;
-    const canonicalHit = canonicalSanctions?.sanctioned === true;
-    const sanctionsHit = suppliedHit || canonicalHit;
-    if (canonicalHit) {
-      auditTrail.push(`[3/3] \uD83D\uDEA8 SANCTIONS HIT ON RESOLVED ENTITY: '${entity?.canonicalName}' matches list(s): ${canonicalSanctions?.matchedLists.join(", ")}`);
-    }
-    if (suppliedHit) {
-      auditTrail.push(`[3/3] \uD83D\uDEA8 SANCTIONS HIT ON SUPPLIED VENDOR NAME: '${cmd.name}' matches list(s): ${sanctionsRes.matchedLists.join(", ")}`);
-    }
-    if (!sanctionsHit) {
-      auditTrail.push(`[3/3] Sanctions Screening (OFAC/EU/UN): \u2705 CLEAR (riskLevel=${sanctionsRes.riskLevel})`);
-    }
-    const sanctionsDegraded = Boolean(sanctionsRes.degraded || canonicalSanctions?.degraded);
-    const degradedReason = sanctionsRes.degradedReason || canonicalSanctions?.degradedReason;
-    const allMatches = [...sanctionsRes.matches, ...canonicalSanctions?.matches ?? []];
-    const allMatchedLists = Array.from(new Set([...sanctionsRes.matchedLists, ...canonicalSanctions?.matchedLists ?? []]));
-    const maxMatchScore = Math.max(sanctionsRes.matchScore, canonicalSanctions?.matchScore ?? 0);
-    const combinedSanctions = {
-      sanctioned: sanctionsHit,
-      riskLevel: sanctionsHit ? maxMatchScore >= 0.95 ? "EXACT_MATCH" : "POTENTIAL_MATCH" : sanctionsDegraded ? "UNKNOWN" : sanctionsRes.riskLevel === "POTENTIAL_MATCH" || canonicalSanctions?.riskLevel === "POTENTIAL_MATCH" ? "POTENTIAL_MATCH" : "CLEAR",
-      matchScore: maxMatchScore,
-      matchedLists: allMatchedLists,
-      matches: allMatches,
-      degraded: sanctionsDegraded,
-      degradedReason,
-      coverage: sanctionsRes.coverage || canonicalSanctions?.coverage
-    };
-    let verdict = "APPROVED";
-    let riskLevel = "CLEAR";
-    if (sanctionsHit) {
-      verdict = "REJECTED";
-      riskLevel = "CRITICAL";
-      auditTrail.push(`[VERDICT] \u274C REJECTED due to sanctions match on lists: ${allMatchedLists.join(", ")}`);
-    } else if (sanctionsDegraded) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "HIGH_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Sanctions screening is in degraded mode (${degradedReason ?? "coverage threshold unmet"}). Unqualified approval is prohibited.`);
-    } else if (entity && entity.status && ["INACTIVE", "DISSOLVED", "LIQUIDATING"].includes(entity.status)) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "HIGH_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is '${entity.status}' (not active). Verification cannot be approved.`);
-    } else if (entity && (!entity.status || entity.status === "UNKNOWN")) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "MEDIUM_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is 'UNKNOWN' (standing unverified). Unqualified approval is prohibited.`);
-    } else if (vatOwnershipMismatch) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "HIGH_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number belongs to a different entity than the resolved vendor.`);
-    } else if (vatValid === false) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "HIGH_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number was rejected or unconfirmed by VIES`);
-    } else if (vatValid === true && !vatOwnershipConfirmed) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "MEDIUM_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: VAT registration is valid, but ownership by this vendor is unconfirmed.`);
-    } else if (!entityRes.resolved || entityRes.confidence < 0.7) {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "MEDIUM_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity identity resolution confidence is low (${Math.round(entityRes.confidence * 100)}%)`);
-    } else if (combinedSanctions.riskLevel === "POTENTIAL_MATCH") {
-      verdict = "FLAGGED_FOR_REVIEW";
-      riskLevel = "MEDIUM_RISK";
-      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Near-threshold fuzzy sanctions similarity match requiring compliance review`);
-    } else {
-      verdict = "APPROVED";
-      riskLevel = "CLEAR";
-      auditTrail.push(`[VERDICT] \u2705 APPROVED: Verified corporate entity, clean sanctions record, valid VAT status`);
-    }
-    const baseConfidence = entityRes.confidence || 0.5;
-    const vatBonus = vatOwnershipMismatch ? -0.3 : vatOwnershipConfirmed ? 0.1 : vatValid === false ? -0.2 : 0;
-    const confidence = Math.min(1, Math.max(0, baseConfidence + vatBonus));
-    return {
-      vendorName: cmd.name,
-      verdict,
-      riskLevel,
-      confidence,
-      sanctionsHit,
-      vatValid,
-      entity,
-      vatVerification: vatRes,
-      sanctionsScreening: combinedSanctions,
-      auditTrail,
-      evaluatedAt
-    };
-  }
-  async verifyBankPayee(cmd) {
-    const base = verifyBankPayee(cmd);
-    if (!base.valid) {
-      return base;
-    }
-    if (cmd.payeeTaxId && this.deps.bankOwnershipAdapters && this.deps.bankOwnershipAdapters.length > 0) {
-      const adapter = this.deps.bankOwnershipAdapters.find((a) => a.supports(base.countryCode));
-      if (adapter) {
-        try {
-          const res = await adapter.verify(base.normalizedIban, cmd.payeeTaxId);
-          if (res.matched === true) {
-            return {
-              ...base,
-              ownershipVerified: true,
-              ownershipSource: adapter.sourceName
-            };
-          } else if (res.matched === false) {
-            return {
-              ...base,
-              valid: false,
-              ownershipVerified: false,
-              ownershipSource: adapter.sourceName,
-              issues: [
-                ...base.issues,
-                `Bank account '${base.normalizedIban}' is not registered to taxpayer '${cmd.payeeTaxId}' in official ${adapter.sourceName} register`
-              ]
-            };
-          } else {
-            return {
-              ...base,
-              ownershipVerified: null,
-              ownershipSource: adapter.sourceName
-            };
-          }
-        } catch {
-          return {
-            ...base,
-            ownershipVerified: null,
-            ownershipSource: adapter.sourceName
-          };
-        }
-      }
-    }
-    return {
-      ...base,
-      ownershipVerified: null,
-      ownershipSource: null
-    };
-  }
-  async batchResolve(cmd) {
-    const startedAt = Date.now();
-    const promises = cmd.items.map(async (item) => {
-      try {
-        const country = item.country || item.jurisdiction;
-        const res = await this.resolveEntity({
-          query: item.query,
-          country,
-          jurisdiction: country
-        });
-        return {
-          query: item.query,
-          country,
-          resolved: res.resolved,
-          entity: res.entity,
-          confidence: res.confidence
-        };
-      } catch (err) {
-        return {
-          query: item.query,
-          country: item.country || item.jurisdiction,
-          resolved: false,
-          entity: null,
-          confidence: 0,
-          error: err?.message || "Internal resolution error"
-        };
-      }
-    });
-    const results = await Promise.all(promises);
-    const resolvedCount = results.filter((r) => r.resolved).length;
-    const unresolvedCount = results.length - resolvedCount;
-    return {
-      total: results.length,
-      resolvedCount,
-      unresolvedCount,
-      results,
-      durationMs: Math.max(1, Date.now() - startedAt)
-    };
-  }
-}
-
-// node_modules/zod/v4/core/util.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/util.js
 function getEnumValues(entries) {
   const numericValues = Object.values(entries).filter((v) => typeof v === "number");
   const values = Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -4674,7 +6153,7 @@ function constantCatch(value) {
   return fn;
 }
 
-// node_modules/zod/v4/core/core.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/core.js
 var _a;
 var _zodDesc = { value: undefined, enumerable: false };
 var _E = "captureStackTrace" in Error ? Error : null;
@@ -4792,7 +6271,7 @@ function config(newConfig) {
     Object.assign(globalConfig, newConfig);
   return globalConfig;
 }
-// node_modules/zod/v4/core/errors.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/errors.js
 function _getMessage() {
   const internals = this._zod;
   internals.message ?? (internals.message = JSON.stringify(internals.def, jsonStringifyReplacer, 2));
@@ -4907,7 +6386,7 @@ function formatError(error, mapper = (issue) => issue.message) {
   return fieldErrors;
 }
 
-// node_modules/zod/v4/core/parse.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/parse.js
 function finalizeParams(callee, params) {
   return { callee: params?.callee ?? callee, Err: params?.Err };
 }
@@ -5054,7 +6533,7 @@ var _safeEncodeAsync = (_Err) => async (schema, value, _ctx) => {
 var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
   return _safeParseAsync(_Err)(schema, value, _ctx);
 };
-// node_modules/zod/v4/core/regexes.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][0-9a-z]{6,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$/;
@@ -5112,7 +6591,7 @@ var boolean = /^(?:true|false)$/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// node_modules/zod/v4/core/checks.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {});
@@ -5428,7 +6907,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/zod/v4/core/doc.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/doc.js
 class Doc {
   constructor(args = [], closed = {}) {
     this.content = [];
@@ -5470,14 +6949,14 @@ ${content.join(`
   }
 }
 
-// node_modules/zod/v4/core/versions.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 6,
   patch: 7
 };
 
-// node_modules/zod/v4/core/schemas.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {});
@@ -6604,6 +8083,28 @@ var $ZodEnum = /* @__PURE__ */ $constructor("$ZodEnum", (inst, def) => {
     return payload;
   };
 });
+var $ZodLiteral = /* @__PURE__ */ $constructor("$ZodLiteral", (inst, def) => {
+  $ZodType.init(inst, def);
+  const values = new Set(def.values);
+  inst._zod.values = values;
+  defineLazyInternal(inst, "pattern", (zod) => {
+    const vals = zod.def.values;
+    return new RegExp(vals.length ? `^(${vals.map((o) => typeof o === "string" ? escapeRegex(o) : o ? escapeRegex(o.toString()) : String(o)).join("|")})$` : "^[^\\s\\S]$");
+  });
+  inst._zod.parse = (payload, _ctx) => {
+    const input = payload.value;
+    if (values.has(input)) {
+      return payload;
+    }
+    payload.issues.push({
+      code: "invalid_value",
+      values: def.values,
+      input,
+      inst
+    });
+    return payload;
+  };
+});
 var $ZodTransform = /* @__PURE__ */ $constructor("$ZodTransform", (inst, def) => {
   $ZodType.init(inst, def);
   inst._zod.optin = "optional";
@@ -6857,7 +8358,7 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-// node_modules/zod/v4/core/memoizer.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/memoizer.js
 class $ZodCyclicError extends Error {
   constructor() {
     super(`Cannot parse a reference cycle that closes through a transform`);
@@ -7126,7 +8627,7 @@ function isBackEdge(ctx, value) {
   const backEdges = ctx[STATE]?.backEdges;
   return backEdges !== undefined && isRef(value) && backEdges.has(value);
 }
-// node_modules/zod/v4/locales/en.js
+// ../../../../Projects/agentum/node_modules/zod/v4/locales/en.js
 var error = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -7248,7 +8749,7 @@ function en_default() {
     localeError: error()
   };
 }
-// node_modules/zod/v4/core/registries.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/registries.js
 var _a2;
 class $ZodRegistry {
   constructor() {
@@ -7295,7 +8796,7 @@ function registry() {
 }
 (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
-// node_modules/zod/v4/core/api.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/api.js
 function snapshotChecks(def) {
   if (def.checks)
     def.checks = [...def.checks];
@@ -7748,7 +9249,7 @@ function _check(fn, params) {
   ch._zod.check = fn;
   return ch;
 }
-// node_modules/zod/v4/core/to-json-schema.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
   for (const source of sources) {
     for (const key of Reflect.ownKeys(source)) {
@@ -8271,7 +9772,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   extractDefs(ctx, schema);
   return finalize(ctx, schema);
 };
-// node_modules/zod/v4/core/json-schema-processors.js
+// ../../../../Projects/agentum/node_modules/zod/v4/core/json-schema-processors.js
 var narrowMin = (agg, key, value) => {
   if (agg[key] === undefined || value > agg[key])
     agg[key] = value;
@@ -9014,7 +10515,7 @@ function toJSONSchema(input, params) {
   extractDefs(ctx, input);
   return finalize(ctx, input);
 }
-// node_modules/zod/v4/classic/errors.js
+// ../../../../Projects/agentum/node_modules/zod/v4/classic/errors.js
 var _installedErrorProtos = /* @__PURE__ */ new WeakSet([Object.prototype, Error.prototype]);
 function _lazyMethod(proto, key, make) {
   Object.defineProperty(proto, key, {
@@ -9059,7 +10560,7 @@ var ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, undefi
   Parent: Error
 });
 
-// node_modules/zod/v4/classic/parse.js
+// ../../../../Projects/agentum/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -9073,7 +10574,7 @@ var safeDecode = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// node_modules/zod/v4/classic/schemas.js
+// ../../../../Projects/agentum/node_modules/zod/v4/classic/schemas.js
 function _ensureDefaultLocale() {
   if (!globalConfig.localeError)
     config(en_default());
@@ -9430,6 +10931,9 @@ var ZodURL = /* @__PURE__ */ $constructor("ZodURL", (inst, def) => {
   $ZodURL.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
+function url(params) {
+  return _url(ZodURL, params);
+}
 var ZodEmoji = /* @__PURE__ */ $constructor("ZodEmoji", (inst, def) => {
   $ZodEmoji.init(inst, def);
   ZodStringFormat.init(inst, def);
@@ -9753,6 +11257,27 @@ function _enum(values, params) {
     ...normalizeParams(params)
   });
 }
+var ZodLiteral = /* @__PURE__ */ $constructor("ZodLiteral", (inst, def) => {
+  $ZodLiteral.init(inst, def);
+  ZodType.init(inst, def);
+  inst._zod.processJSONSchema = (ctx, json, params) => literalProcessor(inst, ctx, json, params);
+  inst.values = new Set(def.values);
+  Object.defineProperty(inst, "value", {
+    get() {
+      if (def.values.length > 1) {
+        throw new Error("This schema contains multiple valid literal values. Use `.values` instead.");
+      }
+      return def.values[0];
+    }
+  });
+});
+function literal(value, params) {
+  return new ZodLiteral({
+    type: "literal",
+    values: Array.isArray(value) ? value : [value],
+    ...normalizeParams(params)
+  });
+}
 var ZodTransform = /* @__PURE__ */ $constructor("ZodTransform", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodTransform.init(inst, def);
@@ -9924,7 +11449,513 @@ function refine(fn, _params = {}) {
 function superRefine(fn, params) {
   return _superRefine(fn, params);
 }
-// src/application/tool-registry.ts
+// ../../../../Projects/agentum/node_modules/zod/v4/classic/iso.js
+var exports_iso = {};
+__export(exports_iso, {
+  ZodISODate: () => ZodISODate,
+  ZodISODateTime: () => ZodISODateTime,
+  ZodISODuration: () => ZodISODuration,
+  ZodISOTime: () => ZodISOTime,
+  date: () => date2,
+  datetime: () => datetime2,
+  duration: () => duration2,
+  time: () => time2
+});
+function datetime2(params) {
+  return _isoDateTime(ZodISODateTime, params);
+}
+function date2(params) {
+  return _isoDate(ZodISODate, params);
+}
+function time2(params) {
+  return _isoTime(ZodISOTime, params);
+}
+function duration2(params) {
+  return _isoDuration(ZodISODuration, params);
+}
+// ../../agentum-clean-release/agentum/src/domain/company-events.ts
+var CompanyEventSchema = object({
+  id: string2().min(1),
+  source: literal("FR_BODACC"),
+  sourceUrl: url().refine((value) => {
+    try {
+      const url2 = new URL(value);
+      return url2.protocol === "https:" && url2.hostname === "www.bodacc.fr";
+    } catch {
+      return false;
+    }
+  }),
+  publishedAt: exports_iso.date(),
+  category: string2().min(1),
+  description: string2().min(1),
+  companyRegistrationNumber: string2().regex(/^\d{9}$/)
+});
+var CompanyEventsResultSchema = object({
+  status: _enum(["OK", "UNAVAILABLE", "UNSUPPORTED"]),
+  source: string2().nullable(),
+  events: array(CompanyEventSchema),
+  truncated: boolean2(),
+  error: string2().optional()
+});
+
+// ../../agentum-clean-release/agentum/src/application/entity-service.ts
+class EntityApplicationService {
+  deps;
+  sourceRouter;
+  constructor(deps) {
+    this.deps = deps;
+    this.sourceRouter = new SourceRouter({
+      free: this.deps.upstreamProviders,
+      paid: this.deps.commercialAggregator,
+      timeoutMs: 2200
+    });
+  }
+  async resolveEntity(cmd) {
+    const startedAt = Date.now();
+    const countryInput = cmd.jurisdiction || cmd.country;
+    const requestedJurisdiction = countryInput ? normalizeCountryCode(countryInput) : undefined;
+    const classified = classifyQuery(cmd.query, requestedJurisdiction);
+    const effectiveJurisdiction = requestedJurisdiction || (classified.type !== "NAME" ? classified.inferredCountry : undefined) || undefined;
+    const cleanPart = encodeURIComponent(classified.cleanedValue.toLowerCase());
+    const jurPart = encodeURIComponent((effectiveJurisdiction ?? "all").toLowerCase());
+    const identityCacheKey = `agentum:identity:v2:${classified.type}:${classified.scheme ?? "legacy"}:${cleanPart}:${jurPart}:${Boolean(cmd.verifyVat)}:${Boolean(cmd.includeParent)}`;
+    let candidates = [];
+    let best = null;
+    let modeUsed = this.deps.config.resolverMode;
+    let vatVerification = null;
+    let routerAttempts = [];
+    let paidUsed = false;
+    const cachedIdentity = await this.deps.cacheStore.getCache(identityCacheKey);
+    if (cachedIdentity) {
+      best = cachedIdentity.best;
+      candidates = cachedIdentity.candidates;
+      modeUsed = "cache";
+      vatVerification = cachedIdentity.vatVerification;
+      routerAttempts = cachedIdentity.routerAttempts;
+      paidUsed = cachedIdentity.paidUsed;
+    } else {
+      if (this.deps.config.resolverMode !== "live") {
+        if (classified.type !== "NAME") {
+          const exact = await this.deps.entityRepo.findByIdentifier(classified.type, classified.cleanedValue, effectiveJurisdiction, classified.scheme);
+          if (exact) {
+            candidates.push({ ...exact, confidence: 0.99 });
+          }
+        }
+        if (candidates.length === 0) {
+          const fuzzy = await this.deps.entityRepo.searchFuzzy(classified.normalizedName, { jurisdiction: effectiveJurisdiction, limit: 5 });
+          candidates.push(...fuzzy);
+        }
+        candidates.sort((a, b) => b.confidence - a.confidence);
+      }
+      const shouldQueryUpstream = this.deps.config.resolverMode === "live" || this.deps.config.resolverMode === "hybrid" && (candidates.length === 0 || candidates[0].confidence < 0.82);
+      if (shouldQueryUpstream) {
+        const routerRes = await this.sourceRouter.resolve(classified, {
+          jurisdiction: effectiveJurisdiction,
+          allowPaidSources: cmd.allowPaidSources
+        });
+        routerAttempts = routerRes.sourcesTried;
+        paidUsed = routerRes.costUsd > 0;
+        const upstreamRecords = routerRes.records;
+        if (upstreamRecords.length > 0) {
+          await this.deps.entityRepo.upsertMany(upstreamRecords);
+          candidates = [...candidates, ...upstreamRecords];
+        }
+      }
+      candidates = coalesceRegistryRecords(candidates);
+      for (const c of candidates) {
+        if (effectiveJurisdiction && normalizeCountryCode(c.jurisdiction) !== normalizeCountryCode(effectiveJurisdiction)) {
+          c.confidence = 0;
+          continue;
+        }
+        if (classified.type !== "NAME" && classified.cleanedValue) {
+          if (matchesEntityIdentifier(c, classified)) {
+            c.confidence = Math.max(c.confidence, 0.95);
+          } else {
+            c.confidence = Math.min(c.confidence, 0.1);
+          }
+        } else {
+          const queryTerm = classified.normalizedName || classified.cleanedValue || classified.raw;
+          const nameSim = Math.max(trigramSimilarity(queryTerm, c.normalizedName), wordTrigramSimilarity(queryTerm, c.normalizedName));
+          const aliasSims = (c.aliases || []).map((a) => {
+            const { normalizedName: aNorm } = normalizeCompanyName(a);
+            return Math.max(trigramSimilarity(queryTerm, aNorm), wordTrigramSimilarity(queryTerm, aNorm));
+          });
+          const bestSim = Math.max(nameSim, ...aliasSims);
+          c.confidence = Math.round(bestSim * 100) / 100;
+        }
+      }
+      candidates.sort((a, b) => b.confidence - a.confidence);
+      let ambiguous = false;
+      if (classified.type === "NAME" && candidates.length >= 2) {
+        const c1 = candidates[0];
+        const c2 = candidates[1];
+        if (c1 && c2 && c1.confidence - c2.confidence < 0.05) {
+          ambiguous = true;
+        }
+      }
+      best = ambiguous ? null : candidates[0] ?? null;
+      if (best && best.confidence < 0.6) {
+        best = null;
+      }
+      if (cmd.verifyVat && (best?.vatNumber || classified.type === "EU_VAT")) {
+        const vatToVerify = best?.vatNumber ?? classified.cleanedValue;
+        try {
+          vatVerification = await this.deps.vatValidator.verifyVat(vatToVerify, this.deps.config.viesTimeoutMs);
+        } catch (err) {
+          vatVerification = {
+            valid: false,
+            countryCode: vatToVerify.slice(0, 2).toUpperCase(),
+            vatNumber: vatToVerify.slice(2),
+            fullVat: vatToVerify.toUpperCase(),
+            registeredName: null,
+            registeredAddress: null,
+            checkedAt: new Date().toISOString(),
+            source: "EU_VIES",
+            error: err instanceof Error ? err.message : String(err)
+          };
+        }
+      }
+      if (best !== null) {
+        await this.deps.cacheStore.setCache(identityCacheKey, {
+          best,
+          candidates,
+          modeUsed,
+          vatVerification,
+          routerAttempts,
+          paidUsed
+        }, 3600);
+      }
+    }
+    let compliance = null;
+    if (cmd.checkSanctions !== false) {
+      compliance = await this.deps.sanctionsRepo.screen({
+        name: best?.canonicalName ?? cmd.query,
+        country: best?.jurisdiction ?? cmd.jurisdiction,
+        registrationNumber: best?.registrationNumber ?? best?.lei ?? undefined
+      });
+    }
+    let beneficialOwnership;
+    if (cmd.includeBeneficialOwners && best) {
+      const adapter = (this.deps.beneficialOwnershipAdapters ?? []).find((a) => a.supportsEntity(best));
+      if (!adapter) {
+        beneficialOwnership = { status: "UNSUPPORTED", source: null, ownerCount: 0 };
+      } else {
+        try {
+          const owners = await adapter.listBeneficialOwners(best, 2200);
+          best = { ...best, beneficialOwners: owners };
+          beneficialOwnership = { status: "OK", source: adapter.sourceName, ownerCount: owners.length };
+        } catch (err) {
+          beneficialOwnership = {
+            status: "UNAVAILABLE",
+            source: adapter.sourceName,
+            ownerCount: 0,
+            error: err instanceof Error ? err.message : String(err)
+          };
+        }
+      }
+    }
+    let companyEvents;
+    if (cmd.includeCompanyEvents) {
+      const adapter = best && this.deps.companyEventsAdapters?.find((a) => a.supportsEntity(best));
+      if (!adapter || !best) {
+        companyEvents = { status: "UNSUPPORTED", source: null, events: [], truncated: false };
+      } else {
+        try {
+          companyEvents = CompanyEventsResultSchema.parse(await adapter.listEvents(best, 2200));
+        } catch {
+          companyEvents = { status: "UNAVAILABLE", source: null, events: [], truncated: false, error: "COMPANY_EVENTS_UNAVAILABLE" };
+        }
+      }
+    }
+    const targetCountry = effectiveJurisdiction || classified.inferredCountry || "XX";
+    const profile = getCountryProfile(targetCountry);
+    const isResolved = best !== null && best.confidence >= 0.6;
+    const result = {
+      resolved: isResolved,
+      confidence: best ? best.confidence : 0,
+      queryType: classified.type,
+      modeUsed,
+      entity: best,
+      compliance,
+      vatVerification,
+      candidates,
+      coverage: {
+        country: profile.iso2,
+        level: profile.coverage,
+        sourcesTried: routerAttempts,
+        paidSourceUsed: paidUsed
+      },
+      ...beneficialOwnership ? { beneficialOwnership } : {},
+      ...companyEvents ? { companyEvents } : {},
+      latencyMs: Math.max(1, Date.now() - startedAt)
+    };
+    return result;
+  }
+  async verifyVat(input) {
+    const normalized = input.vatNumber.replace(/\s+/g, "").toUpperCase();
+    const cacheKey = `agentum:vat:v1:${normalized}`;
+    const cached = await this.deps.cacheStore.getCache(cacheKey);
+    if (cached) {
+      return { ...cached, source: "CACHE" };
+    }
+    const res = await this.deps.vatValidator.verifyVat(input.vatNumber, this.deps.config.viesTimeoutMs);
+    let linkedEntity = await this.deps.entityRepo.findByIdentifier("EU_VAT", res.fullVat);
+    if (!linkedEntity && res.registeredName) {
+      const fuzzy = await this.deps.entityRepo.searchFuzzy(normalizeCompanyName(res.registeredName).normalizedName, { jurisdiction: res.countryCode, limit: 1 });
+      linkedEntity = fuzzy[0] ?? null;
+    }
+    const result = {
+      ...res,
+      linkedEntity: linkedEntity ?? null
+    };
+    await this.deps.cacheStore.setCache(cacheKey, result, 3600);
+    return result;
+  }
+  async screenSanctions(input) {
+    return this.deps.sanctionsRepo.screen(input);
+  }
+  async checkVendor(cmd) {
+    const auditTrail = [];
+    const evaluatedAt = new Date().toISOString();
+    auditTrail.push(`[1/3] Initiating automated KYB due diligence for '${cmd.name}' (${cmd.country ?? "Global"})...`);
+    const entityPromise = this.resolveEntity({
+      query: cmd.registrationNumber || cmd.name,
+      jurisdiction: cmd.country,
+      country: cmd.country
+    });
+    const vatPromise = cmd.vatNumber ? this.verifyVat({ vatNumber: cmd.vatNumber }) : Promise.resolve(null);
+    const sanctionsPromise = this.screenSanctions({
+      name: cmd.name,
+      country: cmd.country,
+      registrationNumber: cmd.registrationNumber
+    });
+    const [entityRes, vatRes, sanctionsRes] = await Promise.all([
+      entityPromise,
+      vatPromise,
+      sanctionsPromise
+    ]);
+    const entity = entityRes.entity;
+    if (entityRes.resolved && entity) {
+      auditTrail.push(`      \u2713 Entity Resolved: '${entity.canonicalName}' (${entity.jurisdiction}) | Primary ID: ${entity.primaryIdValue} (${entity.primaryIdType})`);
+      if (entity.lei)
+        auditTrail.push(`      \u2713 GLEIF LEI: ${entity.lei}`);
+    } else {
+      auditTrail.push(`      \u26A0\uFE0F Entity resolution yielded no exact match (confidence=${entityRes.confidence})`);
+    }
+    let vatValid = null;
+    let vatOwnershipMismatch = false;
+    let vatOwnershipConfirmed = false;
+    if (vatRes) {
+      vatValid = vatRes.valid;
+      auditTrail.push(`[2/3] EU VIES VAT Check '${cmd.vatNumber}': ${vatValid ? "VALID (registered)" : "INVALID / UNCONFIRMED"}`);
+      if (vatValid && entity) {
+        const entityVat = entity.vatNumber?.replace(/\s+/g, "").toUpperCase();
+        const inputVat = cmd.vatNumber?.replace(/\s+/g, "").toUpperCase();
+        if (entityVat && inputVat && entityVat === inputVat) {
+          vatOwnershipConfirmed = true;
+          auditTrail.push(`      \u2713 VAT Ownership Confirmed: Entity record contains registered VAT '${inputVat}'`);
+        } else if (vatRes.linkedEntity) {
+          const isSameEntity = Boolean(entity.id) && vatRes.linkedEntity.id === entity.id || vatRes.linkedEntity.jurisdiction === entity.jurisdiction && vatRes.linkedEntity.primaryIdType === entity.primaryIdType && vatRes.linkedEntity.primaryIdValue === entity.primaryIdValue;
+          if (isSameEntity) {
+            vatOwnershipConfirmed = true;
+            auditTrail.push(`      \u2713 VAT Ownership Confirmed: Linked entity matches resolved entity (${entity.canonicalName})`);
+          } else {
+            vatOwnershipMismatch = true;
+            auditTrail.push(`      \uD83D\uDEA8 VAT OWNERSHIP MISMATCH: VAT '${cmd.vatNumber}' is registered to '${vatRes.linkedEntity.canonicalName}' (${vatRes.linkedEntity.primaryIdValue}), NOT '${entity.canonicalName}'`);
+          }
+        } else if (vatRes.registeredName) {
+          const sim = trigramSimilarity(vatRes.registeredName, entity.canonicalName);
+          if (sim >= 0.6) {
+            vatOwnershipConfirmed = true;
+            auditTrail.push(`      \u2713 VAT Ownership Confirmed via registered name similarity (${Math.round(sim * 100)}%)`);
+          } else if (sim < 0.3) {
+            vatOwnershipMismatch = true;
+            auditTrail.push(`      \uD83D\uDEA8 VAT OWNERSHIP MISMATCH: VAT '${cmd.vatNumber}' registered name '${vatRes.registeredName}' does not match '${entity.canonicalName}' (similarity ${Math.round(sim * 100)}%)`);
+          }
+        }
+      }
+    } else {
+      auditTrail.push(`[2/3] VAT Check: Skipped (no EU VAT number provided)`);
+    }
+    const canonicalSanctions = entityRes.compliance;
+    const suppliedHit = sanctionsRes.sanctioned === true;
+    const canonicalHit = canonicalSanctions?.sanctioned === true;
+    const sanctionsHit = suppliedHit || canonicalHit;
+    if (canonicalHit) {
+      auditTrail.push(`[3/3] \uD83D\uDEA8 SANCTIONS HIT ON RESOLVED ENTITY: '${entity?.canonicalName}' matches list(s): ${canonicalSanctions?.matchedLists.join(", ")}`);
+    }
+    if (suppliedHit) {
+      auditTrail.push(`[3/3] \uD83D\uDEA8 SANCTIONS HIT ON SUPPLIED VENDOR NAME: '${cmd.name}' matches list(s): ${sanctionsRes.matchedLists.join(", ")}`);
+    }
+    if (!sanctionsHit) {
+      auditTrail.push(`[3/3] Sanctions Screening (OFAC/EU/UN): \u2705 CLEAR (riskLevel=${sanctionsRes.riskLevel})`);
+    }
+    const sanctionsDegraded = Boolean(sanctionsRes.degraded || canonicalSanctions?.degraded);
+    const degradedReason = sanctionsRes.degradedReason || canonicalSanctions?.degradedReason;
+    const allMatches = [...sanctionsRes.matches, ...canonicalSanctions?.matches ?? []];
+    const allMatchedLists = Array.from(new Set([...sanctionsRes.matchedLists, ...canonicalSanctions?.matchedLists ?? []]));
+    const maxMatchScore = Math.max(sanctionsRes.matchScore, canonicalSanctions?.matchScore ?? 0);
+    const combinedSanctions = {
+      sanctioned: sanctionsHit,
+      riskLevel: sanctionsHit ? maxMatchScore >= 0.95 ? "EXACT_MATCH" : "POTENTIAL_MATCH" : sanctionsDegraded ? "UNKNOWN" : sanctionsRes.riskLevel === "POTENTIAL_MATCH" || canonicalSanctions?.riskLevel === "POTENTIAL_MATCH" ? "POTENTIAL_MATCH" : "CLEAR",
+      matchScore: maxMatchScore,
+      matchedLists: allMatchedLists,
+      matches: allMatches,
+      degraded: sanctionsDegraded,
+      degradedReason,
+      coverage: sanctionsRes.coverage || canonicalSanctions?.coverage
+    };
+    let verdict = "APPROVED";
+    let riskLevel = "CLEAR";
+    if (sanctionsHit) {
+      verdict = "REJECTED";
+      riskLevel = "CRITICAL";
+      auditTrail.push(`[VERDICT] \u274C REJECTED due to sanctions match on lists: ${allMatchedLists.join(", ")}`);
+    } else if (sanctionsDegraded) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Sanctions screening is in degraded mode (${degradedReason ?? "coverage threshold unmet"}). Unqualified approval is prohibited.`);
+    } else if (entity && entity.status && ["INACTIVE", "DISSOLVED", "LIQUIDATING"].includes(entity.status)) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is '${entity.status}' (not active). Verification cannot be approved.`);
+    } else if (entity && (!entity.status || entity.status === "UNKNOWN")) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity status is 'UNKNOWN' (standing unverified). Unqualified approval is prohibited.`);
+    } else if (vatOwnershipMismatch) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number belongs to a different entity than the resolved vendor.`);
+    } else if (vatValid === false) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "HIGH_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: EU VAT number was rejected or unconfirmed by VIES`);
+    } else if (vatValid === true && !vatOwnershipConfirmed) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: VAT registration is valid, but ownership by this vendor is unconfirmed.`);
+    } else if (!entityRes.resolved || entityRes.confidence < 0.7) {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Corporate entity identity resolution confidence is low (${Math.round(entityRes.confidence * 100)}%)`);
+    } else if (combinedSanctions.riskLevel === "POTENTIAL_MATCH") {
+      verdict = "FLAGGED_FOR_REVIEW";
+      riskLevel = "MEDIUM_RISK";
+      auditTrail.push(`[VERDICT] \u26A0\uFE0F FLAGGED_FOR_REVIEW: Near-threshold fuzzy sanctions similarity match requiring compliance review`);
+    } else {
+      verdict = "APPROVED";
+      riskLevel = "CLEAR";
+      auditTrail.push(`[VERDICT] \u2705 APPROVED: Verified corporate entity, clean sanctions record, valid VAT status`);
+    }
+    const baseConfidence = entityRes.confidence || 0.5;
+    const vatBonus = vatOwnershipMismatch ? -0.3 : vatOwnershipConfirmed ? 0.1 : vatValid === false ? -0.2 : 0;
+    const confidence = Math.min(1, Math.max(0, baseConfidence + vatBonus));
+    return {
+      vendorName: cmd.name,
+      verdict,
+      riskLevel,
+      confidence,
+      sanctionsHit,
+      vatValid,
+      entity,
+      vatVerification: vatRes,
+      sanctionsScreening: combinedSanctions,
+      auditTrail,
+      evaluatedAt
+    };
+  }
+  async verifyBankPayee(cmd) {
+    const base = verifyBankPayee(cmd);
+    if (!base.valid) {
+      return base;
+    }
+    if (cmd.payeeTaxId && this.deps.bankOwnershipAdapters && this.deps.bankOwnershipAdapters.length > 0) {
+      const adapter = this.deps.bankOwnershipAdapters.find((a) => a.supports(base.countryCode));
+      if (adapter) {
+        try {
+          const res = await adapter.verify(base.normalizedIban, cmd.payeeTaxId);
+          if (res.matched === true) {
+            return {
+              ...base,
+              ownershipVerified: true,
+              ownershipSource: adapter.sourceName
+            };
+          } else if (res.matched === false) {
+            return {
+              ...base,
+              valid: false,
+              ownershipVerified: false,
+              ownershipSource: adapter.sourceName,
+              issues: [
+                ...base.issues,
+                `Bank account '${base.normalizedIban}' is not registered to taxpayer '${cmd.payeeTaxId}' in official ${adapter.sourceName} register`
+              ]
+            };
+          } else {
+            return {
+              ...base,
+              ownershipVerified: null,
+              ownershipSource: adapter.sourceName
+            };
+          }
+        } catch {
+          return {
+            ...base,
+            ownershipVerified: null,
+            ownershipSource: adapter.sourceName
+          };
+        }
+      }
+    }
+    return {
+      ...base,
+      ownershipVerified: null,
+      ownershipSource: null
+    };
+  }
+  async batchResolve(cmd) {
+    const startedAt = Date.now();
+    const promises = cmd.items.map(async (item) => {
+      try {
+        const country = item.country || item.jurisdiction;
+        const res = await this.resolveEntity({
+          query: item.query,
+          country,
+          jurisdiction: country
+        });
+        return {
+          query: item.query,
+          country,
+          resolved: res.resolved,
+          entity: res.entity,
+          confidence: res.confidence
+        };
+      } catch (err) {
+        return {
+          query: item.query,
+          country: item.country || item.jurisdiction,
+          resolved: false,
+          entity: null,
+          confidence: 0,
+          error: err?.message || "Internal resolution error"
+        };
+      }
+    });
+    const results = await Promise.all(promises);
+    const resolvedCount = results.filter((r) => r.resolved).length;
+    const unresolvedCount = results.length - resolvedCount;
+    return {
+      total: results.length,
+      resolvedCount,
+      unresolvedCount,
+      results,
+      durationMs: Math.max(1, Date.now() - startedAt)
+    };
+  }
+}
+
+// ../../agentum-clean-release/agentum/src/application/tool-registry.ts
 function defineTool(def) {
   return def;
 }
@@ -9955,7 +11986,7 @@ class ToolRegistry {
   }
 }
 
-// src/domain/entity.ts
+// ../../agentum-clean-release/agentum/src/domain/entity.ts
 var IdentifierTypeSchema = _enum([
   "LEI",
   "EU_VAT",
@@ -10015,6 +12046,20 @@ var OfficerRecordSchema = object({
   nationality: string2().optional(),
   occupation: string2().optional()
 });
+var BeneficialOwnerRecordSchema = object({
+  name: string2(),
+  kind: _enum(["INDIVIDUAL", "CORPORATE", "LEGAL_PERSON", "PROTECTED", "UNKNOWN"]),
+  naturesOfControl: array(string2()),
+  notifiedOn: string2().optional(),
+  ceasedOn: string2().optional(),
+  nationality: string2().optional(),
+  countryOfResidence: string2().optional(),
+  birthYearMonth: string2().optional(),
+  registrationNumber: string2().optional(),
+  countryRegistered: string2().optional(),
+  legalForm: string2().optional(),
+  source: string2()
+});
 var CanonicalEntityRecordSchema = object({
   id: string2().optional(),
   canonicalName: string2(),
@@ -10042,7 +12087,8 @@ var CanonicalEntityRecordSchema = object({
   aliases: array(string2()),
   sources: array(EntityDataSourceRefSchema),
   confidence: number2().min(0).max(1),
-  officers: array(OfficerRecordSchema).optional()
+  officers: array(OfficerRecordSchema).optional(),
+  beneficialOwners: array(BeneficialOwnerRecordSchema).optional()
 });
 var VatVerificationResultSchema = object({
   valid: boolean2(),
@@ -10056,7 +12102,7 @@ var VatVerificationResultSchema = object({
   error: string2().optional()
 });
 var SanctionsEntrySchema = object({
-  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC"]),
+  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC", "UK_FCDO"]),
   externalId: string2(),
   primaryName: string2(),
   aliases: array(string2()),
@@ -10067,7 +12113,7 @@ var SanctionsEntrySchema = object({
   remarks: string2().optional()
 });
 var SanctionsMatchSchema = object({
-  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC"]),
+  listSource: _enum(["OFAC_SDN", "EU_FSF", "UN_SC", "UK_FCDO"]),
   externalId: string2(),
   primaryName: string2(),
   entityType: string2(),
@@ -10095,8 +12141,10 @@ var ResolveEntityCommandSchema = object({
   country: string2().optional().describe("Alias for jurisdiction"),
   verifyVat: boolean2().optional().describe("Verify EU VAT number against live VIES if available"),
   includeParent: boolean2().optional().describe("Include parent and ultimate parent LEI relationships"),
-  checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN & EU Financial Sanctions (default true)"),
+  checkSanctions: boolean2().optional().describe("Cross-screen entity against OFAC SDN, EU FSF, UN SC and UK FCDO sanctions lists (default true)"),
   includeOfficers: boolean2().optional().describe("Include corporate directors, executives, and officers when available"),
+  includeBeneficialOwners: boolean2().optional().describe("Include current beneficial owners (e.g. UK Persons with Significant Control) when available"),
+  includeCompanyEvents: boolean2().optional().describe("Include recent official company notices where available (France BODACC); dated evidence, not a current-status or ownership verdict"),
   allowPaidSources: boolean2().optional().describe("Allow fallback to commercial paid aggregators when official registries are paywalled or unavailable")
 });
 var ResolveEntityResultSchema = object({
@@ -10114,6 +12162,13 @@ var ResolveEntityResultSchema = object({
     sourcesTried: array(any()),
     paidSourceUsed: boolean2()
   }).optional(),
+  beneficialOwnership: object({
+    status: _enum(["OK", "UNAVAILABLE", "UNSUPPORTED"]),
+    source: string2().nullable(),
+    ownerCount: number2(),
+    error: string2().optional()
+  }).optional(),
+  companyEvents: CompanyEventsResultSchema.optional(),
   latencyMs: number2()
 });
 var VerifyVatCommandSchema = object({
@@ -10191,7 +12246,7 @@ var BatchResolveResultSchema = object({
   durationMs: number2()
 });
 
-// src/application/tools/entity.tools.ts
+// ../../agentum-clean-release/agentum/src/application/tools/entity.tools.ts
 function registerEntityTools(registry, service, config) {
   registry.register(defineTool({
     id: "entity.resolve",
@@ -10200,7 +12255,7 @@ function registerEntityTools(registry, service, config) {
     httpPath: "/v1/entity/resolve",
     category: "entity",
     summary: "Deterministic Global Corporate Entity & Registry Resolver",
-    description: "Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK, EU-27, Switzerland, Australia, Singapore, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.",
+    description: "Deterministic Global Corporate Entity & Registry Resolver. Resolves official national corporate registry records, company status, and business identifiers worldwide across primary commercial jurisdictions (including US, UK, EU-27, Switzerland, Singapore, and global LEI). Accepts company names, domains, or national registration numbers with optional ISO country code.",
     priceUsd: config.priceEntityResolveUsd,
     inputSchema: ResolveEntityCommandSchema,
     outputSchema: ResolveEntityResultSchema,
@@ -10273,7 +12328,7 @@ function registerEntityTools(registry, service, config) {
   }));
 }
 
-// src/config.ts
+// ../../agentum-clean-release/agentum/src/config.ts
 function parseRole(raw) {
   if (raw === "api" || raw === "worker" || raw === "all")
     return raw;
@@ -10347,10 +12402,10 @@ function loadConfig(env = process.env) {
 }
 var config2 = loadConfig();
 
-// src/adapters/inbound/http/discovery.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/http/discovery.adapter.ts
 import crypto2 from "crypto";
 
-// node_modules/hono/dist/utils/jwt/jwa.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/jwt/jwa.js
 var AlgorithmTypes = /* @__PURE__ */ function(AlgorithmTypes) {
   AlgorithmTypes["HS256"] = "HS256";
   AlgorithmTypes["HS384"] = "HS384";
@@ -10368,7 +12423,7 @@ var AlgorithmTypes = /* @__PURE__ */ function(AlgorithmTypes) {
   return AlgorithmTypes;
 }({});
 
-// node_modules/hono/dist/utils/jwt/types.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/jwt/types.js
 var JwtAlgorithmNotImplemented = class extends Error {
   constructor(alg) {
     super(`${alg} is not an implemented algorithm`);
@@ -10460,11 +12515,11 @@ var JwtTokenAudience = class extends Error {
   }
 };
 
-// node_modules/hono/dist/utils/jwt/utf8.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/jwt/utf8.js
 var utf8Encoder = new TextEncoder;
 var utf8Decoder = new TextDecoder;
 
-// node_modules/hono/dist/helper/adapter/index.js
+// ../../../../Projects/agentum/node_modules/hono/dist/helper/adapter/index.js
 var knownUserAgents = {
   deno: "Deno",
   bun: "Bun",
@@ -10490,7 +12545,7 @@ var checkUserAgentEquals = (platform) => {
   return navigator.userAgent.startsWith(platform);
 };
 
-// node_modules/hono/dist/utils/jwt/jws.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/jwt/jws.js
 async function signing(privateKey, alg, data) {
   const algorithm = getKeyAlgorithm(alg);
   const cryptoKey = await importPrivateKey(privateKey, algorithm);
@@ -10639,7 +12694,7 @@ function isCryptoKey(key) {
   return key instanceof CryptoKey;
 }
 
-// node_modules/hono/dist/utils/jwt/jwt.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/jwt/jwt.js
 var encodeJwtPart = (part) => encodeBase64Url(utf8Encoder.encode(JSON.stringify(part)).buffer).replace(/=/g, "");
 var encodeSignaturePart = (buf) => encodeBase64Url(buf).replace(/=/g, "");
 var decodeJwtPart = (part) => JSON.parse(utf8Decoder.decode(decodeBase64Url(part)));
@@ -10785,7 +12840,7 @@ var decodeHeader = (token) => {
   }
 };
 
-// node_modules/hono/dist/utils/jwt/index.js
+// ../../../../Projects/agentum/node_modules/hono/dist/utils/jwt/index.js
 var Jwt = {
   sign,
   verify,
@@ -10793,13 +12848,13 @@ var Jwt = {
   verifyWithJwks
 };
 
-// node_modules/hono/dist/middleware/jwt/jwt.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/jwt/jwt.js
 var verifyWithJwks2 = Jwt.verifyWithJwks;
 var verify2 = Jwt.verify;
 var decode3 = Jwt.decode;
 var sign2 = Jwt.sign;
 
-// src/adapters/inbound/http/discovery.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/http/discovery.adapter.ts
 function mountDiscoveryAdapter(app, registry, config) {
   app.get("/", (c) => {
     const accept = c.req.header("accept") ?? "";
@@ -10837,7 +12892,7 @@ function mountDiscoveryAdapter(app, registry, config) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agentum \u2014 Deterministic Global Corporate Entity, VAT &amp; Sanctions Resolver for AI Agents</title>
-  <meta name="description" content="Deterministic Global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, EU Registries, GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Streamable HTTP MCP &amp; REST with x402 v2 and Stripe/Tempo MPP micropayments." />
+  <meta name="description" content="Deterministic Global corporate entity resolution (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, EU Registries, GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Streamable HTTP MCP &amp; REST with x402 v2 and Stripe/Tempo MPP micropayments." />
   <link rel="canonical" href="${config.publicBaseUrl}/" />
   <link rel="icon" type="image/svg+xml" href="${config.publicBaseUrl}/logo.svg" />
   <link rel="mcp-server" href="${config.publicBaseUrl}/mcp" />
@@ -10850,7 +12905,7 @@ function mountDiscoveryAdapter(app, registry, config) {
   <meta property="og:site_name" content="Agentum" />
   <meta property="og:url" content="${config.publicBaseUrl}/" />
   <meta property="og:title" content="Agentum \u2014 Deterministic Global Corporate Entity Resolver for AI Agents" />
-  <meta property="og:description" content="Zero-signup Streamable HTTP MCP server for deterministic corporate KYB, national registries (UK, CH, AU, SG, US, EU), VIES VAT, and OFAC sanctions resolution with inline micropayments." />
+  <meta property="og:description" content="Zero-signup Streamable HTTP MCP server for deterministic corporate KYB, national registries (UK, CH, SG, US, EU), VIES VAT, and OFAC sanctions resolution with inline micropayments." />
   <meta property="og:image" content="${config.publicBaseUrl}/logo.png" />
   
   <!-- Twitter Card Metadata -->
@@ -10890,7 +12945,6 @@ function mountDiscoveryAdapter(app, registry, config) {
             featureList: [
               "UK Companies House official corporate registry lookup",
               "Swiss Federal Commercial Registry (ZEFIX / UID) lookup",
-              "Australian Business Register (ABR / ABN / ACN) lookup",
               "Singapore ACRA (UEN) corporate entity directory",
               "GLEIF Legal Entity Identifier (LEI) resolution across 200+ countries",
               "US SEC EDGAR CIK, EIN and public ticker corporate resolution",
@@ -11622,13 +13676,12 @@ function mountDiscoveryAdapter(app, registry, config) {
         <span>The Autonomous KYB &amp; Entity Resolution Platform for AI Agents</span>
       </div>
       <h1>Deterministic Corporate Entity, VAT &amp; Sanctions Resolver</h1>
-      <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) server</strong> and <strong>REST API</strong>. Query authoritative corporate registries across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Australia</strong> (ABR), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT</strong> validation, 26,650+ OFAC/EU/UN sanctions screening, and inline Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 Base USDC</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
+      <p>Zero-signup <strong>Streamable HTTP Model Context Protocol (MCP) server</strong> and <strong>REST API</strong>. Query authoritative corporate registries across <strong>UK</strong> (Companies House), <strong>Switzerland</strong> (ZEFIX), <strong>Singapore</strong> (ACRA), <strong>United States</strong> (SEC EDGAR), <strong>Lithuania</strong> (JAR), and <strong>GLEIF worldwide LEI</strong>, with real-time <strong>European Commission VIES VAT</strong> validation, 26,650+ OFAC/EU/UN sanctions screening, and inline Dual-402 micropayments (<a href="${config.publicBaseUrl}/.well-known/x402.json">Coinbase x402 v2 Base USDC</a> &amp; <a href="${config.publicBaseUrl}/.well-known/mpp.json">Stripe/Tempo MPP</a>).</p>
       
       <div class="pill-cloud">
         <span class="badge badge-blue">\u26A1 Model Context Protocol (Streamable HTTP)</span>
         <span class="badge">\uD83C\uDDEC\uD83C\uDDE7 UK Companies House</span>
         <span class="badge">\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX</span>
-        <span class="badge">\uD83C\uDDE6\uD83C\uDDFA Australian ABR</span>
         <span class="badge">\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA</span>
         <span class="badge">\uD83C\uDDFA\uD83C\uDDF8 US SEC EDGAR</span>
         <span class="badge">\uD83C\uDF10 GLEIF LEI Worldwide</span>
@@ -11858,10 +13911,10 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
             <span class="badge badge-blue">resolve_entity</span>
           </div>
           <span class="tool-route">POST /v1/entity/resolve</span>
-          <p class="tool-desc">Deterministic resolution across 6 national registries + worldwide GLEIF LEI. Resolves canonical names, registration codes, status, and legal forms.</p>
+          <p class="tool-desc">Deterministic resolution across configured national registries + worldwide GLEIF LEI. Resolves canonical names, registration codes, status, and legal forms.</p>
           <ul class="tool-features">
             <li>UK Companies House (CRN) &amp; Swiss ZEFIX (UID)</li>
-            <li>Australian ABR (ABN/ACN) &amp; Singapore ACRA (UEN)</li>
+            <li>Singapore ACRA (UEN)</li>
             <li>US SEC EDGAR (CIK/EIN) &amp; GLEIF LEI (200+ countries)</li>
           </ul>
         </div>
@@ -11980,14 +14033,13 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
     <!-- SECTION 4: Supported Jurisdictions & Data Upstreams -->
     <div class="section-head">
       <h2>\uD83C\uDF0D Supported Jurisdictions &amp; Primary Upstreams</h2>
-      <p>Direct integration with authoritative national company registries and global compliance authorities.</p>
+      <p>Registry availability depends on server configuration. See <a href="/v1/coverage">current registry coverage</a>.</p>
     </div>
     <div class="grid-2">
       <div class="card">
         <ul style="list-style:none; font-size:0.88rem; color:#334155;">
           <li style="margin-bottom:12px;"><strong>\uD83C\uDDEC\uD83C\uDDE7 UK Companies House:</strong> Real-time lookup of English, Welsh, Scottish, and Northern Irish company registration numbers (CRN) and official legal names.</li>
           <li style="margin-bottom:12px;"><strong>\uD83C\uDDE8\uD83C\uDDED Swiss ZEFIX Registry:</strong> Cantonal commercial registers, legal seats, and Unique Enterprise Identifiers (UID / CHE).</li>
-          <li style="margin-bottom:12px;"><strong>\uD83C\uDDE6\uD83C\uDDFA Australian Business Register (ABR):</strong> Australian Business Numbers (ABN) and Australian Company Numbers (ACN).</li>
           <li style="margin-bottom:12px;"><strong>\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA:</strong> Accounting &amp; Corporate Regulatory Authority Unique Entity Numbers (UEN) and business records.</li>
           <li><strong>\uD83C\uDDF1\uD83C\uDDF9 Lithuania Registr\u0173 centras (JAR):</strong> Legal entity code (JAR) and company register.</li>
         </ul>
@@ -12151,20 +14203,6 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         ],
         makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'CH' }; }
       },
-      'au': {
-        id: 'au',
-        name: '\uD83C\uDDE6\uD83C\uDDFA Australian ABR',
-        tool: 'resolve_entity',
-        method: 'POST',
-        endpoint: '/v1/entity/resolve',
-        price: '$0.002 USD',
-        summary: 'Australian Business Register (ABR) lookup by 11-digit ABN, 9-digit ACN, or legal name',
-        fields: [
-          { id: 'query', label: 'Company Name, ABN, or ACN', value: 'Atlassian Pty Ltd', placeholder: 'e.g. Atlassian Pty Ltd or 53102443916' },
-          { id: 'jurisdictionHint', label: 'Jurisdiction Hint', value: 'AU', placeholder: 'AU' }
-        ],
-        makeBody: function(f) { return { query: f.query, jurisdictionHint: f.jurisdictionHint || 'AU' }; }
-      },
       'sg': {
         id: 'sg',
         name: '\uD83C\uDDF8\uD83C\uDDEC Singapore ACRA',
@@ -12244,7 +14282,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         summary: 'Composite 1-shot KYB: concurrent entity resolution, live VIES VAT check, and OFAC/EU sanctions screening with verdict',
         fields: [
           { id: 'name', label: 'Vendor Legal Name', value: 'Siemens AG', placeholder: 'e.g. Siemens AG' },
-          { id: 'country', label: 'Country Code (ISO 2-letter)', value: 'DE', placeholder: 'e.g. DE, GB, US, CH, AU, SG' },
+          { id: 'country', label: 'Country Code (ISO 2-letter)', value: 'DE', placeholder: 'e.g. DE, GB, US, CH, SG' },
           { id: 'vatNumber', label: 'EU VAT Number (Optional)', value: 'DE129274202', placeholder: 'e.g. DE129274202' }
         ],
         makeBody: function(f) {
@@ -12625,7 +14663,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
       info: {
         title: "Agentum Global Entity Resolver API",
         version: "0.2.0",
-        description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
+        description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening for autonomous AI agents. Supports HTTP 402 via Coinbase x402 v2 and Stripe/Tempo MPP."
       },
       servers: [{ url: config.publicBaseUrl }],
       paths
@@ -12674,7 +14712,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
     name: "agentum-entity-resolver",
     title: "Agentum Global Corporate Entity, VAT & Sanctions Resolver",
     version: "0.2.0",
-    description: "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions screening.",
+    description: "Deterministic Global Corporate Entity (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, Worldwide GLEIF LEI), live EU VIES VAT, and OFAC/EU/UN Sanctions screening.",
     protocolVersion: "2025-03-26",
     endpoint: `${config.publicBaseUrl}/mcp`,
     transport: "streamable-http",
@@ -12952,7 +14990,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
       schema_version: "v1",
       name_for_human: "Agentum Entity & Compliance Resolver",
       name_for_model: "agentum_entity_resolver",
-      description_for_human: "Resolve global companies (UK CRN, Swiss UID, Australian ABN, Singapore UEN, US SEC CIK, EU registries, LEI), validate EU VAT via VIES, and screen OFAC/EU/UN sanctions.",
+      description_for_human: "Resolve global companies (UK CRN, Swiss UID, Singapore UEN, US SEC CIK, EU registries, LEI), validate EU VAT via VIES, and screen OFAC/EU/UN sanctions.",
       description_for_model: "Use this plugin whenever you need to verify a company registration number, look up an LEI or US SEC CIK, validate a European Union VAT number via VIES, or screen a company/individual against OFAC SDN, EU Financial Sanctions, and UN Security Council lists. Includes daily free quota; supports x402 v2 and Stripe/Tempo MPP micropayments.",
       auth: {
         type: "none"
@@ -12970,7 +15008,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
   const handleA2aCard = (c) => {
     return c.json({
       name: "Agentum Compliance & Entity Resolver Agent",
-      description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening.",
+      description: "Deterministic global corporate entity resolution (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening.",
       url: config.publicBaseUrl,
       mcpUrl: `${config.publicBaseUrl}/mcp`,
       version: "0.2.0",
@@ -12994,7 +15032,7 @@ curl -X POST "${config.publicBaseUrl}/v1/compliance/verify-bank-payee" \\
         name: t.summary,
         description: t.description,
         tags: [t.category, "kyb", "compliance", "entity-resolution", "sanctions", "vat"],
-        examples: t.mcpName === "resolve_entity" ? ["Resolve NVIDIA CORP (US)", "Resolve Revolut Bank UAB (LT)", "Resolve Atlassian Pty Ltd (AU)", "Resolve Nestle SA (CH)"] : t.mcpName === "verify_eu_vat" ? ["Verify EU VAT IE6388047V", "Verify EU VAT LT100011706713", "Verify EU VAT DE129274202"] : ["Screen SEVERSTAL PAO against OFAC and EU sanctions"]
+        examples: t.mcpName === "resolve_entity" ? ["Resolve NVIDIA CORP (US)", "Resolve Revolut Bank UAB (LT)", "Resolve Nestle SA (CH)"] : t.mcpName === "verify_eu_vat" ? ["Verify EU VAT IE6388047V", "Verify EU VAT LT100011706713", "Verify EU VAT DE129274202"] : ["Screen SEVERSTAL PAO against OFAC and EU sanctions"]
       }))
     });
   };
@@ -13132,7 +15170,7 @@ ${urls.map((u) => `  <url>
 `);
     const body = `# Agentum \u2014 Global Corporate Entity, VAT & Sanctions Resolver for AI Agents
 
-> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
+> Deterministic global company registration resolution across national registries (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, corporate bank payee verification, and OFAC/EU/UN sanctions screening.
 
 ## Access & Pricing
 - **Free Tier:** ${config.freeCallsPerDay} free calls/day per agent (\`X-Agent-Id\` or IP) \u2014 zero signup or API keys required.
@@ -13239,10 +15277,10 @@ ${detailedTools}
   });
 }
 
-// src/adapters/inbound/http/rest.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/http/rest.adapter.ts
 import crypto4 from "crypto";
 
-// node_modules/hono/dist/middleware/bearer-auth/index.js
+// ../../../../Projects/agentum/node_modules/hono/dist/middleware/bearer-auth/index.js
 var TOKEN_STRINGS = "[A-Za-z0-9._~+/-]+=*";
 var PREFIX = "Bearer";
 var HEADER = "Authorization";
@@ -13310,7 +15348,7 @@ var bearerAuth = (options) => {
   };
 };
 
-// src/adapters/outbound/telemetry/railway-logger.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/telemetry/railway-logger.ts
 function classifyAgentFamily(ua) {
   const lower = ua.toLowerCase();
   if (lower.includes("claude") || lower.includes("anthropic"))
@@ -13400,7 +15438,7 @@ class RailwayTelemetryTracker {
 }
 var globalTelemetry = new RailwayTelemetryTracker;
 
-// src/adapters/inbound/http/dual-402.middleware.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/http/dual-402.middleware.ts
 import crypto3 from "crypto";
 function computeCallerFingerprint(headers, connection) {
   if (connection?.production) {
@@ -13643,7 +15681,7 @@ function createDual402Middleware(opts) {
   };
 }
 
-// src/adapters/inbound/http/rest.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/http/rest.adapter.ts
 function mountRestToolsAdapter(app, deps) {
   for (const tool of deps.registry.getAll()) {
     const paymentGate = createDual402Middleware({
@@ -13793,7 +15831,7 @@ function mountRestToolsAdapter(app, deps) {
   });
 }
 
-// src/adapters/inbound/mcp/mcp-http.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/mcp/mcp-http.adapter.ts
 import crypto5 from "crypto";
 var KNOWN_JURISDICTIONS = [
   "LT",
@@ -13846,7 +15884,7 @@ var MCP_PROMPTS = [
   },
   {
     name: "sanctions_escalation_review",
-    description: "Perform an adversarial sanctions and watchlist escalation review (including Cyrillic/Greek homoglyph and alias screening) across OFAC SDN, EU Financial Sanctions, and UN Security Council lists.",
+    description: "Perform an adversarial sanctions and watchlist escalation review (including Cyrillic/Greek homoglyph and alias screening) across OFAC SDN, EU Financial Sanctions, UN Security Council, and UK FCDO Sanctions List.",
     arguments: [
       {
         name: "entityName",
@@ -14236,7 +16274,7 @@ function mountMcpHttpAdapter(app, deps) {
                 name: "agentum-entity-resolver",
                 version: "0.2.0"
               },
-              instructions: `Use resolve_entity, verify_eu_vat, and screen_sanctions for authoritative global corporate entity resolution (UK, Switzerland, Australia, Singapore, US, EU, and worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening. Includes ${deps.config.freeCallsPerDay} free calls/day; subsequent calls use x402 v2 or Stripe/Tempo MPP via HTTP headers or _meta.`,
+              instructions: `Use resolve_entity, verify_eu_vat, and screen_sanctions for authoritative global corporate entity resolution (UK, Switzerland, Singapore, US, EU, and worldwide GLEIF LEI), live EU VIES VAT validation, and OFAC/EU/UN sanctions screening. Includes ${deps.config.freeCallsPerDay} free calls/day; subsequent calls use x402 v2 or Stripe/Tempo MPP via HTTP headers or _meta.`,
               capabilities: {
                 tools: { listChanged: false },
                 resources: { subscribe: false, listChanged: false },
@@ -14295,7 +16333,7 @@ function mountMcpHttpAdapter(app, deps) {
                 {
                   uri: "agentum://registries/coverage",
                   name: "Supported Corporate & Sanctions Registries",
-                  description: "Coverage metadata for GLEIF LEI, US SEC EDGAR, Lithuania Registr\u0173 centras JAR, EU Commission VIES VAT, OFAC SDN, EU Financial Sanctions, and UN Security Council lists",
+                  description: "Coverage metadata for GLEIF LEI, US SEC EDGAR, Lithuania Registr\u0173 centras JAR, EU Commission VIES VAT, OFAC SDN, EU Financial Sanctions, UN Security Council, and UK FCDO Sanctions List",
                   mimeType: "application/json"
                 },
                 {
@@ -14332,7 +16370,7 @@ function mountMcpHttpAdapter(app, deps) {
                 {
                   uriTemplate: "agentum://sanctions/{name}",
                   name: "Global Sanctions Screening Summary",
-                  description: "Compact sanctions screening summary (top 3 matches) against OFAC SDN, EU Consolidated Financial Sanctions, and UN Security Council lists",
+                  description: "Compact sanctions screening summary (top 3 matches) against OFAC SDN, EU Consolidated Financial Sanctions, UN Security Council, and UK FCDO Sanctions List",
                   mimeType: "application/json"
                 },
                 {
@@ -14409,20 +16447,21 @@ function mountMcpHttpAdapter(app, deps) {
                         L0_SCREENED: all.filter((p) => p.coverage === "L0_SCREENED").length
                       },
                       liveOfficialRegistries: [
-                        "UK Companies House (GB)",
+                        ...process.env.COMPANIES_HOUSE_API_KEY?.trim() ? ["UK Companies House (GB)"] : [],
                         "Swiss ZEFIX (CH)",
-                        "Australian ABR (AU)",
+                        ...process.env.ABR_GUID?.trim() ? ["Australian ABR (AU)"] : [],
                         "Singapore ACRA (SG)",
                         "US SEC EDGAR (US)",
                         "Lithuania Registr\u0173 centras JAR (LT)",
                         "France Recherche Entreprises (FR)",
+                        "Poland Ministry of Justice KRS (PL; KRS identifier lookup only)",
+                        "Latvia Enterprise Register open data (LV)",
                         "Czech ARES (CZ)",
                         "Norway Br\xF8nn\xF8ysundregistrene (NO)",
                         "Finland PRH Virre (FI)",
-                        "New Zealand NZBN (NZ)",
+                        ...process.env.NZBN_API_KEY?.trim() ? ["New Zealand NZBN (NZ)"] : [],
                         "Brazil Receita Federal CNPJ (BR)",
-                        "Canada Corporations (CA)",
-                        "Japan National Tax Agency (JP)",
+                        ...process.env.JP_NTA_APP_ID?.trim() ? ["Japan National Tax Agency (JP)"] : [],
                         "GLEIF Global LEI Index (GLOBAL)"
                       ],
                       taxAndAccountRegistries: [
@@ -14435,7 +16474,7 @@ function mountMcpHttpAdapter(app, deps) {
                         "European Union Consolidated Financial Sanctions (FSF)",
                         "United Nations Security Council Consolidated List (UN SC)"
                       ],
-                      fallbackAggregator: "OpenCorporates API (commercial paid fallback)"
+                      fallbackAggregator: process.env.OPENCORPORATES_API_KEY?.trim() ? "OpenCorporates API (commercial paid fallback; per-request opt-in required)" : null
                     }, null, 2)
                   }
                 ]
@@ -14756,7 +16795,7 @@ function mountMcpHttpAdapter(app, deps) {
           const entity = args.entityName ?? "<ENTITY_NAME>";
           promptText = `Conduct an adversarial sanctions escalation review for "${entity}":
 1. Call \`screen_sanctions\` with name="${entity}"${args.country ? `, country="${args.country}"` : ""} and threshold=0.70.
-2. Evaluate all returned matches across OFAC_SDN, EU_FSF, and UN_SC, paying special attention to Cyrillic/Latin homoglyphs, transliterated aliases, and registration numbers.
+2. Evaluate all returned matches across OFAC_SDN, EU_FSF, UN_SC, and UK_FCDO, paying special attention to Cyrillic/Latin homoglyphs, transliterated aliases, and registration numbers.
 3. Classify the counterparty as CLEAR, POTENTIAL_MATCH_ESCALATE, or CONFIRMED_SANCTIONED.`;
         } else {
           const vendor = args.vendorName ?? "<VENDOR_NAME>";
@@ -15135,7 +17174,183 @@ function mountMcpHttpAdapter(app, deps) {
   });
 }
 
-// src/adapters/inbound/worker/feed-stream.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/worker/official-sanctions.ts
+var import_saxes = __toESM(require_saxes(), 1);
+var add = (array, value) => {
+  const v = value?.trim();
+  if (v && !array.includes(v))
+    array.push(v);
+};
+async function parseOfficialXml(chunks, source) {
+  const parser = new import_saxes.SaxesParser;
+  const entries = [];
+  let depth = 0, root = "", recordDepth = 0, recordSize = 0, recordStart = 0, current;
+  let stack = [], text = "", names = [], seenContainers = new Set;
+  const attr = (attrs, name) => String(attrs[name] ?? "");
+  parser.on("doctype", () => {
+    throw new Error("DTD is prohibited in sanctions XML");
+  });
+  parser.on("opentag", (tag) => {
+    depth++;
+    if (depth > 64)
+      throw new Error("XML depth exceeds limit");
+    const name = tag.name;
+    stack.push(name);
+    text = "";
+    if (depth === 1) {
+      root = name;
+      if (root !== (source === "UN_SC" ? "CONSOLIDATED_LIST" : "export"))
+        throw new Error("Wrong sanctions XML root");
+    }
+    if (depth === 1 && source === "EU_FSF" && attr(tag.attributes, "xmlns") !== "http://eu.europa.ec/fpi/fsd/export")
+      throw new Error("Wrong EU sanctions namespace");
+    if (depth === 2) {
+      if (source === "EU_FSF" ? name !== "sanctionEntity" : !["INDIVIDUALS", "ENTITIES"].includes(name) || seenContainers.has(name))
+        throw new Error("Invalid sanctions XML structure");
+      seenContainers.add(name);
+    }
+    if (source === "UN_SC" && depth === 3 && (stack[1] === "INDIVIDUALS" && name !== "INDIVIDUAL" || stack[1] === "ENTITIES" && name !== "ENTITY"))
+      throw new Error("Invalid UN sanctions XML structure");
+    if (source === "UN_SC" && depth === 3 && (stack[1] === "INDIVIDUALS" && name === "INDIVIDUAL" || stack[1] === "ENTITIES" && name === "ENTITY") || source === "EU_FSF" && depth === 2 && name === "sanctionEntity") {
+      if (current)
+        throw new Error("Nested sanctions record");
+      recordDepth = depth;
+      recordSize = 0;
+      recordStart = parser.position;
+      names = [];
+      current = { listSource: source, externalId: source === "EU_FSF" ? attr(tag.attributes, "logicalId") : "", primaryName: "", aliases: [], identifiers: [], countries: [], programs: [], entityType: name === "INDIVIDUAL" ? "INDIVIDUAL" : "ENTITY" };
+      if (source === "EU_FSF") {
+        add(current.identifiers, attr(tag.attributes, "euReferenceNumber"));
+        add(current.identifiers, attr(tag.attributes, "unitedNationId"));
+      }
+    } else if (current && source === "EU_FSF") {
+      if (name === "nameAlias")
+        add(names, attr(tag.attributes, "wholeName"));
+      if (name === "subjectType")
+        current.entityType = attr(tag.attributes, "code") === "person" ? "INDIVIDUAL" : "ENTITY";
+      if (name === "regulation")
+        add(current.programs, attr(tag.attributes, "programme"));
+      if (name === "identification")
+        add(current.identifiers, attr(tag.attributes, "number"));
+      if (name === "citizenship" || name === "address") {
+        const code = attr(tag.attributes, "countryIso2Code");
+        if (code !== "00")
+          add(current.countries, code);
+      }
+    }
+  });
+  parser.on("text", (value) => {
+    text += value;
+    if (current && (recordSize += value.length) > 1024 * 1024)
+      throw new Error("Sanctions XML record exceeds limit");
+  });
+  parser.on("cdata", (value) => {
+    text += value;
+    if (current && (recordSize += value.length) > 1024 * 1024)
+      throw new Error("Sanctions XML record exceeds limit");
+  });
+  parser.on("closetag", (tag) => {
+    const value = text.trim(), name = tag.name;
+    if (current && source === "UN_SC") {
+      if (name === "DATAID" && depth === recordDepth + 1)
+        current.externalId = value;
+      if (/^(FIRST_NAME|SECOND_NAME|THIRD_NAME|FOURTH_NAME)$/.test(name) && depth === recordDepth + 1)
+        add(names, value);
+      if (name === "ALIAS_NAME")
+        add(current.aliases, value);
+      if (name === "NUMBER" && stack.some((x) => x.endsWith("_DOCUMENT")))
+        add(current.identifiers, value);
+      if (name === "REFERENCE_NUMBER")
+        add(current.identifiers, value);
+      if (name === "UN_LIST_TYPE")
+        add(current.programs, value);
+      if (name === "COUNTRY")
+        add(current.countries, value);
+      if (name === "COMMENTS1")
+        current.remarks = value || undefined;
+    } else if (current && source === "EU_FSF" && name === "remark" && value)
+      current.remarks = [current.remarks, value].filter(Boolean).join("; ");
+    if (current && depth === recordDepth) {
+      current.primaryName = source === "UN_SC" ? names.join(" ") : names.shift() ?? "";
+      if (source === "EU_FSF")
+        for (const n of names)
+          add(current.aliases, n);
+      if (!current.externalId || !current.primaryName)
+        throw new Error("Invalid sanctions XML record");
+      if (!current.programs.length)
+        current.programs.push(source);
+      entries.push(current);
+      current = undefined;
+    }
+    stack.pop();
+    depth--;
+    text = "";
+  });
+  for await (const chunk of chunks) {
+    parser.write(chunk);
+    if (current && parser.position - recordStart > 1024 * 1024)
+      throw new Error("Sanctions XML record exceeds limit");
+  }
+  parser.close();
+  if (!root || !entries.length || current || depth || source === "UN_SC" && (!seenContainers.has("INDIVIDUALS") || !seenContainers.has("ENTITIES")))
+    throw new Error("Invalid sanctions XML document");
+  return entries;
+}
+
+class UkSanctionsCsvCollector {
+  header;
+  preamble = false;
+  entries = new Map;
+  primary = new Set;
+  accept(row) {
+    if (!this.preamble) {
+      if (row.length !== 1 || !/^Report Date:/i.test(row[0]))
+        throw new Error("Invalid UK CSV report date");
+      this.preamble = true;
+      return;
+    }
+    if (!this.header) {
+      this.header = row.map((x) => x.toLowerCase());
+      const required = ["unique id", "name 6", "name 1", "name type", "regime name", "designation type", "sanctions imposed"];
+      if (new Set(this.header).size !== this.header.length || required.some((x) => !this.header.includes(x)))
+        throw new Error("Invalid UK CSV header");
+      return;
+    }
+    if (row.length !== this.header.length)
+      throw new Error("Invalid UK CSV row");
+    const get = (name) => row[this.header.indexOf(name)]?.trim() ?? "";
+    const id = get("unique id"), name = [1, 2, 3, 4, 5, 6].map((i) => get(`name ${i}`)).filter(Boolean).join(" "), type = get("designation type").toLowerCase();
+    if (!id || !type || get("name type").toLowerCase() === "primary name" && !name)
+      throw new Error("Invalid UK CSV record");
+    let e = this.entries.get(id);
+    if (!e) {
+      e = { listSource: "UK_FCDO", externalId: id, primaryName: name, aliases: [], countries: [], identifiers: [], programs: [], entityType: type === "individual" ? "INDIVIDUAL" : type === "ship" ? "VESSEL" : type === "aircraft" ? "AIRCRAFT" : "ENTITY" };
+      this.entries.set(id, e);
+    }
+    if (get("name type").toLowerCase() === "primary name") {
+      if (e.primaryName !== name && !this.primary.has(id))
+        add(e.aliases, e.primaryName);
+      e.primaryName = name;
+      this.primary.add(id);
+    } else if (name && name !== e.primaryName)
+      add(e.aliases, name);
+    for (const key of ["un reference number", "ofsi group id", "national identifier number", "passport number", "business registration number (s)", "imo number", "hull identification number (hin)"])
+      add(e.identifiers, get(key));
+    add(e.countries, get("nationality(/ies)"));
+    add(e.countries, get("address country"));
+    add(e.programs, get("regime name"));
+    const remarks = [get("sanctions imposed"), get("other information")].filter(Boolean).join("; ");
+    if (remarks)
+      e.remarks = remarks;
+  }
+  finish() {
+    if (!this.header || !this.entries.size || this.primary.size !== this.entries.size || [...this.entries.values()].some((e) => !e.primaryName.trim()))
+      throw new Error("Invalid UK CSV records");
+    return [...this.entries.values()];
+  }
+}
+
+// ../../agentum-clean-release/agentum/src/adapters/inbound/worker/feed-stream.ts
 async function* responseBytes(response, limit, signal) {
   const reader = response.body?.getReader();
   if (!reader)
@@ -15274,7 +17489,7 @@ async function* csvRows(chunks) {
   yield* decoder.finish();
 }
 
-// src/adapters/outbound/persistence/db-schema.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/persistence/db-schema.ts
 var entitiesTable = {
   tableName: "entities",
   columns: [
@@ -15414,7 +17629,7 @@ var syncRunsTable = {
   `
 };
 
-// src/adapters/outbound/persistence/entity-repository.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/persistence/entity-repository.adapter.ts
 var SEED_ENTITIES = [
   {
     id: "LT_JAR:301844044",
@@ -15650,14 +17865,14 @@ class InMemoryEntityRepositoryAdapter {
       this.entities.set(key, { ...entity });
     }
   }
-  async findByIdentifier(type, value, jurisdiction) {
+  async findByIdentifier(type, value, jurisdiction, scheme) {
     if (!value.trim())
       return null;
     const aliases = { VAT: "EU_VAT", TAX: "US_EIN", CIK: "US_CIK", NATIONAL_REG: "NATIONAL_ID" };
     const parsedType = IdentifierTypeSchema.safeParse(aliases[type] ?? type);
     if (!parsedType.success || parsedType.data === "NAME")
       return null;
-    const query = { ...classifyQuery(value, jurisdiction), type: parsedType.data };
+    const query = { ...classifyQuery(value, jurisdiction), type: parsedType.data, ...scheme ? { scheme } : {} };
     const targetJur = normalizeCountryCode(jurisdiction || query.inferredCountry || "");
     for (const entity of this.entities.values()) {
       if (targetJur && entity.jurisdiction.toUpperCase() !== targetJur)
@@ -15747,7 +17962,7 @@ class HybridPostgresEntityRepositoryAdapter {
       this.initPromise = null;
     return this.sqlHealthy ? this.sql : null;
   }
-  async findByIdentifier(type, value, jurisdiction) {
+  async findByIdentifier(type, value, jurisdiction, scheme) {
     const db = await this.ensureDb();
     if (db && this.sqlHealthy) {
       try {
@@ -15768,14 +17983,14 @@ class HybridPostgresEntityRepositoryAdapter {
               OR domains @> ${JSON.stringify([domain])}::text::jsonb)
         `;
         const candidates = rows.map(mapRowToEntity);
-        const matching = await new InMemoryEntityRepositoryAdapter(candidates).findByIdentifier(type, value, jurisdiction);
+        const matching = await new InMemoryEntityRepositoryAdapter(candidates).findByIdentifier(type, value, jurisdiction, scheme);
         if (matching)
           return matching;
       } catch {
         this.sqlHealthy = false;
       }
     }
-    return this.memory.findByIdentifier(type, value, jurisdiction);
+    return this.memory.findByIdentifier(type, value, jurisdiction, scheme);
   }
   async searchFuzzy(normalizedName, opts) {
     const db = await this.ensureDb();
@@ -15958,7 +18173,7 @@ function mapRowToEntity(row, similarityScore) {
   };
 }
 
-// src/adapters/outbound/persistence/sanctions-repository.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/persistence/sanctions-repository.adapter.ts
 var SEED_SANCTIONS = [
   {
     listSource: "OFAC_SDN",
@@ -15999,7 +18214,7 @@ var SEED_SANCTIONS = [
     remarks: "Designated under E.O. 13224"
   }
 ];
-var REQUIRED_FEEDS = ["OFAC_SDN", "EU_FSF", "UN_SC"];
+var REQUIRED_FEEDS = ["OFAC_SDN", "EU_FSF", "UN_SC", "UK_FCDO"];
 function assessCoverage(totalRecords, statuses, minRecords = 100, maxAgeMs = 168 * 3600 * 1000) {
   const issues = [];
   const refreshed = [];
@@ -16304,7 +18519,7 @@ class HybridPostgresSanctionsRepositoryAdapter {
         degradedReason: feedStatus.degradedReason,
         coverage: {
           recordCount: totalCount,
-          sourcesScreened: ["OFAC_SDN", "EU_FSF", "UN_SC"],
+          sourcesScreened: [...REQUIRED_FEEDS],
           lastSyncAt: feedStatus.lastRefreshedAt
         }
       };
@@ -16444,11 +18659,12 @@ class HybridPostgresSanctionsRepositoryAdapter {
   }
 }
 
-// src/adapters/inbound/worker/ingest.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/worker/ingest.adapter.ts
 var DEFAULT_BULK_FEED_URLS = {
   ofacSdnCsvUrl: "https://www.treasury.gov/ofac/downloads/sdn.csv",
-  euFsfSimpleCsvUrl: "https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv",
-  unScSimpleCsvUrl: "https://data.opensanctions.org/datasets/latest/un_sc_sanctions/targets.simple.csv",
+  euFsfSimpleCsvUrl: "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw",
+  unScSimpleCsvUrl: "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
+  ukFcdoSimpleCsvUrl: "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv",
   secCompanyTickersUrl: "https://www.sec.gov/files/company_tickers.json",
   ltJarBulkJsonUrl: "https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo?limit(500)",
   gleifBulkJsonUrl: "https://api.gleif.org/api/v1/lei-records?page[size]=200&page[number]=1"
@@ -16665,6 +18881,11 @@ class SanctionsCsvCollector {
     this.entries.push(...parseOpenSanctionsRows([this.header, row], this.source));
   }
 }
+var OPEN_SANCTIONS_FEEDS = {
+  eu_fsf_live: { listSource: "EU_FSF", urlKey: "euFsfSimpleCsvUrl" },
+  un_sc_live: { listSource: "UN_SC", urlKey: "unScSimpleCsvUrl" },
+  uk_fcdo_live: { listSource: "UK_FCDO", urlKey: "ukFcdoSimpleCsvUrl" }
+};
 
 class DatasetIngestWorkerAdapter {
   deps;
@@ -16701,7 +18922,14 @@ class DatasetIngestWorkerAdapter {
               throw new Error(`HTTP ${response.status}`);
             const bytes = responseBytes(response, this.deps.maxFeedBytes ?? 100 * 1024 * 1024, controller.signal);
             if (format !== "json") {
-              const collector = new SanctionsCsvCollector(format);
+              const selectedFormat = format === "OFAC_SDN" ? undefined : this.deps.sanctionsFormats?.[format];
+              const official = selectedFormat === "official" || selectedFormat !== "opensanctions" && (url === DEFAULT_BULK_FEED_URLS[format === "EU_FSF" ? "euFsfSimpleCsvUrl" : format === "UN_SC" ? "unScSimpleCsvUrl" : "ukFcdoSimpleCsvUrl"] || (format === "EU_FSF" || format === "UN_SC") && new URL(url).pathname.toLowerCase().endsWith(".xml"));
+              if (official && (format === "EU_FSF" || format === "UN_SC"))
+                return await parseOfficialXml(decodeUtf8(bytes), format);
+              if (format !== "OFAC_SDN" && !official && selectedFormat !== "opensanctions" && !new URL(url).pathname.toLowerCase().endsWith(".csv"))
+                throw new Error("Unknown sanctions feed format; configure sanctionsFormats");
+              const officialUk = official && format === "UK_FCDO";
+              const collector = officialUk ? new UkSanctionsCsvCollector : new SanctionsCsvCollector(format);
               for await (const row of csvRows(decodeUtf8(bytes)))
                 collector.accept(row);
               return collector.finish();
@@ -16715,7 +18943,7 @@ class DatasetIngestWorkerAdapter {
             timer = setTimeout(() => {
               controller.abort();
               reject(new Error("Feed request timed out"));
-            }, this.deps.requestTimeoutMs ?? 30000);
+            }, this.deps.requestTimeoutMs ?? (format !== "json" && format !== "OFAC_SDN" && (url === DEFAULT_BULK_FEED_URLS.euFsfSimpleCsvUrl || url === DEFAULT_BULK_FEED_URLS.unScSimpleCsvUrl || url === DEFAULT_BULK_FEED_URLS.ukFcdoSimpleCsvUrl || this.deps.sanctionsFormats?.[format] === "official") ? 120000 : 30000));
           })
         ]);
       } catch (error) {
@@ -16755,6 +18983,7 @@ class DatasetIngestWorkerAdapter {
       "ofac_sdn_live",
       "eu_fsf_live",
       "un_sc_live",
+      "uk_fcdo_live",
       "sec_edgar_bulk",
       "lt_jar_bulk"
     ] : sources;
@@ -16798,9 +19027,10 @@ class DatasetIngestWorkerAdapter {
         }
         continue;
       }
-      if (src === "eu_fsf_live" || src === "un_sc_live") {
-        const listSource = src === "eu_fsf_live" ? "EU_FSF" : "UN_SC";
-        const url = src === "eu_fsf_live" ? this.feedUrls.euFsfSimpleCsvUrl : this.feedUrls.unScSimpleCsvUrl;
+      const openSanctionsFeed = OPEN_SANCTIONS_FEEDS[src];
+      if (openSanctionsFeed) {
+        const listSource = openSanctionsFeed.listSource;
+        const url = this.feedUrls[openSanctionsFeed.urlKey];
         let attempt;
         try {
           attempt = await this.beginFeedAttempt(listSource);
@@ -16869,7 +19099,7 @@ class DatasetIngestWorkerAdapter {
   }
 }
 
-// src/adapters/outbound/payments/mpp.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/payments/mpp.adapter.ts
 import crypto6 from "crypto";
 
 class MppPaymentAdapter {
@@ -17051,7 +19281,7 @@ class MppPaymentAdapter {
   }
 }
 
-// src/adapters/outbound/payments/x402.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/payments/x402.adapter.ts
 class X402PaymentAdapter {
   config;
   fetchImpl;
@@ -17229,7 +19459,7 @@ class X402PaymentAdapter {
   }
 }
 
-// src/adapters/outbound/persistence/quota-cache.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/persistence/quota-cache.adapter.ts
 class InMemoryQuotaAndCacheAdapter {
   cache = new Map;
   quotas = new Map;
@@ -17362,7 +19592,7 @@ function createQuotaAndCacheAdapter(redisUrl) {
   return new RedisQuotaAndCacheAdapter(redisUrl);
 }
 
-// src/adapters/outbound/upstreams/eu-vies.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/eu-vies.adapter.ts
 function parseEuVatNumber(raw) {
   if (!raw || typeof raw !== "string") {
     return null;
@@ -17454,7 +19684,7 @@ class EuViesVatAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/gleif.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/gleif.adapter.ts
 var EU_COUNTRIES = new Set([
   "AT",
   "BE",
@@ -17614,7 +19844,7 @@ function mapGleifItem(item) {
   };
 }
 
-// src/adapters/outbound/upstreams/lithuania-jar.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/lithuania-jar.adapter.ts
 class LithuaniaJarUpstreamAdapter {
   fetchImpl;
   sourceName = "LT_JAR";
@@ -17706,7 +19936,7 @@ class LithuaniaJarUpstreamAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/sec-edgar.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/sec-edgar.adapter.ts
 class SecEdgarUpstreamAdapter {
   userAgent;
   fetchImpl;
@@ -17858,7 +20088,7 @@ class SecEdgarUpstreamAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/uk-companies-house.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/uk-companies-house.adapter.ts
 class UkCompaniesHouseAdapter {
   sourceName = "UK_COMPANIES_HOUSE";
   apiKey;
@@ -17868,6 +20098,8 @@ class UkCompaniesHouseAdapter {
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
   supports(query, jurisdiction) {
+    if (!this.apiKey?.trim())
+      return false;
     if (query.type === "UK_CRN")
       return true;
     if (query.inferredCountry === "GB" || query.inferredCountry === "UK")
@@ -17879,15 +20111,12 @@ class UkCompaniesHouseAdapter {
     return false;
   }
   async search(query, opts) {
+    if (!this.apiKey?.trim())
+      return [];
     const isCrn = query.type === "UK_CRN" || (/^[A-Z]{2}\d{6}$/i.test(query.cleanedValue) || /^\d{7,8}$/.test(query.cleanedValue) && (query.inferredCountry === "GB" || opts?.jurisdiction?.toUpperCase() === "GB"));
     const timeout = opts?.timeoutMs ?? 2200;
     const signal = AbortSignal.timeout(timeout);
-    const headers = {
-      Accept: "application/json"
-    };
-    if (this.apiKey) {
-      headers.Authorization = `Basic ${Buffer.from(`${this.apiKey}:`).toString("base64")}`;
-    }
+    const headers = this.headers();
     try {
       if (isCrn) {
         const crn = /^\d{1,8}$/.test(query.cleanedValue) ? query.cleanedValue.padStart(8, "0") : query.cleanedValue.toUpperCase();
@@ -17911,6 +20140,63 @@ class UkCompaniesHouseAdapter {
     } catch {
       return [];
     }
+  }
+  supportsEntity(entity) {
+    if (!this.apiKey?.trim())
+      return false;
+    const jur = entity.jurisdiction.toUpperCase();
+    return (jur === "GB" || jur === "UK") && Boolean(this.companyNumberOf(entity));
+  }
+  async listBeneficialOwners(entity, timeoutMs = 2200) {
+    const crn = this.companyNumberOf(entity);
+    if (!crn)
+      throw new Error("Entity has no UK company number");
+    if (!this.apiKey)
+      throw new Error("COMPANIES_HOUSE_API_KEY is not configured");
+    const url = `https://api.company-information.service.gov.uk/company/${encodeURIComponent(crn)}/persons-with-significant-control?items_per_page=100`;
+    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs), headers: this.headers() });
+    if (res.status === 404)
+      return [];
+    if (!res.ok)
+      throw new Error(`Companies House PSC lookup failed: HTTP ${res.status}`);
+    const data = await res.json();
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items.filter((item) => item && !item.ceased_on && item.ceased !== true).map((item) => this.mapPsc(item));
+  }
+  companyNumberOf(entity) {
+    const raw = (entity.registrationNumber ?? (entity.id?.startsWith("UK_CRN:") ? entity.primaryIdValue : "")).trim().toUpperCase();
+    if (/^\d{1,8}$/.test(raw))
+      return raw.padStart(8, "0");
+    if (/^[A-Z]{2}\d{6}$/.test(raw))
+      return raw;
+    return null;
+  }
+  headers() {
+    const headers = { Accept: "application/json" };
+    if (this.apiKey)
+      headers.Authorization = `Basic ${Buffer.from(`${this.apiKey}:`).toString("base64")}`;
+    return headers;
+  }
+  mapPsc(item) {
+    const kindRaw = String(item.kind ?? "");
+    const kind = kindRaw.startsWith("individual-") ? "INDIVIDUAL" : kindRaw.startsWith("corporate-entity-") ? "CORPORATE" : kindRaw.startsWith("legal-person-") ? "LEGAL_PERSON" : kindRaw.startsWith("super-secure-") ? "PROTECTED" : "UNKNOWN";
+    const dob = item.date_of_birth;
+    const ident = item.identification ?? {};
+    const str = (v) => typeof v === "string" && v.trim() ? v.trim() : undefined;
+    return {
+      name: str(item.name) ?? (kind === "PROTECTED" ? "Protected PSC (details suppressed)" : "UNKNOWN"),
+      kind,
+      naturesOfControl: Array.isArray(item.natures_of_control) ? item.natures_of_control.map(String) : [],
+      notifiedOn: str(item.notified_on),
+      ceasedOn: str(item.ceased_on),
+      nationality: str(item.nationality),
+      countryOfResidence: str(item.country_of_residence),
+      birthYearMonth: dob?.year && dob?.month ? `${dob.year}-${String(dob.month).padStart(2, "0")}` : undefined,
+      registrationNumber: str(ident.registration_number),
+      countryRegistered: str(ident.country_registered),
+      legalForm: str(ident.legal_form),
+      source: this.sourceName
+    };
   }
   mapStatus(statusRaw) {
     const s = String(statusRaw ?? "").toLowerCase();
@@ -18025,7 +20311,7 @@ class UkCompaniesHouseAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/swiss-zefix.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/swiss-zefix.adapter.ts
 class SwissZefixAdapter {
   sourceName = "SWISS_ZEFIX";
   fetchImpl;
@@ -18157,16 +20443,18 @@ class SwissZefixAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/australian-abr.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/australian-abr.adapter.ts
 class AustralianAbrAdapter {
   sourceName = "AU_ABR";
   guid;
   fetchImpl;
   constructor(opts = {}) {
-    this.guid = opts.guid ?? process.env.ABR_GUID ?? "dummy-guid";
+    this.guid = opts.guid ?? process.env.ABR_GUID ?? "";
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
   supports(query, jurisdiction) {
+    if (!this.guid?.trim())
+      return false;
     if (query.type === "AU_ABN" || query.type === "AU_ACN")
       return true;
     if (query.inferredCountry === "AU")
@@ -18202,6 +20490,8 @@ class AustralianAbrAdapter {
     return null;
   }
   async search(query, opts) {
+    if (!this.guid?.trim())
+      return [];
     const timeout = opts?.timeoutMs ?? 2200;
     const signal = AbortSignal.timeout(timeout);
     try {
@@ -18347,7 +20637,7 @@ class AustralianAbrAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/singapore-acra.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/singapore-acra.adapter.ts
 class SingaporeAcraAdapter {
   sourceName = "SG_ACRA";
   fetchImpl;
@@ -18446,7 +20736,7 @@ class SingaporeAcraAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/configurable-registry.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/configurable-registry.adapter.ts
 var EU_COUNTRIES2 = new Set([
   "AT",
   "BE",
@@ -18501,6 +20791,8 @@ class ConfigurableRegistryAdapter {
     this.env = deps?.env ?? (typeof process !== "undefined" ? process.env : {});
   }
   hasRequiredCredentials(isIdLookup) {
+    if (this.config.enabled === false)
+      return false;
     const template = isIdLookup ? this.config.lookupUrl : this.config.searchUrl;
     if (!template)
       return false;
@@ -18508,7 +20800,7 @@ class ConfigurableRegistryAdapter {
     if (urlMatches) {
       for (const m of urlMatches) {
         const varName = m.slice(2, -1);
-        if (!this.env[varName] && !process.env[varName]) {
+        if (!this.env[varName]?.trim()) {
           return false;
         }
       }
@@ -18519,7 +20811,7 @@ class ConfigurableRegistryAdapter {
         if (hMatches) {
           for (const m of hMatches) {
             const varName = m.slice(2, -1);
-            if (!this.env[varName] && !process.env[varName]) {
+            if (!this.env[varName]?.trim()) {
               return false;
             }
           }
@@ -18529,6 +20821,9 @@ class ConfigurableRegistryAdapter {
     return true;
   }
   supports(query, jurisdiction) {
+    const isIdLookup = Boolean(query.scheme && this.config.schemes.includes(query.scheme));
+    if (!this.hasRequiredCredentials(isIdLookup))
+      return false;
     if (query.scheme && this.config.schemes.includes(query.scheme)) {
       return true;
     }
@@ -18546,7 +20841,8 @@ class ConfigurableRegistryAdapter {
     if (isIdLookup) {
       if (!this.hasRequiredCredentials(true))
         return [];
-      url = this.config.lookupUrl.replace("{id}", encodeURIComponent(query.cleanedValue));
+      const id = this.config.formatId?.(query.cleanedValue) ?? query.cleanedValue;
+      url = this.config.lookupUrl.replace("{id}", encodeURIComponent(id));
     } else if (query.type === "NAME" && this.config.searchUrl) {
       if (!this.hasRequiredCredentials(false))
         return [];
@@ -18556,7 +20852,7 @@ class ConfigurableRegistryAdapter {
     }
     let hasMissingCred = false;
     url = url.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-      const val = this.env[varName] || process.env[varName] || "";
+      const val = this.env[varName]?.trim() ?? "";
       if (!val)
         hasMissingCred = true;
       return encodeURIComponent(val);
@@ -18569,32 +20865,44 @@ class ConfigurableRegistryAdapter {
     if (this.config.headers) {
       for (const [key, rawVal] of Object.entries(this.config.headers)) {
         const val = rawVal.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-          return this.env[varName] || process.env[varName] || "";
+          return this.env[varName]?.trim() ?? "";
         });
         headers[key] = val;
       }
     }
     const timeout = opts?.timeoutMs || this.config.timeoutMs || 2500;
+    const body = !isIdLookup && this.config.searchBody ? JSON.stringify(this.config.searchBody(query.cleanedValue || query.raw)) : undefined;
+    if (body !== undefined)
+      headers["Content-Type"] = "application/json";
     try {
       const response = await this.fetchImpl(url, {
-        method: "GET",
+        method: body === undefined ? "GET" : "POST",
         headers,
+        body,
         signal: AbortSignal.timeout(timeout)
       });
       if (!response.ok) {
-        return [];
+        if (response.status === 404 || response.status === 410)
+          return [];
+        const retryAfter = response.headers?.get("retry-after");
+        const retrySeconds = retryAfter && /^\d+$/.test(retryAfter) ? Math.min(Number(retryAfter), 86400) : undefined;
+        throw new UpstreamProviderError(response.status === 429 ? "RATE_LIMITED" : response.status === 401 || response.status === 403 ? "ACCESS_DENIED" : "UNAVAILABLE", response.status, retrySeconds);
       }
       let data;
       try {
         data = await response.json();
       } catch {
-        return [];
+        throw new UpstreamProviderError("INVALID_RESPONSE");
       }
-      if (!data)
-        return [];
+      if (!data || typeof data !== "object")
+        throw new UpstreamProviderError("INVALID_RESPONSE");
+      if (this.config.validateResponse && !this.config.validateResponse(data, query)) {
+        throw new UpstreamProviderError("INVALID_RESPONSE");
+      }
       let items = [];
-      if (this.config.resultsPath && getByDotPath(data, this.config.resultsPath)) {
-        const extracted = getByDotPath(data, this.config.resultsPath);
+      const resultsPath = !isIdLookup && this.config.searchResultsPath ? this.config.searchResultsPath : this.config.resultsPath;
+      if (resultsPath && getByDotPath(data, resultsPath)) {
+        const extracted = getByDotPath(data, resultsPath);
         if (Array.isArray(extracted)) {
           items = extracted;
         } else if (extracted != null && typeof extracted === "object") {
@@ -18605,7 +20913,8 @@ class ConfigurableRegistryAdapter {
       }
       const records = [];
       const now = new Date().toISOString();
-      for (const item of items) {
+      for (const rawItem of items) {
+        const item = this.config.normalizeItem?.(rawItem) ?? rawItem;
         const idVal = getByDotPath(item, this.config.fieldMap.id);
         const nameVal = getByDotPath(item, this.config.fieldMap.name);
         if (!nameVal)
@@ -18666,7 +20975,7 @@ class ConfigurableRegistryAdapter {
           registrationAuthority: this.sourceName,
           vatNumber: null,
           vatValid: null,
-          taxId: null,
+          taxId: this.config.fieldMap.taxId ? getByDotPath(item, this.config.fieldMap.taxId) ?? null : null,
           cik: null,
           tickers: [],
           legalForm: this.config.fieldMap.legalForm ? getByDotPath(item, this.config.fieldMap.legalForm) ?? detectedLegalForm : detectedLegalForm,
@@ -18693,15 +21002,80 @@ class ConfigurableRegistryAdapter {
           ]
         });
       }
+      if (items.length > 0 && records.length === 0)
+        throw new UpstreamProviderError("INVALID_RESPONSE");
       return records;
-    } catch {
-      return [];
+    } catch (error) {
+      if (error instanceof UpstreamProviderError)
+        throw error;
+      throw new UpstreamProviderError(error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError") ? "TIMEOUT" : "UNAVAILABLE");
     }
   }
 }
 
-// src/adapters/outbound/upstreams/registry-configs.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/registry-configs.ts
+function normalizeFinnishCompany(company) {
+  const name = company.names?.find((n) => n.type === "1" && !n.endDate)?.name;
+  const address = company.addresses?.find((a) => a.type === 1) ?? company.addresses?.[0];
+  const postOffices = address?.postOffices;
+  const form = company.companyForms?.find((f) => !f.endDate)?.descriptions;
+  return {
+    businessId: company.businessId?.value,
+    name,
+    status: company.companySituations?.some((s) => !s.endDate) ? undefined : company.tradeRegisterStatus,
+    deletionDate: company.endDate,
+    registrationDate: company.registrationDate,
+    legalForm: form?.find((d) => d.languageCode === "3")?.description ?? form?.[0]?.description,
+    street: [address?.street, address?.buildingNumber].filter(Boolean).join(" "),
+    city: postOffices?.find((p) => p.languageCode === "1")?.city ?? postOffices?.[0]?.city,
+    postalCode: address?.postCode
+  };
+}
 var REGISTRY_CONFIGS = [
+  {
+    sourceName: "LV_UR",
+    country: "LV",
+    schemes: ["LV_REGCODE"],
+    lookupUrl: "https://data.gov.lv/dati/api/3/action/datastore_search?resource_id=25e80bf3-f107-4ab4-89ef-251b5b9374e9&limit=20&filters=%7B%22regcode%22%3A%22{id}%22%7D",
+    searchUrl: "https://data.gov.lv/dati/api/3/action/datastore_search?resource_id=25e80bf3-f107-4ab4-89ef-251b5b9374e9&limit=20&q={q}",
+    resultsPath: "result.records",
+    validateResponse: (data) => data.success === true && Array.isArray(data.result?.records),
+    normalizeItem: (item) => ({
+      id: item.regcode,
+      name: item.name,
+      legalForm: item.type_text,
+      street: item.address,
+      postalCode: item.index,
+      incorporationDate: typeof item.registered === "string" ? item.registered.slice(0, 10) : undefined,
+      deletionDate: item.terminated
+    }),
+    fieldMap: { id: "id", name: "name", legalForm: "legalForm", street: "street", postalCode: "postalCode", incorporationDate: "incorporationDate" },
+    statusMap: {}
+  },
+  {
+    sourceName: "PL_KRS",
+    country: "PL",
+    schemes: ["PL_KRS"],
+    lookupUrl: "https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/{id}?rejestr=P&format=json",
+    resultsPath: "odpis",
+    validateResponse: (data, query) => data.odpis?.naglowekA?.numerKRS === query.cleanedValue && Boolean(data.odpis?.dane?.dzial1?.danePodmiotu?.nazwa),
+    normalizeItem: (item) => {
+      const company = item.dane?.dzial1?.danePodmiotu;
+      const address = item.dane?.dzial1?.siedzibaIAdres?.adres;
+      return {
+        id: item.naglowekA?.numerKRS,
+        name: company?.nazwa,
+        legalForm: company?.formaPrawna,
+        taxId: company?.identyfikatory?.nip,
+        street: [address?.ulica, address?.nrDomu, address?.nrLokalu].filter(Boolean).join(" "),
+        city: address?.miejscowosc,
+        postalCode: address?.kodPocztowy,
+        inLiquidation: Boolean(item.dane?.dzial6?.likwidacja && Object.keys(item.dane.dzial6.likwidacja).length)
+      };
+    },
+    fieldMap: { id: "id", name: "name", taxId: "taxId", legalForm: "legalForm", street: "street", city: "city", postalCode: "postalCode" },
+    statusMap: {}
+  },
   {
     sourceName: "FR_RECHERCHE_ENTREPRISES",
     country: "FR",
@@ -18728,7 +21102,9 @@ var REGISTRY_CONFIGS = [
     country: "CZ",
     schemes: ["CZ_ICO"],
     lookupUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{id}",
-    searchUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty?obchodniJmeno={q}",
+    searchUrl: "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat",
+    searchBody: (term) => ({ obchodniJmeno: term, start: 0, pocet: 20 }),
+    searchResultsPath: "ekonomickeSubjekty",
     fieldMap: {
       id: "ico",
       name: "obchodniJmeno",
@@ -18764,21 +21140,25 @@ var REGISTRY_CONFIGS = [
     sourceName: "FI_PRH_YTJ",
     country: "FI",
     schemes: ["FI_YTUNNUS"],
-    lookupUrl: "https://avoindata.prh.fi/bis/v1/{id}",
-    searchUrl: "https://avoindata.prh.fi/bis/v1?totalResults=true&name={q}",
-    resultsPath: "results",
+    lookupUrl: "https://avoindata.prh.fi/opendata-ytj-api/v3/companies?businessId={id}",
+    searchUrl: "https://avoindata.prh.fi/opendata-ytj-api/v3/companies?name={q}",
+    formatId: (id) => /^\d{8}$/.test(id) ? `${id.slice(0, 7)}-${id.slice(7)}` : id,
+    resultsPath: "companies",
+    normalizeItem: normalizeFinnishCompany,
     fieldMap: {
       id: "businessId",
       name: "name",
       status: "status",
-      street: "addresses.0.street",
-      city: "addresses.0.city",
-      postalCode: "addresses.0.postCode"
+      street: "street",
+      city: "city",
+      postalCode: "postalCode",
+      legalForm: "legalForm",
+      incorporationDate: "registrationDate"
     },
     statusMap: {
-      "0": "ACTIVE",
-      "1": "DISSOLVED",
-      ACTIVE: "ACTIVE"
+      "1": "ACTIVE",
+      "2": "INACTIVE",
+      "4": "DISSOLVED"
     }
   },
   {
@@ -18822,6 +21202,7 @@ var REGISTRY_CONFIGS = [
     }
   },
   {
+    enabled: false,
     sourceName: "CA_CORP",
     country: "CA",
     schemes: ["CA_BN"],
@@ -18862,7 +21243,7 @@ var REGISTRY_CONFIGS = [
   }
 ];
 
-// src/adapters/outbound/upstreams/commercial-aggregator.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/commercial-aggregator.adapter.ts
 var EU_COUNTRIES3 = new Set([
   "AT",
   "BE",
@@ -18904,9 +21285,13 @@ class OpenCorporatesAggregatorAdapter {
     this.costPerCallUsd = deps?.costPerCallUsd ?? 0.05;
   }
   supports(query, jurisdiction) {
+    if (!this.apiKey?.trim())
+      return false;
     return true;
   }
   async search(query, opts) {
+    if (!this.apiKey?.trim())
+      return [];
     const term = query.cleanedValue || query.raw;
     if (!term)
       return [];
@@ -19016,7 +21401,7 @@ class OpenCorporatesAggregatorAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/poland-whitelist.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/poland-whitelist.adapter.ts
 class PolandWhiteListAdapter {
   sourceName = "PL_MF_WHITELIST";
   fetchImpl;
@@ -19058,7 +21443,7 @@ class PolandWhiteListAdapter {
   }
 }
 
-// src/adapters/outbound/upstreams/czech-vat-accounts.adapter.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/czech-vat-accounts.adapter.ts
 class CzechVatAccountsAdapter {
   sourceName = "CZ_ARES_VAT_ACCOUNTS";
   fetchImpl;
@@ -19094,7 +21479,119 @@ class CzechVatAccountsAdapter {
   }
 }
 
-// src/app.ts
+// ../../agentum-clean-release/agentum/src/adapters/outbound/upstreams/bodacc.adapter.ts
+var SOURCE = "FR_BODACC";
+var ENDPOINT = "https://www.bodacc.fr/api/explore/v2.1/catalog/datasets/annonces-commerciales/records";
+var MAX_BYTES = 256 * 1024;
+var ResponseSchema = object({ total_count: number2().int().nonnegative(), results: array(object({
+  id: string2().regex(/^[A-Za-z0-9]+$/),
+  dateparution: exports_iso.date(),
+  familleavis_lib: string2().min(1),
+  typeavis_lib: string2().min(1),
+  registre: array(string2()),
+  url_complete: string2()
+})) });
+function sirenOf(entity) {
+  if (entity.jurisdiction !== "FR" || !entity.registrationNumber || !/^\d+$/.test(entity.registrationNumber))
+    return null;
+  const id = entity.registrationNumber;
+  if (id.length === 9 && luhn(id))
+    return id;
+  if (id.length === 14 && entity.primaryIdValue === id && luhn(id) && luhn(id.slice(0, 9)))
+    return id.slice(0, 9);
+  return null;
+}
+
+class BodaccAdapter {
+  fetchImpl;
+  maxResults;
+  constructor(options = {}) {
+    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.maxResults = Number.isFinite(options.maxResults) ? Math.min(20, Math.max(1, Math.floor(options.maxResults))) : 20;
+  }
+  supportsEntity(entity) {
+    return sirenOf(entity) !== null;
+  }
+  async listEvents(entity, timeoutMs = 2200) {
+    const siren = sirenOf(entity);
+    if (!siren)
+      return { status: "UNSUPPORTED", source: null, events: [], truncated: false };
+    const controller = new AbortController;
+    let timer;
+    let reader;
+    let completed = false;
+    try {
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("timeout"));
+        }, Math.max(1, timeoutMs));
+      });
+      const operation = async () => {
+        const url = new URL(ENDPOINT);
+        url.searchParams.set("where", `registre="${siren}"`);
+        url.searchParams.set("select", "id,dateparution,familleavis_lib,typeavis_lib,registre,url_complete");
+        url.searchParams.set("order_by", "dateparution desc");
+        url.searchParams.set("limit", String(this.maxResults));
+        const response = await this.fetchImpl(url, { signal: controller.signal });
+        if (controller.signal.aborted) {
+          response.body?.cancel().catch(() => {});
+          throw new Error("timeout");
+        }
+        if (!response.ok || !response.body)
+          throw new Error("response");
+        const responseReader = response.body.getReader();
+        reader = responseReader;
+        const chunks = [];
+        let size = 0;
+        while (true) {
+          const { done, value } = await responseReader.read();
+          if (done) {
+            completed = true;
+            break;
+          }
+          size += value.byteLength;
+          if (size > MAX_BYTES)
+            throw new Error("size");
+          chunks.push(value);
+        }
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        const payload = ResponseSchema.parse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+        if (payload.results.length > this.maxResults || payload.total_count < payload.results.length)
+          throw new Error("count");
+        const events = payload.results.map((row) => {
+          if (!row.registre.some((id) => /^\d{9}$/.test(id.replace(/ /g, "")) && id.replace(/ /g, "") === siren))
+            throw new Error("identity");
+          const expectedUrl = `https://www.bodacc.fr/pages/annonces-commerciales-detail/?q.id=id:${row.id}`;
+          if (row.url_complete !== expectedUrl)
+            throw new Error("url");
+          return CompanyEventSchema.parse({ id: row.id, source: SOURCE, sourceUrl: expectedUrl, publishedAt: row.dateparution, category: row.familleavis_lib, description: row.typeavis_lib, companyRegistrationNumber: siren });
+        });
+        return { status: "OK", source: SOURCE, events, truncated: payload.total_count > events.length };
+      };
+      return await Promise.race([operation(), timeout]);
+    } catch {
+      return { status: "UNAVAILABLE", source: SOURCE, events: [], truncated: false, error: "BODACC_UNAVAILABLE" };
+    } finally {
+      if (timer)
+        clearTimeout(timer);
+      if (!completed) {
+        controller.abort();
+        reader?.cancel().catch(() => {});
+      }
+      try {
+        reader?.releaseLock();
+      } catch {}
+    }
+  }
+}
+
+// ../../agentum-clean-release/agentum/src/app.ts
 function createApp(overrides = {}, customDeps) {
   const appConfig = {
     ...loadConfig(),
@@ -19108,11 +21605,12 @@ function createApp(overrides = {}, customDeps) {
     minRecords: appConfig.nodeEnv === "production" ? 100 : 1
   });
   const configurableAdapters = REGISTRY_CONFIGS.map((cfg) => new ConfigurableRegistryAdapter(cfg, { fetchImpl }));
+  const ukCompaniesHouse = new UkCompaniesHouseAdapter({ fetchImpl });
   const upstreamProviders = [
     new GleifUpstreamAdapter(fetchImpl),
     new LithuaniaJarUpstreamAdapter(fetchImpl),
     new SecEdgarUpstreamAdapter(appConfig.secEdgarUserAgent, fetchImpl),
-    new UkCompaniesHouseAdapter({ fetchImpl }),
+    ukCompaniesHouse,
     new SwissZefixAdapter({ fetchImpl }),
     new AustralianAbrAdapter({ fetchImpl }),
     new SingaporeAcraAdapter({ fetchImpl }),
@@ -19130,6 +21628,8 @@ function createApp(overrides = {}, customDeps) {
       new PolandWhiteListAdapter({ fetchImpl }),
       new CzechVatAccountsAdapter({ fetchImpl })
     ],
+    beneficialOwnershipAdapters: [ukCompaniesHouse],
+    companyEventsAdapters: [new BodaccAdapter({ fetchImpl })],
     vatValidator
   });
   const registry = new ToolRegistry;
@@ -19206,7 +21706,7 @@ function createApp(overrides = {}, customDeps) {
   };
 }
 
-// src/adapters/inbound/worker/schedule.ts
+// ../../agentum-clean-release/agentum/src/adapters/inbound/worker/schedule.ts
 function scheduleRefresh(refresh, intervalMs) {
   refresh();
   const timer = setInterval(refresh, intervalMs);
@@ -19214,10 +21714,10 @@ function scheduleRefresh(refresh, intervalMs) {
   return () => clearInterval(timer);
 }
 
-// src/index.ts
+// ../../agentum-clean-release/agentum/src/index.ts
 var { app, config: config3, ingestWorker } = createApp();
 if (config3.serviceRole === "all" || config3.serviceRole === "worker") {
-  const syncSources = config3.nodeEnv === "production" ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
+  const syncSources = config3.nodeEnv === "production" ? ["ofac_sdn_live", "eu_fsf_live", "un_sc_live", "uk_fcdo_live", "sec_edgar_bulk", "lt_jar_bulk"] : ["seed_eu_us", "ofac_eu_sanctions"];
   const refresh = () => {
     ingestWorker.runSync(syncSources).then((report) => {
       for (const [source, detail] of Object.entries(report.sourceDetails)) {

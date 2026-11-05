@@ -41,13 +41,30 @@ jobs:
 
       - name: Install MCP dependencies
         run: |
-          cd packages/agentum-mcp && npm install
+          cd packages/agentum-mcp && npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
 
       - name: Test agentum-mcp CLI binary
         run: |
           node packages/agentum-mcp/bin/agentum-mcp.js --version
           node packages/agentum-mcp/bin/agentum-mcp.js --help
 
-      - name: Test Vendor Onboarding Cookbook
+      - name: Run MCP package tests
+        run: node --test packages/agentum-mcp/test/*.test.js
+
+      - name: Install and validate LangChain package
+        working-directory: packages/agentum-langchain
         run: |
-          bun run examples/vendor-onboarding-agent.ts
+          npm ci --registry=https://registry.npmjs.org --no-audit --no-fund
+          bun test
+          npm run build
+          npm pack --dry-run
+
+      - name: Check standalone bundle syntax
+        run: bun build server/agentum-standalone.ts --target=bun --outfile=/tmp/agentum-standalone-check.js
+
+      - name: Check public release status
+        continue-on-error: true
+        run: |
+          npm view agentum-langchain version --registry=https://registry.npmjs.org
+          npm view agentum-langchain@0.3.0 version --registry=https://registry.npmjs.org || true
+          curl --connect-timeout 10 --max-time 20 --fail --silent --show-error https://agentum.asimplek.cloud/health

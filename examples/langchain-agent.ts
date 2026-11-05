@@ -2,7 +2,7 @@
  * Example: LangChain Agent with Agentum Corporate Entity & Compliance Toolkit
  *
  * Demonstrates an autonomous LangChain ReAct agent resolving companies across
- * global jurisdictions (UK, Switzerland, Australia, Singapore, US, EU) and screening sanctions.
+ * global jurisdictions (UK, Switzerland, Singapore, US, EU) and screening sanctions.
  *
  * Requirements:
  *   npm install agentum-langchain @langchain/openai @langchain/langgraph @langchain/core zod
@@ -45,9 +45,9 @@ async function main() {
     console.log("Demonstrating direct LangChain StructuredTool invocation across global registries:\n");
 
     const resolveTool = tools.find((t) => t.name === "resolve_entity")!;
-    console.log("1. Invoking resolve_entity directly for 'Atlassian Pty Ltd' (Australia ABR):");
-    const resAu = await resolveTool.invoke({ query: "Atlassian Pty Ltd", jurisdiction: "AU" });
-    console.log(resAu);
+    console.log("1. Invoking resolve_entity directly for 'Grab Holdings' (Singapore ACRA):");
+    const resSg = await resolveTool.invoke({ query: "Grab Holdings", jurisdiction: "SG" });
+    console.log(resSg);
 
     console.log("\n2. Invoking resolve_entity for 'Nestle SA' (Swiss ZEFIX):");
     const resCh = await resolveTool.invoke({ query: "Nestle SA", jurisdiction: "CH" });
@@ -72,7 +72,7 @@ async function main() {
   const userQuery = `
 Please perform a complete KYB compliance verification for these 3 prospective counterparties:
 1. "Grab Holdings" in Singapore
-2. "Atlassian" in Australia
+2. "Nestle" in Switzerland
 3. "Siemens" in Germany (VAT: DE129274202)
 
 For each company:

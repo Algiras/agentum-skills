@@ -1,6 +1,6 @@
 {
   "name": "agentum-langchain",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Official LangChain & AI Frameworks toolkit for Agentum: Deterministic Global Corporate Entity Resolution, EU VIES VAT, and OFAC/EU/UN Sanctions screening with autonomous x402 micropayments.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -45,7 +45,7 @@ export function createAgentumAiTools(clientOrConfig?: AgentumClient | AgentumCli
   return {
     resolve_entity: {
       description:
-        "Authoritative deterministic corporate identity resolution across global registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI).",
+        "Authoritative deterministic corporate identity resolution across global registries (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI).",
       parameters: ResolveEntitySchema,
       execute: async (args: ResolveEntityInput) => client.resolveEntity(args),
     },
@@ -92,14 +92,14 @@ export function getAgentumOpenAITools() {
       function: {
         name: "resolve_entity",
         description:
-          "Authoritative deterministic corporate identity resolution across global registries (UK Companies House, Swiss ZEFIX, Australian ABR, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI).",
+          "Authoritative deterministic corporate identity resolution across global registries (UK Companies House, Swiss ZEFIX, Singapore ACRA, US SEC EDGAR, European Registries, and Worldwide GLEIF LEI).",
         parameters: {
           type: "object",
           properties: {
             query: {
               type: "string",
               description:
-                "Company legal name, registration number (UK CRN, Swiss UID, Australian ABN/ACN, Singapore UEN, Lithuanian JAR, US SEC CIK/EIN), LEI, EU VAT number, or corporate domain.",
+                "Company legal name, registration number (UK CRN, Swiss UID, Singapore UEN, Lithuanian JAR, US SEC CIK/EIN), LEI, EU VAT number, or corporate domain.",
             },
             jurisdiction: {
               type: "string",
@@ -113,6 +113,10 @@ export function getAgentumOpenAITools() {
             verifyVat: {
               type: "boolean",
               description: "Set true to perform EU VIES VAT verification.",
+            },
+            includeCompanyEvents: {
+              type: "boolean",
+              description: "Include recent official company notices where available (France BODACC); dated evidence, not a current-status verdict.",
             },
           },
           required: ["query"],

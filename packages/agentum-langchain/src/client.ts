@@ -22,6 +22,7 @@ export interface ResolveEntityInput {
   jurisdictionHint?: string;
   checkSanctions?: boolean;
   verifyVat?: boolean;
+  includeCompanyEvents?: boolean;
 }
 
 export interface VerifyVatInput {
@@ -101,6 +102,7 @@ export class AgentumClient {
       jurisdiction: input.jurisdiction || input.country || input.jurisdictionHint,
       checkSanctions: input.checkSanctions ?? false,
       verifyVat: input.verifyVat ?? false,
+      ...(input.includeCompanyEvents !== undefined ? { includeCompanyEvents: input.includeCompanyEvents } : {}),
     };
     return this.postJson("/v1/entity/resolve", payload);
   }

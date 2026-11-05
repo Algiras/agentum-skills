@@ -88,3 +88,66 @@ test("buildSignedX402Payload throws when challenge amount exceeds safety cap", a
     /exceeds safety cap/
   );
 });
+
+test("buildSignedX402Payload throws on network mismatch rather than rewriting challenge network", async () => {
+  const sepoliaChallenge = {
+    x402Version: 2,
+    scheme: "exact",
+    network: "eip155:84532", // Base Sepolia
+    amount: "5000",
+    asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Sepolia USDC
+    payTo: "0x000000000000000000000000000000000000dEaD",
+  };
+  const privKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+  // Wallet configured for Base mainnet (eip155:8453) MUST fail fast when server requires Sepolia (eip155:84532)
+  await assert.rejects(
+    async () => await buildSignedX402Payload(sepoliaChallenge, privKey, "eip155:8453"),
+    /Wallet network mismatch: configured eip155:8453 does not match server requirement eip155:84532/
+  );
+});
+
+test("buildSignedX402Payload signs matching Base Sepolia testnet challenge cleanly", async () => {
+  const sepoliaChallenge = {
+    x402Version: 2,
+    scheme: "exact",
+    network: "eip155:84532", // Base Sepolia
+    amount: "5000",
+    asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Sepolia USDC
+    payTo: "0x000000000000000000000000000000000000dEaD",
+  };
+  const privKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+
+  const b64 = await buildSignedX402Payload(sepoliaChallenge, privKey, "eip155:84532");
+  const decoded = JSON.parse(Buffer.from(b64, "base64").toString("utf-8"));
+  assert.equal(decoded.network, "eip155:84532");
+  assert.equal(decoded.asset, "0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+  assert.ok(decoded.signature.startsWith("0x"));
+});
+
+test("parse402Challenge selects network matching configured targetNetwork when multiple options exist", () => {
+  const challengeObj = {
+    x402Version: 2,
+    accepts: [
+      {
+        scheme: "exact",
+        network: "eip155:8453",
+        amount: "5000",
+        asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      },
+      {
+        scheme: "exact",
+        network: "eip155:84532",
+        amount: "5000",
+        asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      },
+    ],
+  };
+  const parsedSepolia = parse402Challenge({}, challengeObj, "eip155:84532");
+  assert.equal(parsedSepolia.network, "eip155:84532");
+  assert.equal(parsedSepolia.asset, "0x036CbD53842c5426634e7929541eC2318f3dCF7e");
+
+  const parsedMainnet = parse402Challenge({}, challengeObj, "eip155:8453");
+  assert.equal(parsedMainnet.network, "eip155:8453");
+  assert.equal(parsedMainnet.asset, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+});

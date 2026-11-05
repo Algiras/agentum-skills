@@ -12,7 +12,7 @@ const { privateKeyToAddress } = require("./crypto.js");
 
 const DEFAULT_MAX_AMOUNT_CAP = 50000n; // 50,000 atomic units = 0.05 USDC
 
-function parse402Challenge(headers, body) {
+function parse402Challenge(headers, body, targetNetwork) {
   let rawHeader = null;
 
   if (headers && typeof headers === "object") {
@@ -53,6 +53,8 @@ function parse402Challenge(headers, body) {
       payload = body.x402;
     } else if (body.paymentRequired) {
       payload = body.paymentRequired.x402 || body.paymentRequired;
+    } else if (body.accepts) {
+      payload = body;
     }
   }
 
@@ -61,7 +63,15 @@ function parse402Challenge(headers, body) {
   }
 
   const accepts = Array.isArray(payload.accepts) ? payload.accepts : [];
-  const exact = accepts.find((a) => a.scheme === "exact") || accepts[0];
+  let exact = null;
+  if (targetNetwork) {
+    exact =
+      accepts.find((a) => (a.scheme === "exact" || !a.scheme) && a.network === targetNetwork) ||
+      accepts.find((a) => a.network === targetNetwork);
+  }
+  if (!exact) {
+    exact = accepts.find((a) => a.scheme === "exact") || accepts[0];
+  }
 
   if (!exact) {
     return null;
@@ -72,7 +82,7 @@ function parse402Challenge(headers, body) {
     scheme: exact.scheme || "exact",
     network: exact.network || "eip155:8453",
     amount: String(exact.amount || exact.maxAmountRequired || "5000"),
-    asset: exact.asset || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    asset: exact.asset || (exact.network === "eip155:84532" ? "0x036CbD53842c5426634e7929541eC2318f3dCF7e" : "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"),
     payTo: exact.payTo || "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
     maxTimeoutSeconds: exact.maxTimeoutSeconds || 300,
     extra: exact.extra || { name: exact.network === "eip155:8453" ? "USD Coin" : "USDC", version: "2" },
@@ -89,13 +99,19 @@ async function buildSignedX402Payload(challenge, privateKey, targetNetwork, maxA
     }
   }
 
+  if (targetNetwork && challenge.network && challenge.network !== targetNetwork) {
+    throw new Error(
+      `Wallet network mismatch: configured ${targetNetwork} does not match server requirement ${challenge.network}`
+    );
+  }
+
   const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
   const account = privateKeyToAccount(formattedKey);
   const client = new x402Client();
   const scheme = new ExactEvmScheme(account);
   client.register("eip155:*", scheme);
 
-  const network = targetNetwork || challenge.network || "eip155:8453";
+  const network = challenge.network || targetNetwork || "eip155:8453";
   const reqChallenge = {
     x402Version: challenge.x402Version || 2,
     resource: challenge.resource || {},
@@ -104,7 +120,7 @@ async function buildSignedX402Payload(challenge, privateKey, targetNetwork, maxA
         scheme: challenge.scheme || "exact",
         network,
         amount: String(challenge.amount || "5000"),
-        asset: challenge.asset || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        asset: challenge.asset || (network === "eip155:84532" ? "0x036CbD53842c5426634e7929541eC2318f3dCF7e" : "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"),
         payTo: challenge.payTo || "0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e",
         maxTimeoutSeconds: challenge.maxTimeoutSeconds || 300,
         extra: challenge.extra || {

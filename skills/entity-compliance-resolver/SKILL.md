@@ -1,6 +1,6 @@
 ---
 name: entity-compliance-resolver
-description: Deterministic Global Corporate Entity Resolution across national registries (UK Companies House CRN, Swiss ZEFIX UID, Singapore ACRA UEN, US SEC EDGAR CIK/EIN, Lithuania Registrų centras JAR, European Union Registries, and Worldwide GLEIF LEI), live EU Commission VIES VAT validation, and OFAC/EU/UN sanctions screening via Agentum MCP, LangChain, or REST API with HTTP 402 (Coinbase x402 v2 & Stripe/Tempo MPP) micropayments. Use whenever an agent needs to verify a company registration number, look up an LEI, validate an EU VAT number via VIES, or screen a business/counterparty against OFAC SDN, EU Financial Sanctions, and UN Security Council lists.
+description: Verify suppliers using company registry resolution, optional EU VAT validation and sanctions screening with Agentum MCP or REST. Use for supplier onboarding and counterparty checks; inspect source coverage and request human review of uncertain or potential matches.
 ---
 
 # Agentum — Deterministic Global Corporate Entity, VAT & Sanctions Resolver
@@ -60,7 +60,7 @@ Screens an entity or individual against **26,650+ live records** from the **US T
   ```
 
 ### 4. `check_vendor` (`POST /v1/compliance/check-vendor`) — `$0.010/call`
-**All-in-one 1-shot vendor KYB due diligence tool.** Concurrently resolves corporate identity across global registers, validates European Commission VIES VAT numbers, and screens global sanctions (OFAC/EU/UN). Returns a definitive compliance verdict (`APPROVED`, `FLAGGED_FOR_REVIEW`, or `REJECTED`) with a full audit trail in a single round trip.
+Combines company resolution, optional EU VIES VAT verification and sanctions screening for supplier onboarding. Returns a decision-support verdict (`APPROVED`, `FLAGGED_FOR_REVIEW`, or `REJECTED`) with source coverage, screening details and an audit trail. VAT is not checked if omitted. Review uncertain or potential matches; a result is not a legal compliance determination.
 - **Input:**
   ```json
   {
@@ -71,7 +71,7 @@ Screens an entity or individual against **26,650+ live records** from the **US T
   ```
 
 ### 5. `verify_bank_payee` (`POST /v1/compliance/verify-bank-payee`) — `$0.003/call`
-Validates International Bank Account Numbers (IBAN) using ISO 13616 specifications and MOD-97 checksum validation. Verifies whether the issuing country matches the expected corporate jurisdiction to protect agents against invoice fraud and redirection attacks.
+Validates International Bank Account Numbers (IBAN) using ISO 13616 specifications and MOD-97 checksum validation. Checks whether the IBAN country matches the expected jurisdiction. An IBAN checksum or country match does not establish account ownership; check ownership fields only where a supported register is available.
 - **Input:**
   ```json
   {
@@ -93,13 +93,9 @@ Concurrently resolves multiple corporate entity names, registration numbers, or 
   }
   ```
 
-## Access Quota & Inline HTTP 402 Micropayments
+## Access and payment
 
-1. **Zero-Signup Free Tier:** Every agent gets **10 free calls/day** automatically (tracked by `X-Agent-Id` or caller IP). No API key or registration is required.
-2. **Dual HTTP 402 Micropayment Rails (when free quota is exhausted):**
-   - **Rail A — Official Coinbase x402 v2 (`PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE`):** Settles USDC on Base (`eip155:8453` / `eip155:84532`) to `0xea7f1083bacf69d3e3aa0c02ad5fbe4f09024f1e` using standard EIP-3009 typed structured data signatures.
-   - **Rail B — Stripe + Tempo Machine Payments Protocol (`WWW-Authenticate: Payment` / `Authorization: Payment`):** Accepts Stripe `PaymentIntent` (`pi_...`), Stripe Shared Payment Tokens (`spt_...`), or HMAC-signed MPP tokens.
-   - **MCP `_meta` Payment Bridge:** When calling tools over `/mcp`, pass payment credentials inside `params._meta.x402Payment` or `params._meta.mppPayment`.
+Check the connected deployment's [payment guide](https://agentum.asimplek.cloud/pay.md) for current free-tier limits, prices and available payment methods. The hosted service supports x402; prepaid card credits depend on deployment configuration. Do not assume MPP is enabled.
 
 ## Full MCP Protocol Flows (`/mcp`)
 

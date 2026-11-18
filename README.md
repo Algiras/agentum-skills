@@ -12,6 +12,10 @@ Registry availability depends on the server configuration. UK Companies House is
 
 ---
 
+## Supplier onboarding API
+
+Use `check_vendor` via [MCP](https://agentum.asimplek.cloud/mcp) or `POST /v1/compliance/check-vendor` to combine company resolution, optional EU VAT verification and sanctions screening. The response includes source information, screening details and an audit trail. VAT is skipped when no VAT number is supplied; inspect coverage, degraded status and potential matches before deciding. For separate IBAN checks use `verify_bank_payee`: format and country checks do not prove ownership. See the [supplier verification guide](https://github.com/Algiras/agentum/blob/main/docs/guides/supplier-verification.md) and live [payment guide](https://agentum.asimplek.cloud/pay.md).
+
 ## Agent Discovery & Platform Connection
 
 ### 1. Anthropic Claude (Claude Code, Desktop & Web)

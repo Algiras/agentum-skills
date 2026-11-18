@@ -25,6 +25,10 @@ Hosted release remains gated on verifying an environment-preserving deployment r
 
 The npm jobs returned success and explicit publication receipts for both new versions, with npm’s “being processed” notice. The first public registry check still returned the previous versions (`agentum-mcp@0.2.2`, `agentum-langchain@0.2.0`); `agentum-mcp@0.2.3` was subsequently verified via a public npm query. The `agentum-langchain@0.3.0` publish job succeeded, but a later public listing check did not complete in this review; its current availability remains unverified. The original processing notice is historical and does not establish the present state.
 
+## Supplier onboarding publication, 2026-11-18
+
+The existing `check_vendor` tool is promoted for supplier onboarding through the [supplier guide](https://github.com/Algiras/agentum/blob/main/docs/guides/supplier-verification.md), this repository's skill and README, and [official MCP Registry version 0.2.2](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Algiras%2Fagentum-entity-resolver/versions/0.2.2). The registry record was fetched after publication and points to the hosted MCP endpoint. The skills.sh and Glama listing URLs returned HTTP 200; that confirms page reachability, not that either directory has refreshed its cached text. The existing [LangChain integration](https://github.com/langchain-ai/docs/pull/7542) was merged previously. Core [PR #50](https://github.com/Algiras/agentum/pull/50) corrects the skipped-VAT audit wording; deployment verification is separate from its merge.
+
 ## Pull request audit, 2026-11-09
 
 GitHub reports all 49 PRs in [Algiras/agentum](https://github.com/Algiras/agentum/pulls?q=is%3Apr) and all three PRs in [Algiras/agentum-skills](https://github.com/Algiras/agentum-skills/pulls?q=is%3Apr) merged, with no failed recorded checks. The three PRs opened during the clean release sequence were core #1 and distribution #1–2; their review comments and approvals are empty. This is a PR status and targeted release-document review, not a fresh line-by-line audit of every earlier merged change.
